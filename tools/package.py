@@ -3,7 +3,7 @@
 
     python3 tools/package.py
 
-产物：dist/五5班节律屏-测试包-YYYYMMDD.zip
+产物：dist/<班名>节律屏-测试包-YYYYMMDD.zip
 
 只装运行需要的东西：
   · app/      大屏本体（file:// 直接能开，数据已内联在 data.js）
@@ -77,7 +77,7 @@ README = """{klass} · 班级节律屏
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 二、打开大屏
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-最简单：直接双击「五5班节律屏-单文件版.html」。
+最简单：直接双击「{klass}节律屏-单文件版.html」。
 整个屏只有这一个文件，不用解压，Windows / 安卓 / 鸿蒙都能用浏览器打开。
 
 Windows 也可以用文件夹里的：
@@ -181,8 +181,8 @@ def build_single(out: Path) -> Path:
     html = html.replace('<link rel="stylesheet" href="edit.css">',
                         "<style>\n" + css + "\n</style>")
 
-    for name in ["data.js", "rhythm.js", "store.js", "screen.js",
-                 "remote.js", "edit.js", "demo.js"]:
+    # 按 APP_FILES 走，别再单独维护一份列表——加了 config.js 容易漏
+    for name in [f for f in APP_FILES if f.endswith(".js")]:
         code = (APP / name).read_text(encoding="utf-8")
         # 代码里若出现 </script> 会提前结束标签，转义掉
         code = code.replace("</script>", "<\\/script>")

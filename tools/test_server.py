@@ -56,7 +56,7 @@ def main():
     hub = load_module()
     hub.MSG_FILE = os.path.join(tmp, "messages.json")
     hub.PHONE_FILE = os.path.join(ROOT, "server", "phone.html")
-    hub.CONF["klass"] = "五（5）班"
+    hub.CONF["klass"] = "测试班"
     hub._messages = []
     hub._seq = 0
 
@@ -69,7 +69,7 @@ def main():
         # ① ping
         code, head, raw = req(port, "/api/ping")
         d = json.loads(raw)
-        check(code == 200 and d.get("ok") and d.get("class") == "五（5）班",
+        check(code == 200 and d.get("ok") and d.get("class") == "测试班",
               "① 大屏能探测到服务", f'{code} {d.get("class")}')
 
         # ② CORS：大屏是 file:// 打开的，origin 为 null，必须允许 *

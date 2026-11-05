@@ -56,7 +56,7 @@ def main() -> None:
         "start": start.isoformat(),
         "end": (start + dt.timedelta(days=args.days - 1)).isoformat(),
         "group": args.group,
-        # 班级信息只从数据来，页面里不再写死「五（5）班」
+        # 班级信息只从数据来，页面里不写死任何一个具体班名
         "meta": {
             "school": timetable.get("school") or students.get("school") or "",
             "klass": schedule.get("class") or students.get("class") or "",

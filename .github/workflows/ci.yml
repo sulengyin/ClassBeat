@@ -38,11 +38,12 @@ jobs:
       - name: 消息服务
         run: python3 tools/test_server.py
 
-      # 防回归：公开仓库里不能出现真实姓名
+      # 真实班级数据一旦入库就收不回来，这里守住最后一道
       - name: 隐私检查
         run: |
-          if grep -rIl --exclude-dir=.git -e "五（5）班" -e "春江中心小学" .; then
-            echo "::error::发现真实班级信息，不应提交"
+          bad=$(git ls-files | grep -E '^(data|assets|out|dist|preview)/' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::真实数据目录被提交了：$bad"
             exit 1
           fi
-          echo "干净"
+          echo "已跟踪文件里没有 data/、assets/ 等本地目录"

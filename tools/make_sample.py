@@ -78,6 +78,12 @@ def main() -> None:
 
     # 教师：从课表和班主任字段里收集，按出现顺序编号
     sched = json.loads((SRC / "schedule.json").read_text(encoding="utf-8"))
+    tt = json.loads((SRC / "timetable.json").read_text(encoding="utf-8"))
+
+    # 校名、班名也从数据里取，不在脚本里写死——脚本本身也要能公开
+    school = tt.get("school") or ""
+    klass = sched.get("class") or ""
+    klass_flat = klass.replace("（", "").replace("）", "")
     teachers: list[str] = []
     for t in [sched.get("headTeacher")] + [e.get("teacher") for e in sched["entries"]]:
         if t and t not in teachers:
@@ -92,9 +98,12 @@ def main() -> None:
         for real, fake in subst:
             if real in text:
                 text = text.replace(real, fake)
-        text = text.replace("春江中心小学", "示例小学").replace("五（5）班", "五（1）班")
+        if school:
+            text = text.replace(school, "示例小学")
+        if klass:
+            text = text.replace(klass, "五（1）班")
         # 真实素材文件名不带走
-        if text.startswith("assets/source/") or "五5班" in text:
+        if text.startswith("assets/source/") or (klass_flat and klass_flat in text):
             return "示例素材（已隐去）"
         return text
 

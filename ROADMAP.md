@@ -137,14 +137,18 @@ GET  /api/pair    配对信息（IP + 端口 + 一次性码）
 
 ### 阶段 0 · 地基（不动功能）
 
-- **先提交一次「现状快照」**：把现在的 `app/`、`server/`、`data/`、`tools/` 原样推进仓库（`git mv` 保留历史），打 tag `v0.1.0-snapshot`。之后再动结构，出问题能回滚到这个点。
-- 再分目录：`web/`（前端）、`server/`（Go）、`templates/`（模板）、`docs/`
-- 抽出 `config.js`：班级名、作息、课表、岗位全部从配置读，删掉 10 处硬编码
-- 配置加 `schemaVersion`，写迁移函数（老版本 localStorage 能升级）
-- 记录真实设备的兼容基线：两种一体机的浏览器 UA / 内核版本 / 屏幕分辨率，写进 `docs/compat.md`
-- GitHub Actions：跑 136 项测试 + 构建 Linux/Windows/macOS 三个二进制
+- ✅ **先提交一次「现状快照」**：`v0.1.0-snapshot`。之后再动结构，出问题能回滚到这个点。
+- ✅ **真实数据与仓库分家**：`data/` `assets/` 进 `.gitignore`；`tools/make_sample.py` 生成化名版 `sample/`
+  与 `docs/`；测试改成不依赖真实姓名（名单检索用一份编造名单）。
+- ✅ **抽出 `config.js`**：班名只从 `data.js` 的 `meta` 读，页面、标题、导出文件名全走 `CFG`；
+  `tools/package.py` 与 `server/rhythm_server.py` 也跟着数据走。CI 加了「扫不到具体班名」的防回归。
+- ✅ **GitHub Actions**：`.github/workflows/ci.yml`，用 `sample/` 构建后跑 139 项测试 + 隐私扫描。
+- ⬜ 分目录 `web/`：暂缓。改名会牵动 20 多处相对路径，而收益只是好看；
+  等阶段 1 引擎换掉 `data.js` 时一起做，那时有 CI 兜着。
+- ⬜ 配置加 `schemaVersion` + 迁移函数（老版本 localStorage 能升级）——阶段 2 做，现在还没有旧版本要兼容。
+- ⬜ 设备兼容基线 `docs/compat.md`：等一体机真机跑过再写，现在的数据是空的。
 
-**验收**：`grep -r` 扫不到具体班名；CI 三个平台产物都能启动。
+**验收**：`grep -r` 扫不到具体班名 ✅；干净 clone 后 `python3 tools/bundle.py` 能直接用 `sample/` 起来 ✅。
 
 ### 阶段 1 · 运行时引擎
 

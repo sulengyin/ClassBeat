@@ -9,7 +9,7 @@
 
 启动：
     python3 server/rhythm_server.py
-    python3 server/rhythm_server.py --port 8765 --class "五（5）班"
+    python3 server/rhythm_server.py --port 8765 --class "五（1）班"
 """
 
 import argparse

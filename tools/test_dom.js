@@ -170,12 +170,14 @@ global.EventSource = class {
 check(!!global.Screen, "screen.js 注册成功");
 
 /* 班级名只有一个来源：data.js 的 meta。页面文件里不该再出现具体班名——
-   这条就是防止以后又把「五（5）班」写回去。 */
+   这条就是防止以后又把具体班名写回页面。 */
 check(!!global.CFG, "config.js 注册成功");
 check(CFG.klass() === window.RHYTHM_DATA.meta.klass, "班名取自数据", CFG.klass());
+/* 班名以数据里那个为准，这样真数据、示例数据都能查同一件事 */
 const pageFiles = ["app/index.html", "app/screen.js", "app/edit.js", "app/config.js", "app/rhythm.js", "app/store.js"];
-const hard = pageFiles.filter(f => fs.readFileSync(path.join(ROOT, f), "utf8").includes("五（5）班"));
-check(hard.length === 0, "页面里没有写死的班名", hard.join(", ") || "无");
+const KNAME = (window.RHYTHM_DATA.meta || {}).klass;
+const hard = pageFiles.filter(f => fs.readFileSync(path.join(ROOT, f), "utf8").includes(KNAME));
+check(!!KNAME && hard.length === 0, "页面里没有写死的班名", hard.join(", ") || "无");
 check(!!global.Edit, "edit.js 注册成功");
 check(!!global.Demo, "demo.js 注册成功");
 check(!!global.Remote, "remote.js 注册成功");
