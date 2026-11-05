@@ -6,6 +6,17 @@
   "source": "小岗位表 + 值日组表（两张真实表）",
   "status": "PARTIAL",
   "note": "没写频率的岗位一律 unset，不默认成每天；轮换规则未确认前不猜，输出 unknown",
+  "dutyCycle": {
+    "kind": "school-week",
+    "groups": [
+      "A",
+      "B"
+    ],
+    "anchor": "2026-08-31",
+    "anchorGroup": null,
+    "status": "unconfirmed",
+    "note": "anchor 是起始周的周一（开学第一周）；anchorGroup 待老师确认是 A 还是 B。轮次只数「有课的周」，整周放假不消耗轮次。"
+  },
   "roles": [
     {
       "id": "r01",

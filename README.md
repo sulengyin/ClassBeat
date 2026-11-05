@@ -16,6 +16,7 @@
 |---|---|
 | **按时段自动切换** | 21 个作息块 + 6 条课间，按分钟切换，倒计时可配 |
 | **岗位提醒** | 18 个班级岗位，到点提醒该谁做事，频率分 7 类 |
+| **值日轮岗** | A/B 组按周轮流，起始周可设；放假自动跳过，整周停课不消耗轮次 |
 | **两行课间提示** | 第一行「现在做什么」，第二行「准备好：带什么」 |
 | **早晚变色** | 底色跟着天光走，从清晨暖色到傍晚偏暗，不按科目跳色 |
 | **手机推消息** | 同一局域网，手机扫码/输网址，一句话上屏，可设时长、可撤回 |
@@ -63,6 +64,7 @@ node tools/test_rhythm.js    # 节律逻辑
 node tools/test_store.js     # 本地存储
 node tools/test_dom.js       # 页面起得来、不白屏
 python3 tools/check_p1.py    # 数据自洽
+python3 tools/test_calendar.py # 校历与值日轮岗
 python3 tools/test_server.py # 消息服务
 ```
 
@@ -70,7 +72,7 @@ python3 tools/test_server.py # 消息服务
 
 ## 换成你自己的班
 
-数据是纯 JSON，没有数据库。改 `data/` 里这六个文件，再 `python3 tools/bundle.py`：
+数据是纯 JSON，没有数据库。改 `data/` 里这七个文件，再 `python3 tools/bundle.py`：
 
 | 文件 | 管什么 |
 |---|---|
@@ -80,6 +82,7 @@ python3 tools/test_server.py # 消息服务
 | `students.json` | 名单：只用于编辑时补全和换人 |
 | `content.json` | 每科要带什么、提前多久提醒 |
 | `noon.json` | 午间那几个可调的分界点 |
+| `calendar.json` | 校历：只写例外——哪天放假、哪天调休上课 |
 
 先把 `sample/` 拷成 `data/`，再逐条改：
 
@@ -91,6 +94,52 @@ cp -r sample data
 
 1. **课表不存时间**，时间只来自作息表。调一次作息，全周跟着变。
 2. **没写的就留空**。`unset` 不上屏，宁可少显示，也不猜一个错的值。
+
+### 值日轮岗怎么算
+
+`roles.json` 里的 `dutyCycle` 管 A/B 组什么时候换：
+
+```json
+"dutyCycle": {
+  "groups": ["A", "B"],
+  "anchor": "2026-08-31",    // 起始周的周一
+  "anchorGroup": "A",        // 这一周轮到哪组
+  "status": "confirmed"      // 没确认就输出 unknown，不猜
+}
+```
+
+轮次按**上学的周**数，不按日历周数：
+
+| 情况 | 结果 |
+|---|---|
+| 周一放假，周二到周五上课 | 这一周照常算一周，周日照做，下周一换组 |
+| 整周放假（国庆、停课） | **不消耗轮次**，回来还是原来那组 |
+| 只放一天（周三秋游） | 不影响轮换，只是那天不上学 |
+| 调休周六上课 | 算上学日，按 `calendar.json` 里的 `asWeekday` 取课表 |
+
+`calendar.json` 只写例外，没写的日子默认周一到周五上课：
+
+```json
+"days": {
+  "2026-10-01": { "kind": "holiday", "name": "国庆节" },
+  "2026-10-10": { "kind": "school", "name": "调休上课", "asWeekday": 5 }
+}
+```
+
+---
+
+## 备份
+
+公开仓库里只有代码。`data/`、`assets/`、`PLAN.md` 都在 `.gitignore` 里，
+**只 clone 仓库等于什么都没备**。真要备份的是这几样：
+
+```bash
+python3 tools/backup.py
+```
+
+生成 `backups/ClassBeat-备份-YYYYMMDD-HHMM.zip`，里面是：班级数据、原始表照片、
+本地文档、当前安装包、`MANIFEST.txt`（逐文件 SHA256），外加一个 `git bundle`
+（完整提交历史，`git clone xxx.bundle ClassBeat` 就能离线还原）。
 
 ---
 

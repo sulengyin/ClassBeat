@@ -35,6 +35,9 @@ jobs:
       - name: 数据自洽
         run: python3 tools/check_p1.py
 
+      - name: 校历与轮岗
+        run: python3 tools/test_calendar.py
+
       - name: 消息服务
         run: python3 tools/test_server.py
 

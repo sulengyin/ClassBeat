@@ -26,6 +26,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
+sys.path.insert(0, str(ROOT / "tools"))
+
+import school_calendar as sc  # noqa: E402
 
 
 def _default_data() -> Path:
@@ -169,16 +172,14 @@ def build_day_blocks(timetable: dict, noon: dict) -> list[dict]:
 
 # ---------- 岗位 ----------
 
-def resolve_people(role: dict, group: str | None,
+def resolve_people(role: dict, group: str | None, group_reason: str | None,
                    weekday: int) -> tuple[list[str] | None, str | None]:
     """返回 (名单, 无法确定的理由)。宁可 unknown，也不编人名。"""
     if "groups" in role:
-        cyc = role.get("cycle", {})
-        if cyc.get("status") != "confirmed" and group is None:
-            return None, "cycle-group-unconfirmed"
-        chosen = group or cyc.get("current")
+        # 组由 build() 按校历算好传进来；role.cycle.current 是老师手工钉住的覆盖值
+        chosen = group or (role.get("cycle") or {}).get("current")
         if not chosen:
-            return None, "cycle-group-unconfirmed"
+            return None, group_reason or "cycle-group-unconfirmed"
         return role["groups"].get(chosen, []), None
 
     rot = role.get("rotation")
@@ -230,7 +231,7 @@ def role_triggers(role: dict, blocks: list[dict], noon: dict, weekday: int) -> l
 
 
 def build_duties(roles: dict, blocks: list[dict], noon: dict, weekday: int,
-                 group: str | None) -> tuple[list[dict], list[dict], list[str]]:
+                 group: str | None, group_reason: str | None = None) -> tuple[list[dict], list[dict], list[str]]:
     duties: list[dict] = []
     unset: list[str] = []
     unknown: list[dict] = []
@@ -240,7 +241,7 @@ def build_duties(roles: dict, blocks: list[dict], noon: dict, weekday: int,
             unset.append(role["id"])
             continue
 
-        people, reason = resolve_people(role, group, weekday)
+        people, reason = resolve_people(role, group, group_reason, weekday)
         triggers = role_triggers(role, blocks, noon, weekday)
         if not triggers:
             continue
@@ -276,27 +277,38 @@ def build_duties(roles: dict, blocks: list[dict], noon: dict, weekday: int,
 # ---------- 主流程 ----------
 
 def build(date: dt.date, group: str | None = None,
-          parity_override: str | None = None) -> dict:
+          parity_override: str | None = None, cal: dict | None = None) -> dict:
     timetable = load("timetable.json")
     schedule = load("schedule.json")
     content = load("content.json")
     roles = load("roles.json")
     noon_rule = load("noon.json")
 
-    weekday = date.isoweekday()
+    if cal is None:
+        cal = sc.load(DATA)
+    info = sc.resolve_day(cal, date)
+
+    # 放假就不排课、不排值日。调休上课的周六用 asWeekday 指向那天的课表。
+    if not info["inSchool"]:
+        return {
+            "date": date.isoformat(),
+            "weekday": date.isoweekday(),
+            "weekdayName": f"周{WEEKDAY_CN[date.isoweekday() - 1]}",
+            "inSchool": False,
+            "reason": info["reason"],
+            "label": info["label"],
+            "warnings": [],
+        }
+
+    weekday = info["asWeekday"] or date.isoweekday()
     week_no, parity = week_info(date, dt.date.fromisoformat(schedule["termStart"]))
     parity = parity_override or parity
 
     warnings: list[dict] = []
 
-    if weekday > 5:
-        return {
-            "date": date.isoformat(),
-            "weekday": weekday,
-            "inSchool": False,
-            "reason": "weekend",
-            "warnings": [],
-        }
+    group_reason = None
+    if group is None:
+        group, group_reason = sc.group_for(cal, roles.get("dutyCycle") or {}, date)
 
     noon = resolve_noon(noon_rule, weekday, None)
     blocks = build_day_blocks(timetable, noon)
@@ -326,7 +338,7 @@ def build(date: dt.date, group: str | None = None,
 
         timeline.append(item)
 
-    duties, unknown, unset = build_duties(roles, blocks, noon, weekday, group)
+    duties, unknown, unset = build_duties(roles, blocks, noon, weekday, group, group_reason)
 
     # 已知的悬而未决，统一挂到 warnings，别让 UI 自己判断
     for mark in timetable.get("marks", []):
@@ -361,6 +373,11 @@ def build(date: dt.date, group: str | None = None,
         "weekNo": week_no,
         "weekRule": parity,
         "inSchool": True,
+        "calendar": {
+            "label": info["label"],
+            "makeup": info["reason"] == "makeup",
+        },
+        "group": group,
         "class": schedule["class"],
         "noon": {
             "preset": noon["preset"],

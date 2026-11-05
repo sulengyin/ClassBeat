@@ -9,6 +9,9 @@ out/
 dist/
 preview/
 
+# 备份包（里面有真实名册，等同于 data/）
+backups/
+
 # 运行时产生的消息，可能含老师写的话
 server/messages.json
 server/messages.json.bad

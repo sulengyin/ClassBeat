@@ -1,0 +1,13 @@
+{
+  "version": "school-calendar/v1",
+  "termStart": "2026-09-01",
+  "note": "示例校历。只写例外：周一到周五默认上课，周六周日默认放假。真实班级把本校校历填进 data/calendar.json 即可，格式同此。",
+  "days": {
+    "2026-10-01": { "kind": "holiday", "name": "国庆节" },
+    "2026-10-02": { "kind": "holiday", "name": "国庆节" },
+    "2026-10-05": { "kind": "holiday", "name": "国庆节" },
+    "2026-10-06": { "kind": "holiday", "name": "国庆节" },
+    "2026-10-07": { "kind": "holiday", "name": "国庆节" },
+    "2026-10-10": { "kind": "school", "name": "调休上课", "asWeekday": 5 }
+  }
+}
