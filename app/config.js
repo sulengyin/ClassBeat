@@ -29,7 +29,7 @@
       return head + " · " + CFG.klass();
     },
 
-    /* 设置面板抬头用：「五（1）班 · 设置」 */
+    /* 设置面板抬头用：「班名 · 设置」 */
     label: function (suffix) {
       return CFG.klass() + (suffix ? " · " + suffix : "");
     },
