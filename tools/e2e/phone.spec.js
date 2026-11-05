@@ -19,11 +19,9 @@ test("打开就能写，班名对得上", async ({ page }) => {
 test("按得准：按钮不小于 44px，输入框不小于 16px", async ({ page }) => {
   await page.goto("/");
 
-  for (const sel of ["#send", "#retract"]) {
-    const box = await page.locator(sel).boundingBox();
-    expect(box, `${sel} 应该看得见`).not.toBeNull();
-    expect(box.height, `${sel} 高度 ${box.height}px，手指按不准`).toBeGreaterThanOrEqual(44);
-  }
+  const box = await page.locator("#send").boundingBox();
+  expect(box, "#send 应该看得见").not.toBeNull();
+  expect(box.height, `#send 高度 ${box.height}px，手指按不准`).toBeGreaterThanOrEqual(44);
 
   const font = await page.evaluate(() =>
     parseFloat(getComputedStyle(document.querySelector("#text")).fontSize)
@@ -63,8 +61,15 @@ test("发一条能上屏，撤回能撤下来", async ({ page, request }) => {
   expect(hit, "服务端应该收到这条").toBeTruthy();
   expect(hit.forWhom, "默认发给全班").toBe("class");
 
+  // 「屏上现在是什么」那一栏要先亮起来，撤回按钮才存在——
+  // 没有消息可撤时它是隐藏的，这是有意的，不是 bug
+  await expect(page.locator("#live")).toBeVisible();
+  const btn = await page.locator("#retract").boundingBox();
+  expect(btn.height, `撤回按钮 ${btn.height}px，手指按不准`).toBeGreaterThanOrEqual(36);
+
   await page.locator("#retract").click();
   await expect(page.locator("#toast")).toHaveText(/已从教室撤下/);
+  await expect(page.locator("#live")).toBeHidden();
 });
 
 test("历史里能看到刚才那条", async ({ page, request }) => {

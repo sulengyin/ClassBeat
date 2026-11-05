@@ -29,6 +29,8 @@ module.exports = defineConfig({
   },
   webServer: {
     command: "python3 server/rhythm_server.py --port 8765",
+    // 服务端和浏览器必须同一个时区，否则「这条消息过期没有」两边会差 8 小时
+    env: { TZ: "Asia/Shanghai" },
     url: "http://127.0.0.1:8765/api/ping",
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

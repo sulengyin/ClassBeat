@@ -76,6 +76,11 @@ body[data-theme="dark"]{
   --day-paper:#000000;
   --day-card:#0D0D0D;
   --day-cream:#161616;
+  /* --paper/--card/--cream 是 :root 上的别名，在 :root 就已经解析成浅色了，
+     只在 body 上改 --day-* 追不回来，必须在 body 上把别名一起改掉 */
+  --paper:#000000;
+  --card:#0D0D0D;
+  --cream:#161616;
   --grid:rgba(255,255,255,.05);
   --grid-strong:rgba(255,255,255,.1);
   --ink:#FFFFFF;
