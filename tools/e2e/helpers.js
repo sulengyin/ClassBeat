@@ -35,6 +35,17 @@ async function openScreen(page, at) {
   return errors;
 }
 
+/**
+ * 展开右下角的工具条。
+ * 屏幕上没有鼠标，工具条默认 opacity:0 + pointer-events:none，
+ * 必须先点那个半透明的小圆点（#btn-gear）——这条路径本身就是触屏上的真实操作，
+ * 所以测试不能绕过它直接点 #btn-theme。
+ */
+async function openTools(page) {
+  await page.locator("#btn-gear").click();
+  await expect(page.locator("#corner")).toHaveClass(/open/);
+}
+
 /** 页面有没有被撑出滚动条。一体机没有鼠标，看不见的地方等于不存在。 */
 async function overflow(page) {
   return page.evaluate(() => {
@@ -55,4 +66,4 @@ async function hubNow(request) {
   return body.now;
 }
 
-module.exports = { SCREEN_PATH, clearHub, openScreen, overflow, hubNow };
+module.exports = { SCREEN_PATH, clearHub, openScreen, openTools, overflow, hubNow };

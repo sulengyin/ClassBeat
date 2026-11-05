@@ -1,7 +1,7 @@
 /* 大屏：能不能开起来、会不会溢出、老师改得动、手机发的消息上不上屏。 */
 
 const { test, expect } = require("@playwright/test");
-const { clearHub, openScreen, overflow, hubNow } = require("./helpers");
+const { clearHub, openScreen, openTools, overflow, hubNow } = require("./helpers");
 
 // 固定到 11 月 5 日（周四）07:45：刚过到校，第一节还没开始。
 // 数据包是从 2026-11-05 开始编的，钉住日期就不会因为「今天」变了而失效。
@@ -43,8 +43,9 @@ test("主标题用 vmin 撑满，没被小屏压成小字", async ({ page }) => 
 
 test("深色模式是纯黑底、白字", async ({ page }) => {
   await openScreen(page, ARRIVE);
+  await openTools(page);
 
-  await page.locator("#btn-theme").click({ force: true });
+  await page.locator("#btn-theme").click();
   await expect(page.locator("body")).toHaveAttribute("data-theme", "dark");
 
   const colors = await page.evaluate(() => {
@@ -55,7 +56,7 @@ test("深色模式是纯黑底、白字", async ({ page }) => {
   expect(colors.bg).toBe("rgb(0, 0, 0)");
   expect(colors.fg).toBe("rgb(255, 255, 255)");
 
-  await page.locator("#btn-theme").click({ force: true });
+  await page.locator("#btn-theme").click();
   await expect(page.locator("body")).not.toHaveAttribute("data-theme", "dark");
 });
 
@@ -63,7 +64,8 @@ test("验证码挡住乱输，答对才进设置", async ({ page, request }) => 
   await openScreen(page, ARRIVE);
   const ping = await (await request.get("/api/ping")).json();
 
-  await page.locator("#btn-edit").click({ force: true });
+  await openTools(page);
+  await page.locator("#btn-edit").click();
   await expect(page.locator(".gate")).toBeVisible();
 
   const q = await page.locator("#gateQ").innerText();
