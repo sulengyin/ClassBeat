@@ -1,0 +1,20 @@
+{
+  "note": "对拍变体。base = 老师还没确认轮换组；rot = 假设开学第一周是 A 组，用来覆盖 A/B 轮换与节假日跳过。",
+  "variants": [
+    { "name": "base", "patch": {} },
+    {
+      "name": "rot",
+      "patch": {
+        "roles": {
+          "dutyCycle": {
+            "kind": "school-week",
+            "groups": ["A", "B"],
+            "anchor": "2026-08-31",
+            "anchorGroup": "A",
+            "status": "confirmed"
+          }
+        }
+      }
+    }
+  ]
+}

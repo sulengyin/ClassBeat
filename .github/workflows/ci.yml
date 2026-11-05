@@ -42,6 +42,10 @@ jobs:
       - name: 页面能起来
         run: node tools/test_dom.js
 
+      # 前端引擎 vs Python 编译器，132 天逐字段对拍（基准在 tools/golden/）
+      - name: 引擎对拍
+        run: node tools/test_engine.js
+
       - name: 数据自洽
         run: python3 tools/check_p1.py
 
