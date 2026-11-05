@@ -102,8 +102,12 @@ def main() -> None:
             text = text.replace(school, "示例小学")
         if klass:
             text = text.replace(klass, "五（1）班")
-        # 真实素材文件名不带走
-        if text.startswith("assets/source/") or (klass_flat and klass_flat in text):
+        # 文件名里的紧凑班名（「五5班节律屏-…」）也换掉，但只换这几个字，
+        # 不能因为文档里提到过文件名就把整段文字替换掉
+        if klass_flat:
+            text = text.replace(klass_flat, "示例")
+        # 真实素材路径不带走
+        if text.startswith("assets/source/"):
             return "示例素材（已隐去）"
         return text
 
