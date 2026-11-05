@@ -151,7 +151,7 @@ python3 tools/backup.py
 |---|---|---|
 | 逻辑 | `node tools/test_rhythm.js` 等 | 时段判断、岗位、存储、消息服务，162 项，秒级 |
 | 换学校 | `python3 tools/test_variants.py` | 4 套作息 × 5 套岗位 × 4 份校历 = 80 套配置，每套连编 70 天 |
-| 真浏览器 | `npx playwright test` | 46 例 × 6 个项目：一体机 1920/1366、iPad、iPhone、iPhone SE、安卓、鸿蒙视口 |
+| 真浏览器 | `npx playwright test` | 49 例 / 6 个项目：一体机 1920/1366、iPad、iPhone、iPhone SE、安卓、鸿蒙视口 |
 
 换学校那一层不去猜「真实学校长什么样」，而是程序化生成不同作息（8:00/8:20/8:30 上课、
 35/40/45 分钟一节、有无课后服务、短课间），配上不同岗位与校历，逐套检查：
@@ -173,6 +173,11 @@ npx playwright test
 这三层都在 GitHub Actions 的虚拟机上跑，每次推送自动执行。它抓到的第一批问题都不是逻辑错，
 是"在某一种屏上不成立"：深色底色被 CSS 变量别名吃掉、手机输入框字号掉到 13px（iOS 一聚焦就放大整页）、
 工具条在触屏上默认点不到（`pointer-events:none` 要先进齿轮）。
+
+报告怎么看：Actions 里每次运行都会附一份 HTML 报告（artifact，保留 7 天，含截图、录像、trace）。
+另外 `tools/e2e/summary.js` 会把结果压成一条汇总加若干条 annotations：
+**失败**是 error、**重试才过**是 warning、**跳过**计数进汇总。
+后者不用登录也能从 Actions 页面或 check-run API 读到，适合先扫一眼“红的是哪一条”。
 
 **没覆盖的**：真机（鸿蒙 ArkWeb、教室一体机）的渲染差异、触屏手感、反光和字号观感。
 `鸿蒙` 这个项目是 Chromium 加鸿蒙 UA 加 360×780 视口，能挡布局和触摸尺寸问题，

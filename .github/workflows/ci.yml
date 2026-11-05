@@ -6,20 +6,28 @@ on:
   pull_request:
   workflow_dispatch:
 
+# 版本说明（2026-11）：
+# · 所有 action 升到 v7，运行时是 node24。之前的 v4/v5 报
+#   "Node.js 20 is deprecated"，每次运行都会多一条 warning。
+# · runs-on 从 ubuntu-latest 改成 ubuntu-24.04。GitHub 从 2026-10-19 起
+#   把 ubuntu-latest 逐步迁到 Ubuntu 26，同一份工作流会在不同镜像上跑；
+#   钉住 24.04 才能保证 Playwright 拿到的依赖是可复现的。
+# · Node 从 20 升到 24（20 已过 LTS 维护期）。
+
 jobs:
   # 逻辑层：不碰浏览器，几秒钟跑完，失败信息最直接
   unit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       # 仓库里没有 data/，全部用 sample/ 的化名数据构建
       - name: Build data
@@ -55,14 +63,14 @@ jobs:
 
   # 换学校：4 套作息 × 5 套岗位 × 4 份校历，每套连续编译 70 天
   variants:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         python: ["3.10", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - name: 跨学校配置矩阵
@@ -70,18 +78,18 @@ jobs:
 
   # 真浏览器：一体机 1920/1366、iPad(Safari 内核)、iPhone/SE/安卓/鸿蒙视口
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - name: 安装依赖
@@ -97,12 +105,21 @@ jobs:
       - name: 跑浏览器测试
         run: npx playwright test
 
+      # HTML 报告是 artifact，公开仓库下载要登录；这一步把结论打成
+      # notice/warning，在 Actions 页面和 check-run API 里都能直接读到
+      # 「哪个项目、哪一条、失败还是偶发」。
+      - name: 报告摘要
+        if: always()
+        run: node tools/e2e/summary.js
+
       - name: 上传报告
-        if: failure()
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
             playwright-report/
             test-results/
+            e2e-results.json
+          if-no-files-found: warn
           retention-days: 7

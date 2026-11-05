@@ -16,9 +16,16 @@ module.exports = defineConfig({
   fullyParallel: false,
   workers: 1, // 所有用例共用一个消息服务与一个消息文件，串行才不会互相撤回
   retries: process.env.CI ? 1 : 0,
+  // json 是给 tools/e2e/summary.js 用的：它把结果压成 notice/warning，
+  // 这样不登录也能从 check-run 里读到是哪一条挂了（HTML 报告是 artifact，要登录）。
   reporter: process.env.CI
-    ? [["list"], ["html", { open: "never" }], ["github"]]
-    : [["list"], ["html", { open: "never" }]],
+    ? [
+        ["list"],
+        ["html", { open: "never" }],
+        ["github"],
+        ["json", { outputFile: "e2e-results.json" }],
+      ]
+    : [["list"], ["html", { open: "never" }], ["json", { outputFile: "e2e-results.json" }]],
   use: {
     baseURL: "http://127.0.0.1:8765",
     timezoneId: "Asia/Shanghai",
