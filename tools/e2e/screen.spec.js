@@ -48,12 +48,20 @@ test("深色模式是纯黑底、白字", async ({ page }) => {
   await page.locator("#btn-theme").click();
   await expect(page.locator("body")).toHaveAttribute("data-theme", "dark");
 
-  const colors = await page.evaluate(() => {
-    const bg = getComputedStyle(document.body).backgroundColor;
-    const fg = getComputedStyle(document.querySelector("#heroMain")).color;
-    return { bg, fg };
-  });
-  expect(colors.bg).toBe("rgb(0, 0, 0)");
+  const readColors = () =>
+    page.evaluate(() => {
+      const bg = getComputedStyle(document.body).backgroundColor;
+      const fg = getComputedStyle(document.querySelector("#heroMain")).color;
+      return { bg, fg };
+    });
+
+  // 底色是带过渡的（天光一天里慢慢变），点下去的一瞬间读到的还是上一帧的颜色，
+  // 用轮询等它走完，别把过渡当成没生效
+  await expect
+    .poll(async () => (await readColors()).bg, { timeout: 5_000 })
+    .toBe("rgb(0, 0, 0)");
+
+  const colors = await readColors();
   expect(colors.fg).toBe("rgb(255, 255, 255)");
 
   await page.locator("#btn-theme").click();
