@@ -1,0 +1,124 @@
+/* 大屏：能不能开起来、会不会溢出、老师改得动、手机发的消息上不上屏。 */
+
+const { test, expect } = require("@playwright/test");
+const { clearHub, openScreen, overflow, hubNow } = require("./helpers");
+
+// 固定到 11 月 5 日（周四）07:45：刚过到校，第一节还没开始。
+// 数据包是从 2026-11-05 开始编的，钉住日期就不会因为「今天」变了而失效。
+const ARRIVE = "2026-11-05T07:45:00+08:00";
+
+test.beforeEach(async ({ request }) => {
+  await clearHub(request);
+});
+
+test("打开就有内容，且没有脚本错误", async ({ page }) => {
+  const errors = await openScreen(page, ARRIVE);
+
+  await expect(page.locator("#heroMain")).not.toBeEmpty();
+  await expect(page.locator("#bandText")).not.toBeEmpty();
+  await expect(page.locator("#clock")).toHaveText(/^\d{1,2}:\d{2}$/);
+  expect(errors, "控制台不应有报错").toEqual([]);
+});
+
+test("整屏不出滚动条（一体机没有鼠标，溢出即丢失）", async ({ page }) => {
+  await openScreen(page, ARRIVE);
+  const box = await overflow(page);
+  expect(box.x, `横向溢出 ${box.x}px（视口 ${box.w}）`).toBeLessThanOrEqual(1);
+  expect(box.y, `纵向溢出 ${box.y}px（视口 ${box.h}）`).toBeLessThanOrEqual(1);
+});
+
+test("主标题用 vmin 撑满，没被小屏压成小字", async ({ page }) => {
+  await openScreen(page, ARRIVE);
+  const data = await page.evaluate(() => {
+    const el = document.querySelector("#heroMain");
+    return {
+      size: parseFloat(getComputedStyle(el).fontSize),
+      side: Math.min(window.innerWidth, window.innerHeight),
+      text: el.textContent.trim(),
+    };
+  });
+  // 远看清：主标题至少占短边的 12%
+  expect(data.size, `字号 ${data.size}px / 短边 ${data.side}px`).toBeGreaterThan(data.side * 0.12);
+});
+
+test("深色模式是纯黑底、白字", async ({ page }) => {
+  await openScreen(page, ARRIVE);
+
+  await page.locator("#btn-theme").click({ force: true });
+  await expect(page.locator("body")).toHaveAttribute("data-theme", "dark");
+
+  const colors = await page.evaluate(() => {
+    const bg = getComputedStyle(document.body).backgroundColor;
+    const fg = getComputedStyle(document.querySelector("#heroMain")).color;
+    return { bg, fg };
+  });
+  expect(colors.bg).toBe("rgb(0, 0, 0)");
+  expect(colors.fg).toBe("rgb(255, 255, 255)");
+
+  await page.locator("#btn-theme").click({ force: true });
+  await expect(page.locator("body")).not.toHaveAttribute("data-theme", "dark");
+});
+
+test("验证码挡住乱输，答对才进设置", async ({ page, request }) => {
+  await openScreen(page, ARRIVE);
+  const ping = await (await request.get("/api/ping")).json();
+
+  await page.locator("#btn-edit").click({ force: true });
+  await expect(page.locator(".gate")).toBeVisible();
+
+  const q = await page.locator("#gateQ").innerText();
+  const m = q.match(/(\d+)\s*[×x*]\s*(\d+)/);
+  expect(m, `验证码应该是一道算式，实际是「${q}」`).not.toBeNull();
+  const answer = Number(m[1]) * Number(m[2]);
+
+  // 先故意答错：面板不能开
+  const wrong = String(answer + 1);
+  for (const ch of wrong) await page.locator(".gk", { hasText: new RegExp(`^${ch}$`) }).click();
+  await page.locator(".gk.primary").click();
+  await expect(page.locator(".ep")).toBeHidden();
+
+  // 再答对
+  for (const ch of String(answer)) {
+    await page.locator(".gk", { hasText: new RegExp(`^${ch}$`) }).click();
+  }
+  await page.locator(".gk.primary").click();
+  await expect(page.locator("#epTitle")).toBeVisible();
+  await expect(page.locator("#epTitle")).toContainText(ping.class);
+});
+
+test("放学前值日条有内容", async ({ page }) => {
+  await openScreen(page, "2026-11-05T17:12:00+08:00");
+  await expect(page.locator("#duty .duty").first()).toBeVisible();
+  const labels = await page.locator("#duty .duty").allInnerTexts();
+  expect(labels.length, "值日条至少一条").toBeGreaterThan(0);
+  expect(labels.join(" ")).not.toMatch(/undefined|NaN/);
+});
+
+test("手机发的那条会出现在屏上，撤回后消失", async ({ page, request }) => {
+  // 把屏上的时间调到服务端此刻，否则「还没过期」这条判断会把消息挡掉
+  const now = await hubNow(request);
+  await openScreen(page, `2026-11-05T${now}:00+08:00`);
+
+  const text = "测试：请把窗关上";
+  const res = await request.post("/api/messages", {
+    data: { text, level: "normal", minutes: 10 },
+  });
+  expect(res.ok(), "消息应该发得出去").toBeTruthy();
+
+  await expect(page.locator(".notice-text")).toContainText(text);
+
+  await request.post("/api/retract");
+  await expect(page.locator(".notice-text")).toHaveCount(0);
+});
+
+test("紧急通知走大字区，而不是角落的小提示条", async ({ page, request }) => {
+  const now = await hubNow(request);
+  await openScreen(page, `2026-11-05T${now}:00+08:00`);
+
+  await request.post("/api/messages", {
+    data: { text: "现在立刻到走廊排队", level: "urgent", minutes: 10 },
+  });
+
+  await expect(page.locator("#bandText")).toHaveText("紧急通知");
+  await expect(page.locator("#heroMain")).toContainText("现在立刻到走廊排队");
+});

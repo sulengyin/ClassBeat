@@ -12,6 +12,11 @@ preview/
 # 备份包（里面有真实名册，等同于 data/）
 backups/
 
+# 浏览器测试的依赖与产物
+node_modules/
+playwright-report/
+test-results/
+
 # 运行时产生的消息，可能含老师写的话
 server/messages.json
 server/messages.json.bad

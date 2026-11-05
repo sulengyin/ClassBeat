@@ -136,14 +136,14 @@ def build_day_blocks(timetable: dict, noon: dict) -> list[dict]:
 
     out: list[dict] = []
     for b in timetable["blocks"]:
-        seq = b["seq"]
-
-        if seq == 9:  # 午餐：有前置动作时被压缩到 lunchEnd
+        # 认 type 不认 seq：seq 是这所学校的编号习惯（9 是午餐、9b 是午间占位），
+        # 别的学校节次多少、午餐排在第几段都不一样，拿编号当协议会静默串块。
+        if b["type"] == "meal":
             end = lunch_end if noon.get("pre") else bell
             out.append({**b, "end": m2t(end)})
             continue
 
-        if seq == "9b":  # 午间占位：整段重排
+        if b["type"] == "noon":
             if noon.get("pre") and lunch_end < bell:
                 out.append({
                     "seq": "9a",
@@ -155,7 +155,7 @@ def build_day_blocks(timetable: dict, noon: dict) -> list[dict]:
                     "items": noon["pre"].get("items", []),
                 })
             out.append({
-                "seq": "9b",
+                "seq": b.get("seq", "9b"),
                 "start": m2t(bell),
                 "end": m2t(noon_end),
                 "type": "noon",

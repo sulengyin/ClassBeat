@@ -1,0 +1,16 @@
+{
+  "name": "classbeat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "班级节律屏：大屏与手机端的跨浏览器测试",
+  "license": "MIT",
+  "scripts": {
+    "test": "playwright test",
+    "test:screen": "playwright test --project=一体机 --project=平板",
+    "test:phone": "playwright test --project=iPhone --project=安卓 --project=鸿蒙",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

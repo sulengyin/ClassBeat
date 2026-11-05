@@ -4,9 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  test:
+  # 逻辑层：不碰浏览器，几秒钟跑完，失败信息最直接
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,9 +46,63 @@ jobs:
       # 真实班级数据一旦入库就收不回来，这里守住最后一道
       - name: 隐私检查
         run: |
-          bad=$(git ls-files | grep -E '^(data|assets|out|dist|preview)/' || true)
+          bad=$(git ls-files | grep -E '^(data|assets|out|dist|preview|backups)/' || true)
           if [ -n "$bad" ]; then
             echo "::error::真实数据目录被提交了：$bad"
             exit 1
           fi
           echo "已跟踪文件里没有 data/、assets/ 等本地目录"
+
+  # 换学校：4 套作息 × 5 套岗位 × 4 份校历，每套连续编译 70 天
+  variants:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: 跨学校配置矩阵
+        run: python3 tools/test_variants.py --verbose
+
+  # 真浏览器：一体机 1920/1366、iPad(Safari 内核)、iPhone/SE/安卓/鸿蒙视口
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      # Chromium ≈ 安卓/鸿蒙/Windows 一体机，WebKit ≈ iPhone/iPad Safari
+      - name: 安装浏览器
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: 生成示例数据
+        run: python3 tools/bundle.py --data sample --start 2026-11-05
+
+      - name: 跑浏览器测试
+        run: npx playwright test
+
+      - name: 上传报告
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
