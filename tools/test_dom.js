@@ -1,0 +1,316 @@
+/* 没有浏览器时用最小 DOM 桩跑一遍 boot / 编辑面板，抓运行时异常。
+   它不能替代真机目视（字号、反光、触摸都测不到），只保证"页面起得来、不白屏"。
+   node tools/test_dom.js */
+const fs = require("fs");
+const path = require("path");
+const ROOT = path.resolve(__dirname, "..");
+
+let pass = 0, fail = 0;
+function check(ok, title, detail) {
+  console.log((ok ? "PASS  " : "FAIL  ") + title + (detail ? "  · " + detail : ""));
+  ok ? pass++ : fail++;
+}
+
+/* ---------- 最小 DOM ---------- */
+function ClassList(node) {
+  this.n = node;
+}
+ClassList.prototype._list = function () {
+  return (this.n.className || "").split(/\s+/).filter(Boolean);
+};
+ClassList.prototype.add = function (c) {
+  const l = this._list(); if (l.indexOf(c) < 0) l.push(c);
+  this.n.className = l.join(" ");
+};
+ClassList.prototype.remove = function (c) {
+  this.n.className = this._list().filter(x => x !== c).join(" ");
+};
+ClassList.prototype.contains = function (c) { return this._list().indexOf(c) >= 0; };
+ClassList.prototype.toggle = function (c, force) {
+  const has = this.contains(c);
+  const want = force === undefined ? !has : !!force;
+  want ? this.add(c) : this.remove(c);
+  return want;
+};
+
+class El {
+  constructor(tag) {
+    this.tagName = String(tag).toUpperCase();
+    this.children = [];
+    this.parentNode = null;
+    this.className = "";
+    this.style = { setProperty(k, v) { this[k] = v; } };
+    this.dataset = {};
+    this.id = "";
+    this._text = "";
+    this.value = "";
+    this.checked = false;
+    this.classList = new ClassList(this);
+  }
+  get textContent() {
+    if (this.children.length) return this.children.map(c => c.textContent).join("");
+    return this._text;
+  }
+  set textContent(v) { this._text = v == null ? "" : String(v); this.children = []; }
+  set innerHTML(v) { this.children = []; this._text = v == null ? "" : String(v); }
+  get innerHTML() { return this._text; }
+  get offsetWidth() { return 100; }
+  appendChild(c) { c.parentNode = this; this.children.push(c); return c; }
+  insertBefore(c, ref) {
+    c.parentNode = this;
+    const i = this.children.indexOf(ref);
+    if (i < 0) this.children.push(c);
+    else this.children.splice(i, 0, c);
+    return c;
+  }
+  remove() {
+    if (this.parentNode) {
+      const i = this.parentNode.children.indexOf(this);
+      if (i >= 0) this.parentNode.children.splice(i, 1);
+      this.parentNode = null;
+    }
+  }
+  addEventListener(type, fn) { (this._h || (this._h = {}))[type] = fn; }
+  setAttribute(k, v) { this["attr_" + k] = v; }
+  focus() {}
+  querySelectorAll(sel) {
+    const cls = (sel.match(/\.([\w-]+)/g) || []).map(s => s.slice(1));
+    const attr = sel.match(/\[([\w-]+)\]/);
+    const out = [];
+    const walk = n => {
+      n.children.forEach(c => {
+        if (cls.length && !cls.every(x => c.classList.contains(x))) { walk(c); return; }
+        if (attr) {
+          const k = attr[1].replace(/^data-/, "").replace(/-([a-z])/g, (m, g) => g.toUpperCase());
+          if (c.dataset[k] === undefined) { walk(c); return; }
+        }
+        out.push(c); walk(c);
+      });
+    };
+    walk(this);
+    return out;
+  }
+  querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
+}
+
+const body = new El("body");
+const document = {
+  body: body,
+  documentElement: new El("html"),
+  readyState: "complete",
+  title: "",
+  createElement: t => new El(t),
+  getElementById(id) {
+    let found = null;
+    const walk = n => {
+      if (found) return;
+      if (n.id === id) { found = n; return; }
+      n.children.forEach(walk);
+    };
+    walk(body);
+    return found;
+  },
+  addEventListener() {},
+  querySelector(sel) { return body.querySelectorAll(sel)[0] || null; },
+  querySelectorAll(sel) { return body.querySelectorAll(sel); },
+  fullscreenElement: null
+};
+
+/* 主屏骨架：与 index.html 的 id 对齐 */
+["cls", "date", "clock", "sec", "main", "band", "bandText", "spine", "heroMain", "heroSub", "after", "chips",
+ "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner",
+ "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme",
+ "demo", "d-play", "d-now", "d-ribbon", "d-range", "d-speed", "d-close"].forEach(id => {
+  const e = new El(id.indexOf("btn") === 0 || id === "warn-title" ? "button" : "div");
+  e.id = id;
+  body.appendChild(e);
+});
+/* 与真实 DOM 一致：状态词在 .band 里面，倒计时靠 dataset.text 取原文 */
+const bandEl = document.getElementById("band");
+const bandTextEl = document.getElementById("bandText");
+bandTextEl.remove();
+bandEl.appendChild(bandTextEl);
+
+const demoBar = () => document.getElementById("demo");
+/* 演练条的跳转按钮：querySelectorAll(".d-jump") 要能找到 */
+["07:50", "10:16", "10:23", "11:42", "17:12"].forEach(t => {
+  const b = new El("button");
+  b.className = "d-btn d-jump";
+  b.dataset.t = t;
+  demoBar().appendChild(b);
+});
+
+global.setInterval = () => 0;
+global.setTimeout = () => 0;
+global.clearTimeout = () => {};
+global.requestAnimationFrame = fn => { global.__raf = fn; return 1; };
+global.cancelAnimationFrame = () => {};
+global.document = document;
+global.window = global;
+global.localStorage = {
+  _d: {},
+  getItem(k) { return this._d[k] === undefined ? null : this._d[k]; },
+  setItem(k, v) { this._d[k] = String(v); },
+  removeItem(k) { delete this._d[k]; }
+};
+global.location = { search: "?t=11:10&date=2026-11-05" };
+global.matchMedia = () => ({ matches: false });
+
+/* 教室消息服务：测试环境里当作"不存在"，验证降级路径不报错 */
+global.fetch = () => Promise.reject(new Error("no hub"));
+global.EventSource = class {
+  constructor(url) { this.url = url; this.readyState = 0; global.__es = this; }
+  close() { this.readyState = 2; }
+};
+
+/* ---------- 加载 ---------- */
+["app/data.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/screen.js", "app/remote.js", "app/edit.js", "app/demo.js"]
+  .forEach(f => eval(fs.readFileSync(path.join(ROOT, f), "utf8")));
+
+check(!!global.Screen, "screen.js 注册成功");
+
+/* 班级名只有一个来源：data.js 的 meta。页面文件里不该再出现具体班名——
+   这条就是防止以后又把「五（5）班」写回去。 */
+check(!!global.CFG, "config.js 注册成功");
+check(CFG.klass() === window.RHYTHM_DATA.meta.klass, "班名取自数据", CFG.klass());
+const pageFiles = ["app/index.html", "app/screen.js", "app/edit.js", "app/config.js", "app/rhythm.js", "app/store.js"];
+const hard = pageFiles.filter(f => fs.readFileSync(path.join(ROOT, f), "utf8").includes("五（5）班"));
+check(hard.length === 0, "页面里没有写死的班名", hard.join(", ") || "无");
+check(!!global.Edit, "edit.js 注册成功");
+check(!!global.Demo, "demo.js 注册成功");
+check(!!global.Remote, "remote.js 注册成功");
+check(global.Remote && /127\.0\.0\.1:8765/.test(global.Remote.hub), "默认连本机服务", global.Remote && global.Remote.hub);
+
+/* boot 在加载时已跑（readyState=complete） */
+const band = document.getElementById("band");
+const hero = document.getElementById("heroMain");
+/* 倒计时是滚轮 DOM，正文要读 dataset.text；普通状态仍是 textContent */
+const heroText = (n) => (n || hero).dataset.text || (n || hero).textContent;
+check(!!band.textContent, "顶栏状态词已渲染", band.textContent);
+check(!!heroText(), "主视觉已渲染", heroText());
+check(String(hero.style.fontSize).indexOf("vmin") > 0, "字号按字数算出", hero.style.fontSize);
+
+/* 每个时段都跑一遍，确认没有分支报错，并抽查文案 */
+const times = ["07:50", "08:30", "09:10", "10:12", "10:24", "11:25", "11:45",
+               "12:20", "12:55", "13:20", "15:45", "16:35", "17:15", "18:00"];
+const Screen = global.Screen;
+let err = null;
+const seen = {};
+
+times.forEach(t => {
+  try {
+    const p = t.split(":").map(Number);
+    global.__rhythmTime = p[0] * 60 + p[1];
+    Screen.render();
+    seen[t] = heroText();
+  } catch (e) { err = err || e; }
+});
+check(!err, "各时段渲染无异常", times.length + " 个时点");
+check(/^\d+:\d{2}$/.test(seen["10:24"] || ""), "课间最后 1 分钟主角换成倒计时", seen["10:24"]);
+check((seen["11:25"] || "").indexOf("书法") > 0, "第 4 节书法上屏", seen["11:25"]);
+check((seen["08:30"] || "").indexOf("语文") > 0, "第 1 节语文上屏", seen["08:30"]);
+check(seen["10:24"] !== seen["10:12"], "焦点随时间真的变了",
+  seen["10:12"] + " → " + seen["10:24"]);
+
+/* 紧急通知：红色只由老师手动发，文字要能占住主区 */
+const Store = global.Store;
+Store.patchDayOverride("2026-11-05", {
+  notice: {
+    text: "现在全部同学停止手上的事情，带上水杯到走廊排成一列，按小组顺序下楼",
+    level: "urgent", at: "10:00", until: "23:59", createdAt: Date.now()
+  }
+});
+global.__rhythmTime = 10 * 60;
+Screen.render();
+check(document.getElementById("band").textContent === "紧急通知", "紧急通知顶栏变红底",
+  document.getElementById("band").textContent);
+check(document.body.dataset.alert === "1", "红框被打开");
+check(document.body.dataset.tone === "red", "整屏语气切到红");
+const nsz = parseFloat(document.getElementById("heroMain").style.fontSize);
+check(nsz >= 8, "长通知的字号仍然够大", nsz.toFixed(1) + "vmin");
+
+/* 普通通知不该触发红框 */
+Store.patchDayOverride("2026-11-05", {
+  notice: { text: "今天午饭后把作业本交到讲台", level: "normal", at: "10:00", until: "23:59", createdAt: Date.now() }
+});
+Screen.render();
+check(document.body.dataset.alert === "0", "普通通知不红");
+check(!!document.querySelector(".notice-bar"), "普通通知占一条窄带");
+
+/* 关闭按钮：单击不算，按住 0.9 秒才生效 */
+const nx = document.querySelector(".notice-x");
+check(!!nx, "通知条上有长按关闭");
+
+(function () {
+  const realST = global.setTimeout;
+  global.setTimeout = fn => { fn(); return 1; };
+  nx._h.pointerdown({ preventDefault() {} });
+  global.setTimeout = realST;
+  Screen.render();
+  check(!document.querySelector(".notice-bar"), "按住后通知从屏上撤掉");
+})();
+
+Store.clearDayOverride("2026-11-05");
+
+/* 演练：把时间推到某一刻，屏上必须真的跟着变 */
+try {
+  global.Demo.open(10 * 60 + 23, false);
+} catch (e) { err = e; }
+check(!err && document.body.dataset.demo === "1", "演练条能打开", err ? err.message : "无异常");
+check(global.__rhythmTime === 10 * 60 + 23, "演练接管屏幕时间", String(global.__rhythmTime));
+check(document.getElementById("d-now").textContent === "10:23", "时间轴读数是推到的时刻",
+  document.getElementById("d-now").textContent);
+check(/^\d+:\d{2}$/.test(heroText()),
+  "推到课间收尾，主视觉是倒计时", heroText());
+check(document.getElementById("d-ribbon").children.length >= 20,
+  "一天的结构条画出来了", document.getElementById("d-ribbon").children.length + " 段");
+
+global.Demo.seek(17 * 60 + 22, true);
+check(heroText().indexOf("放学") >= 0,
+  "拖到放学，主视觉跟着换", heroText());
+
+global.Demo.close();
+check(document.body.dataset.demo === "0" && global.__rhythmTime === null,
+  "关掉演练回到真实时间", String(global.__rhythmTime));
+
+/* ---------- 教室消息接入（PLAN 2.22） ---------- */
+(function () {
+  global.Remote.connect(0);
+  const es = global.__es;
+  check(!!es && /\/api\/stream\?since=0/.test(es.url), "连上服务后订阅 SSE", es && es.url);
+
+  const today = global.Screen.todayKey();
+  const key = "rhythm.overrides.v1";
+
+  es.onmessage({ data: JSON.stringify({
+    seq: 9, text: "现在到走廊集合", level: "normal",
+    at: "11:10", until: "23:59", forWhom: "class"
+  }) });
+  let all = JSON.parse(localStorage.getItem(key) || "{}");
+  check(all[today] && all[today].notice && all[today].notice.text === "现在到走廊集合",
+        "手机消息写进本地覆盖层", all[today] && all[today].notice && all[today].notice.text);
+
+  es.onmessage({ data: JSON.stringify({
+    seq: 10, text: "记得带教研材料", level: "normal",
+    at: "11:10", until: "23:59", forWhom: "self"
+  }) });
+  all = JSON.parse(localStorage.getItem(key) || "{}");
+  check(all[today].notice.text === "现在到走廊集合",
+        "只给自己看的不上屏", all[today].notice.text);
+
+  es.onmessage({ data: "这不是 json" });
+  check(true, "坏消息不让页面崩");
+})();
+
+/* 编辑面板 */
+try {
+  global.Edit.open();
+} catch (e) {
+  err = e;
+}
+check(!err, "编辑面板能打开", err ? err.message : "无异常");
+check(!!document.getElementById("gateQ"), "先出验证码，不直接进面板",
+  document.getElementById("gateQ") ? document.getElementById("gateQ").textContent : "缺失");
+
+console.log("\n" + pass + "/" + (pass + fail) + " 通过");
+process.exit(fail ? 1 : 0);

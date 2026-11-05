@@ -1,0 +1,384 @@
+/* P3 数据层：覆盖、话术、名单检索、验证码。
+   纯函数（applyOverrides / rankStudents / challenge）不碰 DOM，可 node 测。
+   存储坏掉时：备份坏数据 → 回退默认 → 大屏继续能跑（PLAN P3 失败处理）。 */
+(function (root) {
+  "use strict";
+
+  var KEY = {
+    overrides: "rhythm.overrides.v1",
+    history:   "rhythm.history.v1",
+    phrases:   "rhythm.phrases.v1",
+    prefs:     "rhythm.prefs.v1",
+    picked:    "rhythm.picked.v1",
+    lock:      "rhythm.lock.v1",
+    texts:     "rhythm.texts.v1"
+  };
+
+  var mem = {};
+
+  function clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+
+  function ls() {
+    try {
+      var s = root.localStorage;
+      if (!s) return null;
+      s.setItem("__probe", "1");
+      s.removeItem("__probe");
+      return s;
+    } catch (e) { return null; }
+  }
+
+  function read(k, def) {
+    var s = ls();
+    if (!s) return mem[k] !== undefined ? clone(mem[k]) : clone(def);
+    var raw = null;
+    try { raw = s.getItem(k); } catch (e) { return clone(def); }
+    if (!raw) return clone(def);
+    try {
+      var v = JSON.parse(raw);
+      return v == null ? clone(def) : v;
+    } catch (e) {
+      /* 坏数据不当垃圾扔掉：留一份现场，再回退 */
+      try { s.setItem(k + ".broken." + Date.now(), raw); } catch (_) {}
+      return clone(def);
+    }
+  }
+
+  function write(k, v) {
+    var s = ls();
+    if (!s) { mem[k] = clone(v); return false; }
+    try { s.setItem(k, JSON.stringify(v)); return true; }
+    catch (e) { mem[k] = clone(v); return false; }
+  }
+
+  /* ---------- 日期 ---------- */
+  function dayKey(d) {
+    d = d || new Date();
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+
+  /* ---------- 覆盖层 ---------- */
+  function allOverrides() { return read(KEY.overrides, {}); }
+
+  function getDayOverride(key) {
+    var all = allOverrides();
+    return all[key] || null;
+  }
+
+  function pushHistory(key, snapshot) {
+    var h = read(KEY.history, {});
+    h[key] = (h[key] || []).concat([clone(snapshot)]).slice(-10);
+    write(KEY.history, h);
+  }
+
+  /* 合并式修改：只传要改的字段，不动其他 */
+  function patchDayOverride(key, patch) {
+    var all = allOverrides();
+    var cur = all[key] || {};
+    pushHistory(key, cur);
+    all[key] = Object.assign({}, cur, patch);
+    all[key].updatedAt = new Date().toISOString();
+    write(KEY.overrides, all);
+    return all[key];
+  }
+
+  function clearDayOverride(key) {
+    var all = allOverrides();
+    if (!all[key]) return;
+    pushHistory(key, all[key]);
+    delete all[key];
+    write(KEY.overrides, all);
+  }
+
+  function undo(key) {
+    var h = read(KEY.history, {});
+    var stack = h[key] || [];
+    if (!stack.length) return false;
+    var prev = stack.pop();
+    h[key] = stack;
+    write(KEY.history, h);
+
+    var all = allOverrides();
+    if (prev && Object.keys(prev).length) all[key] = prev;
+    else delete all[key];
+    write(KEY.overrides, all);
+    return true;
+  }
+
+  function canUndo(key) {
+    var h = read(KEY.history, {});
+    return (h[key] || []).length > 0;
+  }
+
+  /* 把覆盖套到当天数据上，返回新对象，不改原始数据 */
+  function applyOverrides(day, ov) {
+    if (!day || !ov) return day;
+    var out = clone(day);
+
+    if (ov.lessons) {
+      (out.timeline || []).forEach(function (b) {
+        if (b.type !== "class") return;
+        var L = ov.lessons[b.periodNo];
+        if (!L) return;
+        if (L.subject) b.subject = L.subject;
+        if (L.teacher !== undefined) b.teacher = L.teacher;
+        if (L.place !== undefined) b.place = L.place;
+        b.overridden = true;
+      });
+    }
+
+    if (ov.noon) {
+      (out.timeline || []).forEach(function (b) {
+        if (b.type !== "noon") return;
+        if (ov.noon.title) b.name = ov.noon.title;
+        if (ov.noon.tip !== undefined) b.tip = ov.noon.tip;
+        if (ov.noon.items) b.items = ov.noon.items;
+        b.overridden = true;
+      });
+    }
+
+    if (ov.roles) {
+      (out.duties || []).forEach(function (d) {
+        var r = ov.roles[d.roleId];
+        if (!r) return;
+        if (r.people) {
+          d.people = r.people.slice();
+          d.status = r.people.length ? "ok" : "unknown";
+          d.reason = d.status === "ok" ? null : "no-people";
+        }
+        if (r.at) d.at = r.at;
+        d.overridden = true;
+      });
+    }
+
+    return out;
+  }
+
+  /* ---------- 名单检索 ---------- */
+  /* 排序：本场景相关的人 → 最近点过 → 名单顺序。
+     这是 2.17 定的规则，越靠前的越容易被点到。 */
+  function rankStudents(list, q, related, limit) {
+    q = (q || "").trim();
+    related = related || [];
+    limit = limit || 8;
+    if (!list) return [];
+
+    var pool = list.filter(function (s) {
+      if (s.active === false) return false;
+      if (!q) return true;
+      return s.name.indexOf(q) >= 0 || (s.alias && s.alias.indexOf(q) >= 0);
+    });
+
+    var picked = read(KEY.picked, {});
+    var idx = {};
+    list.forEach(function (s, i) { idx[s.name] = i; });
+
+    pool.sort(function (a, b) {
+      var ra = related.indexOf(a.name) >= 0 ? 0 : 1;
+      var rb = related.indexOf(b.name) >= 0 ? 0 : 1;
+      if (ra !== rb) return ra - rb;
+      var ta = picked[a.name] || 0, tb = picked[b.name] || 0;
+      if (ta !== tb) return tb - ta;
+      return (idx[a.name] || 0) - (idx[b.name] || 0);
+    });
+
+    return pool.slice(0, limit);
+  }
+
+  function markPicked(name) {
+    var p = read(KEY.picked, {});
+    p[name] = Date.now();
+    var keys = Object.keys(p);
+    if (keys.length > 60) {
+      keys.sort(function (a, b) { return p[a] - p[b]; })
+          .slice(0, keys.length - 60)
+          .forEach(function (k) { delete p[k]; });
+    }
+    write(KEY.picked, p);
+  }
+
+  /* ---------- 话术 ---------- */
+  var PINNED_MAX = 12, RECENT_MAX = 5;
+
+  function allPhrases() { return read(KEY.phrases, []); }
+
+  /* 召回：记住的排前面，最近用过的补在后面。两层都要有，
+     因为"刚才那条改一下"和"我常说的那句"是两种需求。 */
+  function recall(scope) {
+    var list = allPhrases().filter(function (p) { return p.scope === scope && p.text; });
+    var pinned = list.filter(function (p) { return p.pinned; })
+      .sort(function (a, b) { return (b.useCount || 0) - (a.useCount || 0); })
+      .slice(0, PINNED_MAX);
+    var pinnedText = {};
+    pinned.forEach(function (p) { pinnedText[p.text] = 1; });
+    var recent = list.filter(function (p) { return !p.pinned && !pinnedText[p.text]; })
+      .sort(function (a, b) { return (b.lastUsedAt || 0) - (a.lastUsedAt || 0); })
+      .slice(0, RECENT_MAX);
+    return pinned.concat(recent);
+  }
+
+  function remember(scope, text, pinned) {
+    text = (text || "").trim();
+    if (!text) return allPhrases();
+    var list = allPhrases();
+    var hit = null;
+    list.forEach(function (p) { if (p.scope === scope && p.text === text) hit = p; });
+
+    if (hit) {
+      hit.useCount = (hit.useCount || 0) + 1;
+      hit.lastUsedAt = Date.now();
+      if (pinned) hit.pinned = true;
+    } else {
+      list.push({
+        id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        scope: scope, text: text, pinned: !!pinned,
+        useCount: 1, lastUsedAt: Date.now(), createdAt: Date.now()
+      });
+    }
+    write(KEY.phrases, trimPhrases(list));
+    return list;
+  }
+
+  function removePhrase(id) {
+    var list = allPhrases().filter(function (p) { return p.id !== id; });
+    write(KEY.phrases, list);
+    return list;
+  }
+
+  function trimPhrases(list) {    var byScope = {};
+    list.forEach(function (p) { (byScope[p.scope] = byScope[p.scope] || []).push(p); });
+    var keep = [];
+    Object.keys(byScope).forEach(function (sc) {
+      var arr = byScope[sc];
+      var pin = arr.filter(function (p) { return p.pinned; })
+        .sort(function (a, b) { return (b.useCount || 0) - (a.useCount || 0); })
+        .slice(0, PINNED_MAX);
+      var pinText = {};
+      pin.forEach(function (p) { pinText[p.text] = 1; });
+      var rec = arr.filter(function (p) { return !pinText[p.text]; })
+        .sort(function (a, b) { return (b.lastUsedAt || 0) - (a.lastUsedAt || 0); })
+        .slice(0, RECENT_MAX);
+      keep = keep.concat(pin, rec);
+    });
+    return keep;
+  }
+
+  /* ---------- 时间词检测 ---------- */
+  /* 话术复用最大的坑：上周写"今天 12:50"，这周直接填进去就是错的。
+     不做自动替换（猜不准），只标出来要求确认一次。 */
+  var TIME_WORD = /今天|明天|后天|昨天|周一|周二|周三|周四|周五|周六|周日|上午|下午|中午|晚上|\d{1,2}[:：]\d{2}/g;
+
+  function findTimeWords(text) {
+    if (!text) return [];
+    var m = String(text).match(TIME_WORD) || [];
+    return m.filter(function (v, i) { return m.indexOf(v) === i; });
+  }
+
+  /* ---------- 验证码 ---------- */
+  function makeChallenge() {
+    var a = 102 + Math.floor(Math.random() * 888);  /* 三位数 */
+    var b = 2 + Math.floor(Math.random() * 8);      /* 一位数 2-9 */
+    return { a: a, b: b, answer: a * b, text: a + " × " + b };
+  }
+
+  /* 连错 3 次锁 60 秒。学生乱试的成本要提高，但不至于把老师也锁死。 */
+  function lockState() {
+    var l = read(KEY.lock, { fails: 0, until: 0 });
+    if (l.until && Date.now() > l.until) {
+      l = { fails: 0, until: 0 };
+      write(KEY.lock, l);
+    }
+    return l;
+  }
+
+  function recordFail() {
+    var l = lockState();
+    l.fails = (l.fails || 0) + 1;
+    if (l.fails >= 3) { l.until = Date.now() + 60000; l.fails = 0; }
+    write(KEY.lock, l);
+    return l;
+  }
+
+  function resetFail() { write(KEY.lock, { fails: 0, until: 0 }); }
+
+  /* ---------- 屏上文字 ---------- */
+  /* 只存"老师改过的"，没改的沿用系统默认。
+     这样以后改了默认文案，老师没动过的地方会自动跟上。 */
+  /* 打包时可以把某位老师改好的文字烤成本包的默认值（DATA.texts）。
+     本机没改过就吃包里的默认，改过就吃本机的——换机器不会丢。 */
+  function texts() {
+    var local = read(KEY.texts, null);
+    if (local && Object.keys(local).length) return local;
+    var baked = root.DATA && root.DATA.texts;
+    return (baked && typeof baked === "object") ? baked : (local || {});
+  }
+
+  function patchTexts(patch) {
+    var cur = read(KEY.texts, {}) || {};
+    Object.keys(patch).forEach(function (k) {
+      if (patch[k] == null) delete cur[k];
+      else cur[k] = patch[k];
+    });
+    write(KEY.texts, cur);
+    return cur;
+  }
+
+  function resetTexts() {
+    write(KEY.texts, {});
+    return {};
+  }
+
+  /* ---------- 偏好 ---------- */
+  function prefs() { return read(KEY.prefs, { cdMode: "auto", reduce: false }); }
+  function setPref(k, v) {
+    var p = prefs(); p[k] = v; write(KEY.prefs, p); return p;
+  }
+
+  /* ---------- 备份 / 迁移 ---------- */
+  /* 老师改的东西全在这台机器的 localStorage 里：换机器、清缓存、
+     或者要人帮着打包，都得能整车搬走。撤销栈不搬——那是过程不是结果。 */
+  var EXPORT_FORMAT = "rhythm-config/v1";
+
+  function exportAll() {
+    return {
+      format: EXPORT_FORMAT,
+      savedAt: new Date().toISOString(),
+      texts: read(KEY.texts, {}) || {},
+      overrides: read(KEY.overrides, {}) || {},
+      phrases: allPhrases(),
+      prefs: prefs()
+    };
+  }
+
+  function importAll(obj) {
+    if (!obj || typeof obj !== "object") return { ok: false, why: "文件不是有效的设置" };
+    if (obj.format !== EXPORT_FORMAT) return { ok: false, why: "不是本程序导出的设置文件" };
+
+    var n = 0;
+    if (obj.texts && typeof obj.texts === "object") { write(KEY.texts, obj.texts); n++; }
+    if (obj.overrides && typeof obj.overrides === "object") { write(KEY.overrides, obj.overrides); n++; }
+    if (Array.isArray(obj.phrases)) { write(KEY.phrases, trimPhrases(obj.phrases)); n++; }
+    if (obj.prefs && typeof obj.prefs === "object") { write(KEY.prefs, obj.prefs); n++; }
+    if (!n) return { ok: false, why: "文件里没有可导入的内容" };
+    return { ok: true, n: n };
+  }
+
+  var api = {
+    KEY: KEY, dayKey: dayKey, clone: clone,
+    allOverrides: allOverrides, getDayOverride: getDayOverride,
+    patchDayOverride: patchDayOverride, clearDayOverride: clearDayOverride,
+    applyOverrides: applyOverrides, undo: undo, canUndo: canUndo,
+    rankStudents: rankStudents, markPicked: markPicked,
+    recall: recall, remember: remember, allPhrases: allPhrases, removePhrase: removePhrase,
+    findTimeWords: findTimeWords,
+    texts: texts, patchTexts: patchTexts, resetTexts: resetTexts,
+    exportAll: exportAll, importAll: importAll,
+    makeChallenge: makeChallenge, lockState: lockState,
+    recordFail: recordFail, resetFail: resetFail,
+    prefs: prefs, setPref: setPref
+  };
+
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.Store = api;
+})(typeof window !== "undefined" ? window : globalThis);

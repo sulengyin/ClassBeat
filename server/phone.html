@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FBF3DF">
+<title>发到教室</title>
+<style>
+  /* 和大屏同一套：奶油方格纸、深棕描边、亮黄主色 */
+  :root{
+    --bg:#FBF3DF; --card:#FFF8E7; --ink:#31231A; --ink2:#6B5545; --ink3:#9B8672;
+    --line:#3A2A1E; --line-soft:rgba(58,42,30,.28);
+    --yellow:#FFD64F; --green:#7A5A12; --red:#DE3B34; --amber:#996008;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --e:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background-color:var(--bg);color:var(--ink);
+    font:400 17px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  body{background-image:
+    linear-gradient(to right,rgba(176,146,84,.13) 1px,transparent 1px),
+    linear-gradient(to bottom,rgba(176,146,84,.13) 1px,transparent 1px);
+    background-size:26px 26px}
+  body{padding:0 18px calc(28px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+
+  header{padding:22px 0 14px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .cls{font-size:21px;font-weight:900;letter-spacing:.02em}
+  .net{font-family:var(--mono);font-size:11.5px;color:var(--ink3);letter-spacing:.02em}
+  .net b{color:var(--ink2);font-weight:500}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#2FA36B;
+    margin-right:5px;vertical-align:1px;animation:breathe 2.6s var(--e) infinite}
+  @keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
+
+  .card{background:var(--card);border:2px solid var(--line);
+    border-radius:18px 15px 19px 16px;padding:16px;
+    box-shadow:3px 3px 0 rgba(58,42,30,.14)}
+
+  textarea{width:100%;min-height:104px;border:0;outline:0;resize:none;background:transparent;
+    font:500 20px/1.5 inherit;color:var(--ink);padding:0}
+  textarea::placeholder{color:#B3BDB7;font-weight:400}
+  .count{font-family:var(--mono);font-size:11.5px;color:var(--ink3);text-align:right;
+    margin-top:6px;letter-spacing:.03em}
+
+  .row{display:flex;gap:8px;margin-top:14px}
+  .seg{flex:1;border:2px solid var(--line-soft);background:transparent;border-radius:12px;
+    padding:11px 8px;font:700 15.5px inherit;color:var(--ink2);cursor:pointer;
+    transition:background .22s var(--e),color .22s var(--e),border-color .22s var(--e)}
+  .seg.on{background:var(--yellow);border-color:var(--line);color:var(--ink);
+    box-shadow:2px 2px 0 rgba(58,42,30,.18)}
+  .seg.on.red{background:var(--red);border-color:var(--line);color:#FFF8E7}
+
+  .label{font-size:12px;color:var(--ink3);letter-spacing:.06em;margin:18px 0 8px}
+
+  .row.wrap{flex-wrap:wrap}
+  .row.wrap .seg{flex:1 1 44%}
+
+  .custom{display:flex;align-items:center;gap:8px;margin-top:10px;
+    font-size:13px;color:var(--ink3)}
+  .custom input{width:62px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;
+    background:transparent;font:500 14px var(--mono);color:var(--ink);text-align:center;outline:0}
+  .custom input:focus{border-color:var(--green)}
+  .custom input::-webkit-outer-spin-button,
+  .custom input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+  /* 现在屏上是什么 */
+  .live{display:none;margin-bottom:14px;padding:13px 15px;border-radius:16px 13px 15px 12px;
+    background:var(--yellow);border:2px solid var(--line);
+    box-shadow:3px 3px 0 rgba(58,42,30,.16);align-items:center;gap:12px}
+  .live.show{display:flex;animation:pop .3s var(--e)}
+  .live .lv{flex:1;min-width:0}
+  .live .lv b{display:block;font-size:15.5px;font-weight:600;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .live .lv i{font-style:normal;font-family:var(--mono);font-size:11.5px;color:var(--ink3)}
+  .live button{flex:none;padding:9px 14px;border-radius:10px;border:2px solid var(--line);
+    background:var(--card);color:var(--red);font:800 14px inherit;cursor:pointer}
+  .live button:active{background:#FFE9E4}
+
+  .warn{display:none;margin-top:12px;padding:11px 13px;border-radius:12px;
+    background:#FFD8D2;border:2px solid var(--line);color:#7E1E18;font-size:14.5px;font-weight:700}
+  .warn.show{display:block;animation:pop .34s var(--e)}
+  @keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+  .send{width:100%;margin-top:18px;padding:16px;border:2px solid var(--line);
+    border-radius:15px 13px 16px 12px;
+    background:var(--yellow);color:var(--ink);font:900 18px inherit;letter-spacing:.02em;
+    box-shadow:3px 3px 0 rgba(58,42,30,.2);
+    cursor:pointer;transition:transform .16s var(--e),background .22s var(--e)}
+  .send:active{transform:translateY(2px);box-shadow:1px 1px 0 rgba(58,42,30,.2)}
+  .send.danger{background:var(--red);color:#FFF8E7}
+  .send[disabled]{opacity:.42}
+
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    padding:12px 20px;border-radius:13px;font-size:15px;font-weight:700;
+    background:var(--ink);color:#FFF8E7;border:2px solid var(--ink);
+    transition:all .34s var(--e);max-width:88vw;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast.bad{background:var(--red)}
+
+  .hist{margin-top:26px}
+  .hist h2{font-size:12px;color:var(--ink3);letter-spacing:.06em;font-weight:500;margin:0 0 10px}
+  .item{display:flex;gap:10px;padding:11px 0;border-top:1px solid var(--line);font-size:14.5px}
+  .item:first-of-type{border-top:0}
+  .item .t{font-family:var(--mono);font-size:12px;color:var(--ink3);flex:0 0 44px;padding-top:2px}
+  .item .x{flex:1;color:var(--ink2);word-break:break-all}
+  .item .x.urgent{color:#B02A22;font-weight:500}
+  .item .x.self{color:var(--ink3);font-style:italic}
+  .empty{color:var(--ink3);font-size:14px;padding:8px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="cls" id="cls"></div>
+  <div class="net"><span class="dot"></span><b id="host">连接中</b></div>
+</header>
+
+<div class="live" id="live">
+  <div class="lv">
+    <b id="liveText"></b>
+    <i id="liveMeta"></i>
+  </div>
+  <button id="retract">撤回</button>
+</div>
+
+<div class="card">
+  <textarea id="text" maxlength="60" placeholder="写一句话，教室里马上会看到"></textarea>
+  <div class="count"><span id="n">0</span>/60</div>
+
+  <div class="label">显示方式</div>
+  <div class="row">
+    <button class="seg on" data-level="normal">普通提示</button>
+    <button class="seg" data-level="urgent">紧急</button>
+  </div>
+
+  <div class="label">显示多久</div>
+  <div class="row wrap">
+    <button class="seg" data-min="10">10 分钟</button>
+    <button class="seg on" data-min="30">30 分钟</button>
+    <button class="seg" data-min="60">1 小时</button>
+    <button class="seg" data-min="0">直到我关</button>
+  </div>
+  <div class="custom">
+    <span>或</span>
+    <input id="mins" type="number" inputmode="numeric" min="1" max="180" placeholder="自定">
+    <span>分钟后消失</span>
+  </div>
+
+  <div class="warn" id="warn">紧急消息会让整块屏变红。确认要发这一条吗？</div>
+
+  <button class="send" id="send">发到教室</button>
+</div>
+
+<div class="hist">
+  <h2>最近发出</h2>
+  <div id="list"><div class="empty">还没有发过</div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var API = location.origin;
+  var el = {
+    cls: document.getElementById("cls"),
+    host: document.getElementById("host"),
+    text: document.getElementById("text"),
+    n: document.getElementById("n"),
+    warn: document.getElementById("warn"),
+    send: document.getElementById("send"),
+    list: document.getElementById("list"),
+    toast: document.getElementById("toast"),
+    live: document.getElementById("live"),
+    liveText: document.getElementById("liveText"),
+    liveMeta: document.getElementById("liveMeta"),
+    retract: document.getElementById("retract"),
+    mins: document.getElementById("mins")
+  };
+
+  var level = "normal";
+  var minutes = 30;
+  var armed = false;      // 紧急二次确认
+  var busy = false;
+
+  /* ---------- 连接信息 ---------- */
+
+  el.host.textContent = location.host;
+
+  fetch(API + "/api/ping", { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.ok) {
+        el.cls.textContent = d["class"] || el.cls.textContent;
+        document.title = "发到教室 · " + el.cls.textContent;
+      }
+    })
+    .catch(function () {
+      el.host.textContent = "没连上教室";
+      document.querySelector(".dot").style.background = "#D93B3B";
+    });
+
+  /* ---------- 控件 ---------- */
+
+  function pick(selector, attr, val) {
+    Array.prototype.forEach.call(document.querySelectorAll(selector), function (b) {
+      b.classList.toggle("on", b.getAttribute(attr) === String(val));
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-level]"), function (b) {
+    b.addEventListener("click", function () {
+      level = b.getAttribute("data-level");
+      pick("[data-level]", "data-level", level);
+      if (level === "urgent") {
+        armed = true;
+        el.warn.classList.add("show");
+        el.send.classList.add("danger");
+        el.send.textContent = "确认发送 · 屏会变红";
+      } else {
+        resetArm();
+      }
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-min]"), function (b) {
+    b.addEventListener("click", function () {
+      minutes = +b.getAttribute("data-min");
+      pick("[data-min]", "data-min", minutes);
+      el.mins.value = "";
+    });
+  });
+
+  /* 自定义分钟数：一输入就接管，和上面四个按钮互斥 */
+  el.mins.addEventListener("input", function () {
+    var v = parseInt(el.mins.value, 10);
+    if (el.mins.value === "") {
+      minutes = 30;
+      pick("[data-min]", "data-min", 30);
+      return;
+    }
+    if (v >= 1 && v <= 180) {
+      minutes = v;
+      Array.prototype.forEach.call(document.querySelectorAll("[data-min]"), function (b) {
+        b.classList.remove("on");
+      });
+    }
+  });
+
+  function resetArm() {
+    armed = false;
+    el.warn.classList.remove("show");
+    el.send.classList.remove("danger");
+    el.send.textContent = "发到教室";
+  }
+
+  el.text.addEventListener("input", function () {
+    el.n.textContent = el.text.value.length;
+    if (el.text.value.trim() === "") resetArm();
+  });
+
+  /* ---------- 发送 ---------- */
+
+  function toast(msg, bad) {
+    el.toast.textContent = msg;
+    el.toast.className = "toast show" + (bad ? " bad" : "");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.toast.className = "toast"; }, 2600);
+  }
+
+  el.send.addEventListener("click", function () {
+    if (busy) return;
+    var text = el.text.value.trim();
+    if (!text) { toast("还没写内容", true); el.text.focus(); return; }
+    if (level === "urgent" && armed) {
+      // 第一次点是确认，第二次才真发
+      armed = false;
+      el.send.textContent = "正在发送…";
+    }
+
+    busy = true;
+    el.send.disabled = true;
+
+    fetch(API + "/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text, level: level, minutes: minutes, forWhom: "class" })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { code: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.code !== 200 || !res.d.ok) {
+          throw new Error((res.d && res.d.error) || "发送失败");
+        }
+        toast("已送到教室");
+        el.text.value = "";
+        el.n.textContent = "0";
+        resetArm();
+        load();
+      })
+      .catch(function (e) {
+        var msg = /Failed to fetch|NetworkError|Load failed/i.test(e.message)
+          ? "没连上教室，检查手机是否连了学校 WiFi"
+          : e.message;
+        toast(msg, true);
+        resetArm();
+      })
+      .then(function () {
+        busy = false;
+        setTimeout(function () { el.send.disabled = false; }, 900);
+      });
+  });
+
+  /* ---------- 历史 ---------- */
+
+  /* 屏上现在是什么：手机端也要能看见，否则老师不知道要不要撤回 */
+  function ended(m, now) {
+    if (!m.until) return false;
+    if (m.until >= "00:00" && m.until < "06:00") return false;
+    return now >= m.until;
+  }
+
+  function nowHM() {
+    var d = new Date();
+    return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+
+  function renderLive(list) {
+    var now = nowHM();
+    var cur = null;
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      if (m.retractedAt || m.forWhom !== "class" || ended(m, now)) continue;
+      cur = m; break;
+    }
+    if (!cur) { el.live.classList.remove("show"); return; }
+    el.liveText.textContent = cur.text;
+    el.liveMeta.textContent = cur.until === "23:59"
+      ? cur.at + " 发出 · 显示到今天结束"
+      : cur.at + " 发出 · " + cur.until + " 自动消失";
+    el.live.classList.add("show");
+  }
+
+  el.retract.addEventListener("click", function () {
+    el.retract.disabled = true;
+    fetch(API + "/api/retract", { method: "POST" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        toast(d && d.cleared ? "已从教室撤下" : "屏上没有可撤回的消息");
+        load();
+      })
+      .catch(function () { toast("没连上教室，检查 WiFi", true); })
+      .then(function () { setTimeout(function () { el.retract.disabled = false; }, 800); });
+  });
+
+  function load() {
+    fetch(API + "/api/messages?n=8", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var all = (d.messages || []).slice().reverse();
+        renderLive(all);
+        var list = all.slice(0, 5);
+        if (!list.length) {
+          el.list.innerHTML = '<div class="empty">还没有发过</div>';
+          return;
+        }
+        el.list.innerHTML = "";
+        list.forEach(function (m) {
+          var row = document.createElement("div");
+          row.className = "item";
+          var t = document.createElement("div");
+          t.className = "t";
+          t.textContent = m.at || "";
+          var x = document.createElement("div");
+          x.className = "x" + (m.level === "urgent" ? " urgent" : "");
+          x.textContent = m.text;
+          row.appendChild(t);
+          row.appendChild(x);
+          el.list.appendChild(row);
+        });
+      })
+      .catch(function () {
+        el.list.innerHTML = '<div class="empty">读不到历史</div>';
+      });
+  }
+
+  load();
+  setInterval(load, 15000);
+})();
+</script>
+</body>
+</html>

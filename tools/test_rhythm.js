@@ -1,0 +1,167 @@
+/* 用 node 直接跑 app/rhythm.js 的渲染逻辑，确认每个时段给出的卡片是对的。
+   node tools/test_rhythm.js */
+const fs = require("fs");
+const path = require("path");
+
+const ROOT = path.resolve(__dirname, "..");
+global.window = {};
+eval(fs.readFileSync(path.join(ROOT, "app/data.js"), "utf8"));
+eval(fs.readFileSync(path.join(ROOT, "app/rhythm.js"), "utf8"));
+
+const DATA = global.window.RHYTHM_DATA;
+const R = global.window.Rhythm;
+
+let pass = 0, fail = 0;
+function check(ok, title, detail) {
+  console.log((ok ? "PASS  " : "FAIL  ") + title + (detail ? "  · " + detail : ""));
+  ok ? pass++ : fail++;
+}
+function at(date, hhmm, opts) {
+  const day = DATA.days[date];
+  const p = hhmm.split(":").map(Number);
+  return R.stateAt(day, p[0] * 60 + p[1], opts);
+}
+function duty(date, hhmm) {
+  const day = DATA.days[date];
+  const p = hhmm.split(":").map(Number);
+  return R.dutiesAt(day, p[0] * 60 + p[1]);
+}
+
+/* 周四：7 节正课，第 4 节书法 */
+const first = DATA.days["2026-11-05"].timeline.filter(b => b.type === "class" && b.periodNo === 1)[0];
+let s = at("2026-11-05", "08:30");
+check(s.kind === "class" && s.title === "第 1 节 · 语文" && s.sub === first.teacher,
+  "上课卡：第 1 节 语文 / " + first.teacher, s.title + " / " + s.sub);
+check(!s.countdown.visible, "上课不显示倒计时");
+
+s = at("2026-11-05", "11:25");
+check(s.kind === "class" && s.title.indexOf("第 4 节") === 0 && s.title.indexOf("书法") > 0,
+  "第 4 节是书法（11:20–11:40）", s.title);
+check(s.items.length === 4 && s.items[0] === "毛笔", "书法课摆出 4 样学具", s.items.join("、"));
+
+s = at("2026-11-05", "11:10");
+check(s.kind === "break" && s.sub === "下一节 书法", "课间提示下一节书法", s.sub);
+check(s.items.indexOf("墨汁") >= 0, "level 3 提前一个课间就提示墨汁");
+check(s.countdown.visible && s.countdown.text.indexOf("还有") === 0,
+  "课间倒计时（距上课）", s.countdown.text);
+
+s = at("2026-11-05", "10:18");
+check(s.kind === "break" && s.items.length === 0, "level 1 科目不提前列清单",
+  "items=" + s.items.length);
+check(s.lines.length === 2 && s.lines[0].items.join("/") === "喝水/上厕所",
+  "课间第一行：喝水 上厕所", JSON.stringify(s.lines[0]));
+check(s.lines[1].label === "准备好" && s.lines[1].items[0] === "下节课的书",
+  "课间第二行：准备好，先泛指", JSON.stringify(s.lines[1]));
+
+s = at("2026-11-05", "10:24");
+check(s.items.length > 0, "level 1 科目在最后 2 分钟才列清单", s.items.join("、"));
+
+/* 第二行的清单跟科目走，且老师改过的词要顶掉默认 */
+s = at("2026-11-05", "11:10");
+check(s.lines[1].items.indexOf("墨汁") >= 0, "课间第二行列出书法要带的东西",
+  s.lines[1].items.join("、"));
+
+s = at("2026-11-05", "10:18", {
+  texts: { breakActions: ["补水"], prepLabel: "准备" }
+});
+check(s.lines[0].items[0] === "补水" && s.lines[1].label === "准备",
+  "老师改过的课间用词会覆盖默认", JSON.stringify(s.lines));
+
+/* 任务类不套「准备好」——大扫除的条目本身就是动作 */
+s = at("2026-11-10", "11:55");
+check(s.lines[0].kind === "action" && s.lines[0].items.length === 4,
+  "大扫除四项任务是动作行，不是准备行", JSON.stringify(s.lines[0]));
+
+/* 午间与午餐 */
+s = at("2026-11-05", "12:20");
+check(s.kind === "noon" && s.title === "午间休息", "午间卡", s.title);
+
+s = at("2026-11-05", "12:07");
+check(s.kind === "meal" && s.countdown.visible, "午餐最后 5 分钟倒计时", s.countdown.text);
+
+/* 周二：大扫除插在午餐与午间之间 */
+s = at("2026-11-10", "11:55");
+check(s.kind === "action" && s.title === "大扫除", "周二 11:55 显示大扫除", s.title);
+check(s.items.length === 4, "大扫除 4 项任务", s.items.join("、"));
+check(s.note.indexOf("湿手不碰插座") >= 0, "大扫除安全提示上屏", s.note);
+
+s = at("2026-11-10", "12:20");
+check(s.kind === "noon" && s.title === "午间休息", "大扫除后进入午间", s.title);
+
+/* 放学与周末 */
+s = at("2026-11-05", "17:30");
+check(s.kind === "closed" && s.title === "放学了", "17:20 之后显示放学");
+
+s = at("2026-11-07", "10:00");
+check(s.kind === "holiday" && s.title === "今天不上学", "周六显示不上学");
+
+/* 两头的话也能改：到校前、放学后、休息日不在作息表里，但老师最常改的正是这几句 */
+s = at("2026-11-05", "07:50");
+check(s.kind === "before" && s.title === "早上好", "7:50 显示到校前", s.title);
+check(s.note.indexOf("交作业") >= 0, "到校前那句默认是交作业", s.note);
+check(s.arrived === true, "7:50 已经到校（顶部标签不应再写「还没到校」）");
+
+s = at("2026-11-05", "07:30");
+check(s.arrived === false, "7:30 还没到校");
+
+s = at("2026-11-05", "07:50", {
+  texts: { stage: { before: { title: "早读开始", note: "交作业、交回执" } } }
+});
+check(s.title === "早读开始" && s.note === "交作业、交回执", "到校前的话能被老师改",
+  s.title + " / " + s.note);
+
+s = at("2026-11-05", "17:30", { texts: { stage: { closed: { note: "排队出校门，跟老师再见" } } } });
+check(s.kind === "closed" && s.note === "排队出校门，跟老师再见", "放学那句能被改", s.note);
+
+s = at("2026-11-07", "10:00", { texts: { stage: { holiday: { title: "今天休息" } } } });
+check(s.kind === "holiday" && s.title === "今天休息", "休息日标题能被改", s.title);
+
+s = at("2026-11-05", "10:18", { texts: { breakTitle: "课间休息" } });
+check(s.title === "课间休息", "课间大字能被改", s.title);
+
+/* 值日条 */
+let d = duty("2026-11-05", "10:18");
+check(d.items.length > 0 && d.quiet === true, "课间只挂日常岗位且降权",
+  d.items.map(x => x.name).join("、"));
+
+d = duty("2026-11-10", "17:11");
+const names = d.items.map(x => x.name);
+check(names[0] === "值日组", "放学 4 件事合并成「值日组」一条", names.join(" → "));
+check(names[names.length - 1] === "路队长", "路队长排最后", names.join(" → "));
+check(d.items[0].tasks.length === 4, "值日组合并了 4 项", d.items[0].tasks.join("、"));
+check(d.items[0].people.length === 0 && d.items[0].unknown === true,
+  "A/B 组未确认时显示「待定」，不编人名");
+
+d = duty("2026-11-05", "08:30");
+check(d.items.length === 0, "上课时间值日条不出现");
+
+/* 倒计时三档 */
+s = at("2026-11-05", "11:10", { countdownMode: "off" });
+check(!s.countdown.visible, "全部关闭时课间也不倒计时");
+
+s = at("2026-11-05", "08:30", { countdownMode: "all" });
+check(s.countdown.visible, "全部显示时上课也倒计时", s.countdown.text);
+
+/* ---------- 早读 ---------- */
+/* 11-05 是周四。早读按星期配：配了才显示，没配不许猜。 */
+const rd = { texts: { reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } } } };
+
+s = at("2026-11-05", "07:50", rd);
+check(s.kind === "before" && s.title === "英语早读", "周四 7:50 是英语早读", s.title);
+check(s.reading === true, "标了 reading，顶栏写「早读」而不是「到校」");
+check(s.lines.length === 1 && s.lines[0].label === "早读建议"
+  && s.lines[0].items[0] === "读 Unit 4 单词", "早读建议单独一行上屏",
+  JSON.stringify(s.lines));
+check(s.items.length === 0, "早读不出准备清单", s.items.join("、") || "空");
+
+s = at("2026-11-05", "07:30", rd);
+check(!s.reading && s.title === "早上好", "7:40 前人还没到，不催早读", s.title);
+
+s = at("2026-11-06", "07:50", rd);
+check(!s.reading, "周五没配早读，就退回原样", s.title);
+
+s = at("2026-11-05", "07:50", { texts: { reading: { "4": { subject: "英语" } } } });
+check(s.title === "英语早读" && s.lines.length === 0, "没写建议就只上一个大字", s.title);
+
+console.log("\n" + pass + "/" + (pass + fail) + " 通过");
+process.exit(fail ? 1 : 0);

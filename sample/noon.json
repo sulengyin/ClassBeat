@@ -1,0 +1,52 @@
+{
+  "id": "noon-cj-55-2026s",
+  "class": "五（1）班",
+  "note": "优先级：SchoolNotice > DayOverride > WeekRule > Default；班级端不得绕过",
+  "defaultPreset": "rest",
+  "weekRule": {
+    "1": "rest",
+    "2": "clean",
+    "3": "rest",
+    "4": "rest",
+    "5": "rest"
+  },
+  "presets": {
+    "rest": {
+      "label": "午睡",
+      "title": "午间休息",
+      "items": [],
+      "tip": "闭眼趴一会儿，不说话，不追跑"
+    },
+    "clean": {
+      "label": "大扫除",
+      "title": "午间休息",
+      "items": [],
+      "tip": "闭眼趴一会儿，不说话，不追跑",
+      "pre": {
+        "title": "大扫除",
+        "tip": "先打扫自己的座位，湿手不碰插座",
+        "items": [
+          "擦窗台和黑板",
+          "扫地拖地",
+          "摆正桌椅",
+          "倒垃圾"
+        ]
+      }
+    },
+    "hw": {
+      "label": "自主作业",
+      "title": "自主作业",
+      "items": [
+        "先做当天书面作业",
+        "写完自己检查一遍"
+      ],
+      "tip": "保持安静，不会的先记下来"
+    },
+    "custom": {
+      "label": "自定义",
+      "title": "午间安排",
+      "items": [],
+      "tip": ""
+    }
+  }
+}

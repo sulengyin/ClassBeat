@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 仓库里没有 data/，全部用 sample/ 的化名数据构建
+      - name: Build data
+        run: python3 tools/bundle.py --data sample --start 2026-11-05
+
+      - name: 节律逻辑
+        run: node tools/test_rhythm.js
+
+      - name: 本地存储
+        run: node tools/test_store.js
+
+      - name: 页面能起来
+        run: node tools/test_dom.js
+
+      - name: 数据自洽
+        run: python3 tools/check_p1.py
+
+      - name: 消息服务
+        run: python3 tools/test_server.py
+
+      # 防回归：公开仓库里不能出现真实姓名
+      - name: 隐私检查
+        run: |
+          if grep -rIl --exclude-dir=.git -e "五（5）班" -e "春江中心小学" .; then
+            echo "::error::发现真实班级信息，不应提交"
+            exit 1
+          fi
+          echo "干净"

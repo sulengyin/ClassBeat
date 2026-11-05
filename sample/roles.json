@@ -1,0 +1,396 @@
+{
+  "id": "roles-cj-55-2026s",
+  "class": "五（1）班",
+  "version": "v0",
+  "effectiveFrom": "2026-09-01",
+  "source": "小岗位表 + 值日组表（两张真实表）",
+  "status": "PARTIAL",
+  "note": "没写频率的岗位一律 unset，不默认成每天；轮换规则未确认前不猜，输出 unknown",
+  "roles": [
+    {
+      "id": "r01",
+      "name": "路队长",
+      "duty": "提醒静齐排队，清点人数，有序进场",
+      "freq": {
+        "kind": "event",
+        "event": "列队出发",
+        "times": [
+          "17:10"
+        ]
+      },
+      "people": [
+        "孙星野",
+        "孔子墨"
+      ],
+      "order": 90,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r02",
+      "name": "节能小队长",
+      "duty": "离开教室时检查电灯电扇，放学关好门窗",
+      "freq": {
+        "kind": "event",
+        "event": "离开教室",
+        "times": [
+          "17:10"
+        ]
+      },
+      "people": [
+        "吕雨桐"
+      ],
+      "order": 80,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r03",
+      "name": "补给站队长",
+      "duty": "领水果或奶类，监督下发和垃圾回收",
+      "freq": {
+        "kind": "daily",
+        "times": [
+          "11:45"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "people": [
+        "陈静姝",
+        "沈雨桐"
+      ],
+      "order": 50,
+      "assign": "fixed",
+      "grp": null,
+      "note": "11:45 是推测，表上只写「领水果或奶类」"
+    },
+    {
+      "id": "r04",
+      "name": "劳动委员",
+      "duty": "7:50 检查班级卫生，不到位立即提醒返工",
+      "freq": {
+        "kind": "daily",
+        "times": [
+          "07:50"
+        ],
+        "timesStatus": "CONFIRMED"
+      },
+      "people": [
+        "朱乐言"
+      ],
+      "order": 20,
+      "assign": "fixed",
+      "grp": null,
+      "note": "18 个岗位里唯一在表上写了具体时刻的"
+    },
+    {
+      "id": "r05",
+      "name": "多媒体管理员",
+      "duty": "开关电脑，帮助老师投影",
+      "freq": {
+        "kind": "each"
+      },
+      "people": [
+        "吴书瑶"
+      ],
+      "order": 15,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r06",
+      "name": "体温管理员",
+      "duty": "早、中用体温枪检测并记录异常",
+      "freq": {
+        "kind": "daily",
+        "times": [
+          "07:50",
+          "12:05"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "people": [
+        "华青禾"
+      ],
+      "order": 20,
+      "assign": "fixed",
+      "grp": null,
+      "note": "中午那一次具体时刻未定，暂填 12:05（待确认 15）"
+    },
+    {
+      "id": "r07",
+      "name": "绿植守护者",
+      "duty": "摆放养殖绿植，定期浇水并记录",
+      "freq": {
+        "kind": "unset",
+        "reason": "表上只写「定期」"
+      },
+      "people": [
+        "周予宁"
+      ],
+      "order": 0,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r08",
+      "name": "连廊管理",
+      "duty": "负责教室外连廊的卫生",
+      "freq": {
+        "kind": "unset",
+        "reason": "表上没写什么时候"
+      },
+      "people": [
+        "蒋白露"
+      ],
+      "order": 0,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r09",
+      "name": "外墙美丽师",
+      "duty": "管理外墙作品，避免脱落",
+      "freq": {
+        "kind": "unset",
+        "reason": "表上没写什么时候"
+      },
+      "people": [
+        "卫清越"
+      ],
+      "order": 0,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r10",
+      "name": "讲台清理师",
+      "duty": "整理讲台，提醒老师拿好物品",
+      "freq": {
+        "kind": "each"
+      },
+      "people": [
+        "杨望舒"
+      ],
+      "order": 12,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r11",
+      "name": "黑板清洁师",
+      "duty": "每天擦黑板及板擦摆放",
+      "freq": {
+        "kind": "daily",
+        "times": [
+          "08:10"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "peopleMap": {
+        "1": "沈亦然",
+        "2": "孔子墨",
+        "3": "曹嘉禾",
+        "4": "郑思远",
+        "5": "华青禾"
+      },
+      "substitute": [
+        {
+          "name": "陈静姝",
+          "note": "特殊情况帮忙擦黑板"
+        }
+      ],
+      "order": 12,
+      "assign": "fixed",
+      "grp": null,
+      "rotation": {
+        "kind": "weekday-map",
+        "status": "confirmed"
+      },
+      "note": "1–5 对应周一到周五（老师已确认数字表示星期几）；6 号陈静姝是替补，不是第六天"
+    },
+    {
+      "id": "r12",
+      "name": "班牌",
+      "duty": "每天早上去领回班牌",
+      "freq": {
+        "kind": "daily",
+        "times": [
+          "07:40"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "people": [
+        "钱和风"
+      ],
+      "order": 10,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r13",
+      "name": "作业管理",
+      "duty": "作业给教师确认并签字",
+      "freq": {
+        "kind": "daily",
+        "times": [
+          "07:50"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "people": [
+        "孙明轩"
+      ],
+      "order": 20,
+      "assign": "fixed",
+      "grp": null
+    },
+    {
+      "id": "r14",
+      "name": "擦窗户",
+      "duty": "大扫除时统一擦窗户",
+      "freq": {
+        "kind": "task",
+        "task": "大扫除"
+      },
+      "people": [
+        "韩思远",
+        "沈雨桐",
+        "陶南乔",
+        "魏书瑶",
+        "周予宁",
+        "金梓萱",
+        "周沐辰",
+        "蒋沐辰"
+      ],
+      "order": 35,
+      "assign": "fixed",
+      "grp": "值日组",
+      "note": "不是独立时间，跟着大扫除动作走（11:50–12:10）"
+    },
+    {
+      "id": "r15",
+      "name": "扫地",
+      "duty": "A/B 组轮流，按日期区间换组",
+      "freq": {
+        "kind": "cycle",
+        "times": [
+          "17:10"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "groups": {
+        "A": [
+          "秦静姝",
+          "吕雨桐",
+          "卫浩然",
+          "韩知远"
+        ],
+        "B": [
+          "郑南乔",
+          "何白露",
+          "李青禾"
+        ]
+      },
+      "cycle": {
+        "kind": "date-range",
+        "current": null,
+        "status": "unconfirmed"
+      },
+      "order": 30,
+      "assign": "self-organize",
+      "grp": "值日组",
+      "note": "手写：扫地的同学自主协调扫哪一大组，所以只召集、不分格"
+    },
+    {
+      "id": "r16",
+      "name": "后柜·窗台·图书角",
+      "duty": "A/B 组轮流",
+      "freq": {
+        "kind": "cycle",
+        "times": [
+          "17:10"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "groups": {
+        "A": [
+          "吴亦然"
+        ],
+        "B": [
+          "杨予宁"
+        ]
+      },
+      "cycle": {
+        "kind": "date-range",
+        "current": null,
+        "status": "unconfirmed"
+      },
+      "order": 30,
+      "assign": "fixed",
+      "grp": "值日组",
+      "note": "表上划掉吴亦然、手写赵予安（替补）；两人都在名册，属岗位换人不是学籍变动"
+    },
+    {
+      "id": "r17",
+      "name": "包干区打扫",
+      "duty": "A/B 组轮流",
+      "freq": {
+        "kind": "cycle",
+        "times": [
+          "17:10"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "groups": {
+        "A": [
+          "秦静姝",
+          "蒋沐辰"
+        ],
+        "B": [
+          "吴书瑶",
+          "孔子墨"
+        ]
+      },
+      "cycle": {
+        "kind": "date-range",
+        "current": null,
+        "status": "unconfirmed"
+      },
+      "order": 30,
+      "assign": "fixed",
+      "grp": "值日组"
+    },
+    {
+      "id": "r18",
+      "name": "倒垃圾",
+      "duty": "早晨、中午、放学三次",
+      "freq": {
+        "kind": "cycle",
+        "times": [
+          "07:50",
+          "12:50",
+          "17:10"
+        ],
+        "timesStatus": "ASSUMED"
+      },
+      "groups": {
+        "A": [
+          "姜一诺"
+        ],
+        "B": [
+          "冯乐言"
+        ]
+      },
+      "cycle": {
+        "kind": "date-range",
+        "current": null,
+        "status": "unconfirmed"
+      },
+      "order": 30,
+      "assign": "fixed",
+      "grp": "值日组",
+      "note": "三次是用户口述；具体时刻是推测，中午那次取 12:50"
+    }
+  ]
+}

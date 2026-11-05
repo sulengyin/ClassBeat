@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>班级节律屏</title>
+<link rel="stylesheet" href="edit.css">
+<style>
+/* ============================================================
+   视觉语言：手账 / 贴纸 / 教室公告板
+   · 奶油色方格纸底，深棕粗描边，亮黄贴纸面
+   · 描边不是黑，是暖棕 #3A2A1E——黑会显硬，棕才像马克笔
+   · 圆角不规则 + 轻微倾斜，是为了"贴上去"而不是"排版"
+   · 装饰只在边框和角落，文字区永远干净：8 米外先读字，再看热闹
+   · 底色不按"时段"跳色，而是按天光走：清晨暖、正午亮、傍晚转暗。
+     颜色一天只朝一个方向变，学生不会每 40 分钟被换一次背景。
+     语义色只留在小面积（状态标签、倒计时数字、走廊脊柱），够辨认就行。
+   ============================================================ */
+:root{
+  /* 天光三色由 screen.js 每分钟写一次，这里只是开局默认（早上到校） */
+  --day-paper:#F8EFDF;
+  --day-card:#FFEDCE;
+  --day-cream:#FFF8E7;
+
+  --paper:var(--day-paper);
+  --grid:rgba(176,146,84,.13);
+  --grid-strong:rgba(176,146,84,.22);
+
+  --ink:#31231A;          /* 正文：深可可色，比纯黑柔和 */
+  --ink-2:#6B5545;
+  --ink-3:#9B8672;
+
+  --line:#3A2A1E;         /* 描边 */
+  --line-soft:rgba(58,42,30,.32);
+
+  --cream:var(--day-cream);       /* 便签纸 */
+  --yellow:#FFD64F;
+  --orange:#F2703A;
+  --teal:#3FB6D8;
+  --violet:#8C5BD0;
+  --green:#4CA34A;
+  --red:#DE3B34;
+
+  --card:var(--day-card);
+  --card-ink:#31231A;
+  --accent:#B9791A;
+  --band-ink:#FFF8E7;
+
+  --mono:ui-monospace,SFMono-Regular,Menlo,"Roboto Mono","DejaVu Sans Mono",monospace;
+  --hand:"Kaiti SC","STKaiti","KaiTi","楷体",system-ui,sans-serif;
+  --e-out:cubic-bezier(.22,1,.36,1);
+  --e-spring:cubic-bezier(.16,1.02,.3,1);
+  --e-soft:cubic-bezier(.4,0,.2,1);
+  --d-fast:.16s; --d-in:.34s; --d-move:.52s; --d-slow:.8s;
+  --bw:.42vmin;           /* 标准描边粗细 */
+}
+
+/* 语义色按"现在该干什么"分配，不按好看分配。
+   只给标签、数字、脊柱这些小面积上色，整张卡不再跟着时段换衣服。 */
+body[data-kind="class"]{--accent:#2E6FBF}
+body[data-kind="break"]{--accent:#996008}
+body[data-kind="meal"],
+body[data-kind="noon"]{--accent:#A55C0C}
+body[data-kind="ritual"]{--accent:#6F4CBC}
+body[data-kind="action"]{--accent:#BF5520}
+body[data-kind="after"]{--accent:#7A6A55}
+body[data-kind="before"],
+body[data-kind="closed"],
+body[data-kind="holiday"]{--accent:#7A6A55}
+body[data-alert="1"]{--board:#FFD8D2;--card-ink:#7E1E18;--accent:#C8382F}
+
+/* 深夜版：不是反色，是把纸换成墨绿黑板，描边换成粉笔 */
+body[data-theme="dark"]{
+  /* 纯黑底、白字：教室关灯或者投影用，黑得干净，白得刺眼是刻意的 */
+  --day-paper:#000000;
+  --day-card:#0D0D0D;
+  --day-cream:#161616;
+  --grid:rgba(255,255,255,.05);
+  --grid-strong:rgba(255,255,255,.1);
+  --ink:#FFFFFF;
+  --ink-2:#D9D9D9;
+  --ink-3:#8E8E8E;
+  --line:#FFFFFF;
+  --line-soft:rgba(255,255,255,.34);
+  --card-ink:#FFFFFF;
+  --band-ink:#000000;
+  --accent:#E8B44A;
+}
+
+/* 纯黑底上深棕影等于不存在，换一层很淡的白影，保住"贴纸压着纸"的厚度 */
+body[data-theme="dark"] .board{box-shadow:.7vmin .7vmin 0 rgba(255,255,255,.09)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  position:relative;
+  color:var(--ink);
+  font-family:system-ui,-apple-system,"HarmonyOS Sans SC","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+  padding:0 4.4vmin;
+  display:grid;grid-template-rows:auto 1fr auto;
+  overflow:hidden;-webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-font-smoothing:antialiased;
+  background-color:var(--paper);
+  /* 方格纸：细格 2.2vmin，粗格 11vmin，两级才有"本子"的感觉 */
+  background-image:
+    linear-gradient(to right,var(--grid) 1px,transparent 1px),
+    linear-gradient(to bottom,var(--grid) 1px,transparent 1px),
+    linear-gradient(to right,var(--grid-strong) 1px,transparent 1px),
+    linear-gradient(to bottom,var(--grid-strong) 1px,transparent 1px);
+  background-size:2.2vmin 2.2vmin,2.2vmin 2.2vmin,11vmin 11vmin,11vmin 11vmin;
+  transition:background-color var(--d-slow) var(--e-soft),color var(--d-slow) var(--e-soft);
+}
+
+/* 纸面阴影：四角压暗一点，像一张摊开的纸。只动 transform，走合成层 */
+.aura{
+  position:fixed;inset:-10%;z-index:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.55),transparent 60%),
+             radial-gradient(140% 110% at 50% 110%,rgba(120,92,40,.10),transparent 65%);
+  animation:aura 30s var(--e-soft) infinite alternate;
+  will-change:transform;
+}
+body[data-theme="dark"] .aura{
+  background:radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.045),transparent 62%);
+}
+@keyframes aura{from{transform:translate3d(-.8%,-.6%,0) scale(1)}to{transform:translate3d(1%,.8%,0) scale(1.03)}}
+
+/* ---------- 顶栏：班级牌 + 时钟贴纸 ---------- */
+header{
+  position:relative;z-index:3;
+  display:flex;align-items:center;gap:1.8vmin;
+  padding:2.4vmin 0 1.4vmin;
+  animation:head-in .6s var(--e-out) backwards;
+}
+@keyframes head-in{from{opacity:0;transform:translateY(-1.2vmin)}to{opacity:1;transform:none}}
+
+.buddy{width:8.6vmin;height:8.6vmin;flex:none;margin:-1.2vmin 0 -1.6vmin -.4vmin}
+.buddy svg{width:100%;height:100%;display:block;transform:rotate(-6deg)}
+body[data-reduce="1"] .buddy svg{transform:none}
+
+.cls{font-size:3.5vmin;font-weight:900;letter-spacing:.06em;color:var(--ink)}
+.date{
+  font-family:var(--hand);font-size:2.3vmin;color:var(--ink-3);
+  letter-spacing:.1em;padding-left:2vmin;border-left:.3vmin dashed var(--line-soft);
+}
+
+.clock-wrap{
+  margin-left:auto;display:flex;align-items:baseline;gap:.7vmin;
+  background:var(--cream);border:.34vmin solid var(--line);border-radius:1.8vmin 1.4vmin 1.9vmin 1.3vmin;
+  padding:.7vmin 2vmin .8vmin;
+  box-shadow:.55vmin .55vmin 0 rgba(58,42,30,.13);
+  transform:rotate(.8deg);
+  transition:background-color var(--d-slow) var(--e-soft);
+}
+.clock{font:800 6.2vmin/1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--ink)}
+.clock-wrap .sec{font-size:2.4vmin;color:var(--ink-3);min-width:3.6vmin;letter-spacing:0}
+
+/* ---------- 主区 ---------- */
+main{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:5vmin 5.4vmin 4.6vmin 9.6vmin;min-height:0;
+}
+
+/* 贴纸卡：真身。装饰和它同层，文字在上一层 */
+.board{
+  position:absolute;inset:1vmin 1.2vmin 1.2vmin 1.2vmin;
+  /* 紧急通知是唯一能让整张卡变红的入口——由老师手动触发 */
+  background:var(--board,var(--card));
+  border:.5vmin solid var(--line);
+  border-radius:3.6vmin 2.8vmin 3.4vmin 2.6vmin;
+  box-shadow:.7vmin .7vmin 0 rgba(58,42,30,.13);
+  transform:rotate(-.35deg);
+  z-index:0;pointer-events:none;
+  transition:background-color var(--d-move) var(--e-soft),border-color var(--d-slow) var(--e-soft);
+}
+/* 错位外框：参考图里那圈"画歪了的"细框 */
+.board::before{
+  content:"";position:absolute;left:-1.8vmin;top:-1.8vmin;right:3.2vmin;bottom:3.2vmin;
+  border:.4vmin solid var(--line-soft);
+  border-radius:2.6vmin 3.4vmin 2.4vmin 3vmin;
+}
+
+/* 装饰星星：只压在边框上，不进入文字区 */
+.dec{position:absolute;z-index:1;overflow:visible}
+.dec svg{width:100%;height:100%;display:block}
+.dec-a{left:-1.8vmin;top:-2vmin;width:7.6vmin;height:7.6vmin;transform:rotate(-14deg)}
+.dec-b{left:15vmin;top:-2.2vmin;width:4.8vmin;height:4.8vmin;transform:rotate(12deg)}
+.dec-c{left:25.5vmin;top:-2.8vmin;width:3.2vmin;height:3.2vmin;transform:rotate(-8deg)}
+.dec-d{right:5vmin;bottom:-1.8vmin;width:5.2vmin;height:5.2vmin;transform:rotate(16deg)}
+
+/* 左侧一日脊柱：今天走到哪儿。像尺子上的刻度 */
+.spine{position:absolute;left:2.6vmin;top:6vmin;bottom:5vmin;width:3.4vmin;z-index:1}
+.spine .seg{
+  position:absolute;left:.9vmin;width:1.5vmin;border-radius:.7vmin;
+  border:.1vmin solid rgba(58,42,30,.28);
+  opacity:.6;
+  transition:opacity var(--d-move) var(--e-soft),background-color var(--d-move) var(--e-soft);
+}
+.spine .seg.class{background:#8FB6E4}
+.spine .seg.break{background:#8CC46F}
+.spine .seg.meal,.spine .seg.noon{background:#EFB65C}
+.spine .seg.ritual{background:#B7A5E0}
+.spine .seg.after{background:#BFB4A0}
+.spine .seg.now{
+  opacity:1;background:var(--accent);
+  box-shadow:0 0 0 .45vmin rgba(255,255,255,.45);
+  animation:seg-breathe 3.6s var(--e-soft) infinite;
+}
+@keyframes seg-breathe{0%,100%{opacity:1}50%{opacity:.62}}
+.spine .mark{
+  position:absolute;left:.1vmin;width:3.2vmin;height:.55vmin;border-radius:.3vmin;
+  background:var(--line);opacity:.9;
+  transition:top var(--d-slow) var(--e-out);
+}
+
+/* 状态标签：像贴上去的一小块彩纸 */
+.band{
+  position:relative;z-index:1;
+  align-self:flex-start;display:inline-flex;align-items:center;gap:1.2vmin;
+  background:var(--accent);color:var(--band-ink);
+  font-size:2.5vmin;font-weight:800;letter-spacing:.18em;
+  padding:1.1vmin 2.6vmin 1.1vmin 2vmin;
+  border:.38vmin solid var(--line);
+  border-radius:1.4vmin 1.9vmin 1.6vmin 1.2vmin;
+  box-shadow:.5vmin .5vmin 0 rgba(58,42,30,.16);
+  transform:rotate(-.9deg);
+  transition:background-color var(--d-move) var(--e-soft),color var(--d-move) var(--e-soft);
+  animation:band-in .45s var(--e-out) backwards;
+}
+@keyframes band-in{from{opacity:0;transform:rotate(-.9deg) translateY(-.9vmin)}to{opacity:1;transform:rotate(-.9deg)}}
+.band .dot{
+  width:1vmin;height:1vmin;border-radius:50%;flex:none;
+  background:currentColor;opacity:.9;
+}
+body[data-kind="class"] .band .dot{animation:dot-quiet 4s var(--e-soft) infinite}
+body[data-kind="break"] .band .dot,
+body[data-kind="meal"] .band .dot,
+body[data-kind="noon"] .band .dot{animation:dot-live 2.6s var(--e-soft) infinite}
+@keyframes dot-live{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.45);opacity:.45}}
+@keyframes dot-quiet{0%,100%{opacity:.65}50%{opacity:.35}}
+
+/* 主视觉：一屏只有一件事，字要压得住整张卡 */
+.hero{
+  position:relative;z-index:1;
+  margin-top:1.6vmin;display:flex;align-items:baseline;gap:2vmin;flex-wrap:wrap;
+  line-height:1.04;font-weight:900;letter-spacing:-.01em;color:var(--card-ink);
+}
+.hero-main{
+  display:block;font-size:16vmin;min-width:0;max-width:100%;
+  word-break:break-word;
+  transition:font-size var(--d-in) var(--e-out),color var(--d-move) var(--e-soft);
+  animation:hero-in .5s var(--e-spring) backwards;
+}
+@keyframes hero-in{from{opacity:0;transform:translateY(1.8vmin) rotate(-.6deg)}to{opacity:1;transform:none}}
+.hero-sub{font-size:3.4vmin;font-weight:700;color:var(--ink-2);letter-spacing:.04em}
+
+/* 倒计时：每位一条滚轮，像老式里程表 */
+.hero-main.ticker{
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em;display:flex;align-items:flex-start;line-height:1;
+}
+.tk-col{display:inline-block;height:1em;overflow:hidden;width:.62em;position:relative}
+.tk-strip{display:block;transition:transform .58s var(--e-spring)}
+.tk-strip b{display:block;height:1em;line-height:1;text-align:center;font-weight:900}
+.tk-sep{display:inline-block;width:.3em;text-align:center;opacity:.45}
+body[data-focus="countdown"] .hero-main{color:var(--accent)}
+
+.after{
+  position:relative;z-index:1;
+  font-size:4.2vmin;font-weight:600;color:var(--ink-2);margin-top:1.8vmin;
+  line-height:1.4;max-width:104vmin;
+  animation:after-in .5s var(--e-out) .06s backwards;
+}
+.after:empty{display:none}
+@keyframes after-in{from{opacity:0;transform:translateY(1vmin)}to{opacity:1;transform:none}}
+
+/* 动作 / 用品：两行。第一行是"现在去做什么"，第二行是"带什么"。
+   分开是因为这两件事发生的时间不一样：先喝水上厕所，再收书包。
+   挤在一行，学生会当成一串并列的事一起看过去。 */
+.chips{position:relative;z-index:1;display:flex;flex-direction:column;align-items:flex-start;
+       gap:1.5vmin;margin-top:2.4vmin}
+.chips:empty{display:none}
+.chip-row{display:flex;align-items:center;gap:1.4vmin;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:1vmin;
+  font-size:3.6vmin;font-weight:800;padding:1.2vmin 2.6vmin;
+  border:.32vmin solid var(--line);border-radius:1.4vmin 1.8vmin 1.5vmin 1.2vmin;
+  background:var(--cream);color:var(--ink);
+  box-shadow:.44vmin .44vmin 0 rgba(58,42,30,.12);
+  transform:rotate(-.7deg);
+  animation:chip-in .46s var(--e-spring) backwards;animation-delay:var(--d,0ms);
+}
+.chip:nth-child(even){transform:rotate(.8deg)}
+.chip::before{
+  content:"";width:.95vmin;height:.95vmin;border-radius:.2vmin;
+  background:var(--accent);flex:none;transform:rotate(45deg);
+}
+.chip.prep{background:var(--accent);color:var(--band-ink);border-color:var(--line)}
+.chip.prep::before{background:var(--band-ink);opacity:.8}
+@keyframes chip-in{from{opacity:0;transform:translateY(1.2vmin) scale(.94) rotate(-3deg)}to{opacity:1}}
+
+/* 第二行：准备好。不做成色块，做成"写在纸上的一行字"，
+   和第一行的色块拉开层级——一个是命令，一个是清单。 */
+.prep-line{display:flex;align-items:baseline;flex-wrap:wrap;line-height:1.35}
+.prep-line .plabel{
+  font-size:3.5vmin;font-weight:900;color:var(--card-ink);
+  letter-spacing:.04em;flex:none;
+}
+.prep-line .plabel::after{content:"："}
+.prep-line .pitem{
+  font-size:3.4vmin;font-weight:700;color:var(--card-ink);
+  animation:chip-in .42s var(--e-spring) backwards;animation-delay:var(--d,0ms);
+}
+.prep-line .pitem + .pitem::before{
+  content:"·";margin:0 1.1vmin;font-weight:400;opacity:.45;
+}
+
+/* 老师发的普通通知：一张贴了引号的便签 */
+.notice-bar{
+  position:relative;z-index:1;
+  align-self:flex-start;margin-top:1.8vmin;max-width:100%;
+  display:flex;align-items:flex-start;gap:1.2vmin;
+  font-size:2.9vmin;font-weight:700;line-height:1.45;color:var(--ink);
+  background:var(--cream);
+  border:.38vmin solid var(--line);
+  border-radius:1.4vmin 2vmin 1.6vmin 1.2vmin;
+  padding:1.2vmin 1.4vmin 1.2vmin 8.6vmin;
+  box-shadow:.6vmin .6vmin 0 rgba(58,42,30,.16);
+  transform:rotate(-.5deg);
+  animation:toast-in .38s var(--e-spring) backwards;
+}
+/* 大引号：表示"老师在说话"，不是装饰用的花 */
+.notice-bar::before{
+  content:"\201C";
+  position:absolute;left:1.4vmin;top:2.4vmin;
+  font:900 9vmin/1 Georgia,var(--hand),serif;color:var(--accent);opacity:.85;
+}
+.notice-text{flex:1;min-width:0;padding-top:.3vmin}
+
+/* 关闭：单击没用，按住 0.9 秒才生效。学生乱点关不掉，老师知道要按住。 */
+.notice-x{
+  flex:none;position:relative;overflow:hidden;
+  width:4.6vmin;height:4.6vmin;margin:-.4vmin -.4vmin -.4vmin 0;
+  border:0;border-radius:50%;background:transparent;
+  color:var(--ink-3);font:400 3.2vmin/1 inherit;cursor:pointer;
+  transition:background .2s var(--e-out),color .2s var(--e-out);
+  -webkit-user-select:none;user-select:none;touch-action:none;
+}
+.notice-x:hover{background:rgba(58,42,30,.08);color:var(--ink)}
+.notice-x::after{
+  content:"";position:absolute;left:0;right:0;bottom:.5vmin;height:.4vmin;border-radius:.2vmin;
+  background:var(--accent);transform:scaleX(0);transform-origin:left;
+}
+.notice-x.holding::after{animation:hold-fill .9s linear forwards}
+@keyframes hold-fill{to{transform:scaleX(1)}}
+@keyframes toast-in{from{opacity:0;transform:rotate(-.5deg) translateY(1.4vmin) scale(.97)}to{opacity:1;transform:rotate(-.5deg)}}
+
+/* ---------- 值日条 ---------- */
+footer{
+  position:relative;z-index:3;
+  border-top:.34vmin dashed var(--line-soft);
+  padding:1.7vmin 0 2.2vmin;
+  display:flex;flex-wrap:wrap;align-items:center;gap:1.6vmin;
+  min-height:8.6vmin;
+}
+.duty-label{
+  font-family:var(--hand);font-size:2.1vmin;letter-spacing:.16em;color:var(--ink-3);
+  white-space:nowrap;flex:none;transform:rotate(-1deg);
+}
+.duty-list{display:flex;align-items:center;gap:.9vmin;flex-wrap:wrap;min-width:0}
+.duty{
+  display:flex;align-items:baseline;gap:.9vmin;
+  padding:.8vmin 1.5vmin;border-radius:1vmin 1.3vmin 1.1vmin .9vmin;
+  background:var(--cream);border:.26vmin solid var(--line);
+  box-shadow:.32vmin .32vmin 0 rgba(58,42,30,.12);
+  font-size:2.7vmin;cursor:default;
+  transform:rotate(-.5deg);
+  transition:transform var(--d-in) var(--e-out),box-shadow var(--d-in) var(--e-out);
+}
+.duty:nth-child(even){transform:rotate(.6deg)}
+.duty[data-people]{cursor:pointer}
+.duty[data-people]:hover{transform:translateY(-.4vmin) rotate(0)}
+.duty .task{font-weight:700;color:var(--ink)}
+.duty .who{font-weight:800;color:var(--accent);font-size:2.8vmin}
+.duty .who.none{color:var(--ink-3);font-weight:500;font-size:2.4vmin}
+.duty.quiet{background:transparent;border-color:transparent;box-shadow:none;padding-left:.2vmin;transform:none}
+.duty.quiet .task{font-weight:500;color:var(--ink-3);font-size:2.4vmin}
+.duty.quiet .who{font-weight:600;color:var(--ink-3);font-size:2.5vmin}
+.dot-sep{width:.5vmin;height:.5vmin;border-radius:50%;background:var(--line-soft);flex:none}
+.more{font:600 2vmin/1 var(--mono);color:var(--ink-3)}
+.none{font-size:2.4vmin;color:var(--ink-3)}
+
+/* 值日条展开（PLAN 2.18）：只读，10 秒自动收 */
+.duty-detail{
+  flex-basis:100%;display:none;margin-top:1.2vmin;
+  background:var(--cream);border:.3vmin solid var(--line);border-radius:1.4vmin;
+  padding:1.2vmin 1.8vmin;font-size:2.4vmin;color:var(--ink-2);
+  box-shadow:.4vmin .4vmin 0 rgba(58,42,30,.12);
+}
+.duty-detail.show{display:block;animation:after-in .3s var(--e-out) backwards}
+
+/* ---------- 紧急：红色流光只由老师触发 ---------- */
+.alert-frame{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .3s var(--e-soft);z-index:40}
+body[data-alert="1"] .alert-frame{opacity:1}
+.alert-frame::after{
+  content:"";position:absolute;inset:0;
+  box-shadow:inset 0 0 0 1.1vmin rgba(222,59,52,.55), inset 0 0 16vmin rgba(222,59,52,.16);
+}
+.alert-frame::before{
+  content:"";position:absolute;inset:0;padding:1.5vmin;
+  background:conic-gradient(from 0deg,
+    transparent 0 56%, #FF8A7E 68%, #DE3B34 75%, transparent 85% 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  animation:alert-spin 2.8s linear infinite;
+}
+body[data-alert="1"][data-settled="1"] .alert-frame::before{animation:none;opacity:.3}
+@keyframes alert-spin{to{transform:rotate(1turn)}}
+
+/* 减少动态：系统偏好 + 手动开关 */
+@media (prefers-reduced-motion: reduce){
+  .aura,.spine .seg.now,.band .dot,.alert-frame::before,.hero-main,.chips .chip{animation:none!important}
+  .tk-strip{transition:none!important}
+}
+body[data-reduce="1"] .aura,
+body[data-reduce="1"] .spine .seg.now,
+body[data-reduce="1"] .band .dot,
+body[data-reduce="1"] .alert-frame::before,
+body[data-reduce="1"] .hero-main,
+body[data-reduce="1"] .chip,
+body[data-reduce="1"] .notice-bar{animation:none!important}
+body[data-reduce="1"] .tk-strip{transition:none!important}
+
+/* 状态切换：只播一次 */
+.enter{animation:hero-in .46s var(--e-spring) both}
+
+/* ---------- 角落控制 ---------- */
+.corner{position:fixed;right:1vmin;bottom:1vmin;display:flex;flex-direction:column;
+        align-items:flex-end;gap:.7vmin;z-index:60}
+.corner .tools{display:flex;gap:.6vmin;opacity:0;pointer-events:none;
+               transform:translateY(.6vmin);transition:all var(--d-in) var(--e-out)}
+.corner.open .tools{opacity:1;pointer-events:auto;transform:none}
+.corner button{
+  font:700 1.9vmin/1 inherit;padding:.9vmin 1.4vmin;border-radius:1vmin;
+  border:.24vmin solid var(--line);background:var(--cream);color:var(--ink-2);cursor:pointer;
+  transition:transform var(--d-in) var(--e-out),color var(--d-fast) var(--e-soft);
+}
+.corner button:hover{color:var(--ink);transform:translateY(-.2vmin)}
+.corner button.on{background:var(--accent);color:var(--band-ink)}
+.corner .gear{
+  width:5.4vmin;height:5.4vmin;border-radius:50%;padding:0;font-size:2.2vmin;
+  opacity:.2;background:var(--cream);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity var(--d-in) var(--e-soft);
+}
+.corner:hover .gear,.corner.open .gear{opacity:.95}
+
+/* ---------- 演练条：老师工具，故意做成深色木桌，和屏幕区分 ---------- */
+.demo{
+  position:fixed;left:0;right:0;bottom:0;z-index:58;
+  display:none;align-items:center;gap:1.4vmin;
+  padding:1.2vmin 2.4vmin 1.4vmin;
+  background:rgba(38,26,18,.96);color:#FBF3DF;font-size:2.1vmin;
+  border-top:.3vmin solid rgba(251,243,223,.18);
+  transition:opacity .35s var(--e-soft);
+}
+body[data-demo="1"] .demo{display:flex}
+body.d-idle .demo{opacity:0;pointer-events:none}
+.demo::before{
+  content:"演练";font:700 1.7vmin/1 var(--mono);letter-spacing:.2em;
+  color:rgba(251,243,223,.45);flex:none;
+}
+body[data-demo="1"] .corner{bottom:8.6vmin}
+
+.d-btn{
+  font:600 2vmin/1 inherit;color:#FBF3DF;
+  background:rgba(251,243,223,.1);border:1px solid rgba(251,243,223,.14);border-radius:.9vmin;
+  padding:.9vmin 1.4vmin;cursor:pointer;white-space:nowrap;
+  transition:background-color var(--d-fast) var(--e-soft),transform var(--d-in) var(--e-out);
+}
+.d-btn:hover{background:rgba(251,243,223,.2)}
+.d-btn:active{transform:scale(.97)}
+.d-play{width:5.2vmin;height:5.2vmin;border-radius:50%;padding:0;font-size:2vmin;flex:none;
+        background:rgba(251,243,223,.18)}
+.d-play.on{background:#FFD64F;color:#241A12;border-color:transparent}
+.d-now{font:700 2.8vmin/1 var(--mono);font-variant-numeric:tabular-nums;
+       min-width:9vmin;text-align:center;flex:none}
+
+.d-slot{flex:1;position:relative;height:4.2vmin;display:flex;align-items:center;min-width:24vmin}
+.d-ribbon{position:absolute;left:0;right:0;top:50%;height:1.4vmin;transform:translateY(-50%);
+          border-radius:.4vmin;overflow:hidden;background:rgba(251,243,223,.1)}
+.d-ribbon i{position:absolute;top:0;bottom:0;display:block}
+.rb-class{background:#7FA8D8}
+.rb-break{background:#7FBF6A}
+.rb-meal,.rb-noon{background:#E8B45C}
+.rb-ritual{background:#AD9BD8}
+.rb-after{background:#B9AE99}
+.rb-action{background:#E08A4E}
+
+.d-range{-webkit-appearance:none;appearance:none;width:100%;height:4.2vmin;margin:0;
+         background:transparent;position:relative;z-index:2;cursor:pointer}
+.d-range::-webkit-slider-runnable-track{height:1px;background:transparent}
+.d-range::-webkit-slider-thumb{-webkit-appearance:none;width:1.9vmin;height:1.9vmin;border-radius:50%;
+  background:#FFD64F;border:.3vmin solid #241A12;margin-top:-.9vmin}
+.d-range::-moz-range-track{height:1px;background:transparent}
+.d-range::-moz-range-thumb{width:1.5vmin;height:1.5vmin;border-radius:50%;background:#FFD64F;border:.25vmin solid #241A12}
+
+.d-jumps{display:flex;gap:.6vmin;flex:none}
+.d-jump{font-size:1.8vmin;padding:.8vmin 1.1vmin;background:rgba(251,243,223,.07);color:rgba(251,243,223,.8)}
+.d-close{background:transparent;border-color:transparent;font-size:2.4vmin;padding:.4vmin 1vmin;color:rgba(251,243,223,.6)}
+
+/* ---------- 数据缺失 ---------- */
+.warn{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
+      justify-content:center;background:var(--paper);gap:2vmin;text-align:center;padding:6vmin;z-index:70}
+.warn.show{display:flex}
+.warn h2{font-size:4.4vmin}
+.warn p{font-size:2.6vmin;color:var(--ink-2);line-height:1.9}
+.warn code{font:400 2.2vmin/1 var(--mono);background:var(--cream);border:.24vmin solid var(--line);
+           border-radius:.8vmin;padding:.7vmin 1.2vmin}
+</style>
+</head>
+<body data-theme="light" data-kind="break" data-tone="amber" data-focus="status" data-alert="0">
+
+<div class="aura"></div>
+
+<header>
+  <div class="buddy" aria-hidden="true">
+    <svg viewBox="0 0 100 100">
+      <path d="M50 4 L61.8 33.8 L93.7 35.8 L69 56.2 L77 87.2 L50 70 L23 87.2 L31 56.2 L6.3 35.8 L38.2 33.8 Z"
+            fill="#F2703A" stroke="#3A2A1E" stroke-width="5.5" stroke-linejoin="round"/>
+      <circle cx="40" cy="47" r="3.6" fill="#3A2A1E"/>
+      <circle cx="60" cy="47" r="3.6" fill="#3A2A1E"/>
+      <path d="M43 57 Q50 64 57 57" fill="none" stroke="#3A2A1E" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="31" cy="55" rx="4.2" ry="2.6" fill="#FF9E8A" opacity=".85"/>
+      <ellipse cx="69" cy="55" rx="4.2" ry="2.6" fill="#FF9E8A" opacity=".85"/>
+    </svg>
+  </div>
+  <div class="cls" id="cls"></div>
+  <div class="date" id="date"></div>
+  <div class="clock-wrap">
+    <span class="clock" id="clock">--:--</span><span class="sec" id="sec"></span>
+  </div>
+</header>
+
+<main id="main">
+  <div class="board" aria-hidden="true">
+    <i class="dec dec-a">
+      <svg viewBox="0 0 100 100"><path d="M50 4 L60 40 L96 50 L60 60 L50 96 L40 60 L4 50 L40 40 Z"
+        fill="#FFD64F" stroke="#3A2A1E" stroke-width="6" stroke-linejoin="round"/></svg>
+    </i>
+    <i class="dec dec-b">
+      <svg viewBox="0 0 100 100"><path d="M50 4 L60 40 L96 50 L60 60 L50 96 L40 60 L4 50 L40 40 Z"
+        fill="#F2703A" stroke="#3A2A1E" stroke-width="7" stroke-linejoin="round"/></svg>
+    </i>
+    <i class="dec dec-c">
+      <svg viewBox="0 0 100 100"><path d="M50 4 L60 40 L96 50 L60 60 L50 96 L40 60 L4 50 L40 40 Z"
+        fill="#8C5BD0" stroke="#3A2A1E" stroke-width="7" stroke-linejoin="round"/></svg>
+    </i>
+    <i class="dec dec-d">
+      <svg viewBox="0 0 100 100"><path d="M50 4 L60 40 L96 50 L60 60 L50 96 L40 60 L4 50 L40 40 Z"
+        fill="#3FB6D8" stroke="#3A2A1E" stroke-width="7" stroke-linejoin="round"/></svg>
+    </i>
+  </div>
+
+  <div class="spine" id="spine"></div>
+  <div class="band" id="band"><span class="dot"></span><span id="bandText"></span></div>
+  <h1 class="hero"><span class="hero-main" id="heroMain"></span><span class="hero-sub" id="heroSub"></span></h1>
+  <div class="after" id="after"></div>
+  <div class="chips" id="chips"></div>
+</main>
+
+<footer id="footer">
+  <div class="duty-label">此刻值日</div>
+  <div class="duty-list" id="duty"></div>
+  <div class="duty-detail" id="dutyDetail"></div>
+</footer>
+
+<div class="alert-frame" id="alertFrame"></div>
+
+<div class="corner" id="corner">
+  <div class="tools">
+    <button id="btn-theme">深色</button>
+    <button id="btn-full">全屏</button>
+    <button id="btn-demo">演练</button>
+    <button id="btn-cd">倒计时 · 按推荐</button>
+    <button id="btn-reduce">减少动效</button>
+    <button id="btn-edit">编辑</button>
+  </div>
+  <button class="gear" id="btn-gear" aria-label="设置">⋯</button>
+</div>
+
+<div class="demo" id="demo">
+  <button class="d-btn d-play" id="d-play" aria-label="播放">▶</button>
+  <div class="d-now" id="d-now">07:40</div>
+  <div class="d-slot">
+    <div class="d-ribbon" id="d-ribbon"></div>
+    <input class="d-range" id="d-range" type="range" min="460" max="1080" step="0.5" value="460" aria-label="时间轴">
+  </div>
+  <div class="d-jumps">
+    <button class="d-btn d-jump" data-t="07:50">到校</button>
+    <button class="d-btn d-jump" data-t="10:16">课间</button>
+    <button class="d-btn d-jump" data-t="10:23">倒计时</button>
+    <button class="d-btn d-jump" data-t="11:42">午餐</button>
+    <button class="d-btn d-jump" data-t="17:22">放学</button>
+  </div>
+  <button class="d-btn" id="d-speed">×120</button>
+  <button class="d-btn d-close" id="d-close" aria-label="关闭演练">×</button>
+</div>
+
+<div class="warn" id="warn">
+  <h2 id="warn-title">数据不包含今天</h2>
+  <p id="warn-text">请在电脑上重新生成：<br><code>python3 tools/bundle.py</code></p>
+</div>
+
+<script src="data.js"></script>
+<script src="config.js"></script>
+<script src="rhythm.js"></script>
+<script src="store.js"></script>
+<script src="screen.js"></script>
+<script src="remote.js"></script>
+<script src="edit.js"></script>
+<script src="demo.js"></script>
+</body>
+</html>

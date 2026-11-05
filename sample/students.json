@@ -1,0 +1,248 @@
+{
+  "school": "示例小学",
+  "class": "五（1）班",
+  "updatedAt": "2026-11-05",
+  "source": "班主任提供名册（文字粘贴）",
+  "students": [
+    {
+      "id": "s01",
+      "name": "赵子墨",
+      "active": true
+    },
+    {
+      "id": "s02",
+      "name": "钱嘉禾",
+      "active": true
+    },
+    {
+      "id": "s03",
+      "name": "孙星野",
+      "active": true
+    },
+    {
+      "id": "s04",
+      "name": "李青禾",
+      "active": true
+    },
+    {
+      "id": "s05",
+      "name": "周梓萱",
+      "active": true
+    },
+    {
+      "id": "s06",
+      "name": "吴书瑶",
+      "active": true
+    },
+    {
+      "id": "s07",
+      "name": "郑南乔",
+      "active": true
+    },
+    {
+      "id": "s08",
+      "name": "王一诺",
+      "active": true
+    },
+    {
+      "id": "s09",
+      "name": "冯予安",
+      "active": true
+    },
+    {
+      "id": "s10",
+      "name": "周予安",
+      "active": true
+    },
+    {
+      "id": "s11",
+      "name": "周予宁",
+      "active": true
+    },
+    {
+      "id": "s12",
+      "name": "卫浩然",
+      "active": true
+    },
+    {
+      "id": "s13",
+      "name": "蒋沐辰",
+      "active": true
+    },
+    {
+      "id": "s14",
+      "name": "沈亦然",
+      "active": true
+    },
+    {
+      "id": "s15",
+      "name": "韩思远",
+      "active": true
+    },
+    {
+      "id": "s16",
+      "name": "杨予宁",
+      "active": true
+    },
+    {
+      "id": "s17",
+      "name": "朱乐言",
+      "active": true
+    },
+    {
+      "id": "s18",
+      "name": "秦静姝",
+      "active": true
+    },
+    {
+      "id": "s19",
+      "name": "尤若曦",
+      "active": true
+    },
+    {
+      "id": "s20",
+      "name": "许清越",
+      "active": true
+    },
+    {
+      "id": "s21",
+      "name": "何白露",
+      "active": true
+    },
+    {
+      "id": "s22",
+      "name": "吕雨桐",
+      "active": true
+    },
+    {
+      "id": "s23",
+      "name": "施知远",
+      "active": true
+    },
+    {
+      "id": "s24",
+      "name": "张望舒",
+      "active": true
+    },
+    {
+      "id": "s25",
+      "name": "孔子墨",
+      "active": true
+    },
+    {
+      "id": "s26",
+      "name": "曹嘉禾",
+      "active": true
+    },
+    {
+      "id": "s27",
+      "name": "严星野",
+      "active": true
+    },
+    {
+      "id": "s28",
+      "name": "华青禾",
+      "active": true
+    },
+    {
+      "id": "s29",
+      "name": "金梓萱",
+      "active": true
+    },
+    {
+      "id": "s30",
+      "name": "魏书瑶",
+      "active": true
+    },
+    {
+      "id": "s31",
+      "name": "陶南乔",
+      "active": true
+    },
+    {
+      "id": "s32",
+      "name": "姜一诺",
+      "active": true
+    },
+    {
+      "id": "s33",
+      "name": "赵予安",
+      "active": true
+    },
+    {
+      "id": "s34",
+      "name": "钱和风",
+      "active": true
+    },
+    {
+      "id": "s35",
+      "name": "孙明轩",
+      "active": true
+    },
+    {
+      "id": "s36",
+      "name": "李浩然",
+      "active": true
+    },
+    {
+      "id": "s37",
+      "name": "周沐辰",
+      "active": true
+    },
+    {
+      "id": "s38",
+      "name": "吴亦然",
+      "active": true
+    },
+    {
+      "id": "s39",
+      "name": "郑思远",
+      "active": true
+    },
+    {
+      "id": "s40",
+      "name": "王予宁",
+      "active": true
+    },
+    {
+      "id": "s41",
+      "name": "冯乐言",
+      "active": true
+    },
+    {
+      "id": "s42",
+      "name": "陈静姝",
+      "active": true
+    },
+    {
+      "id": "s43",
+      "name": "褚若曦",
+      "active": true
+    },
+    {
+      "id": "s44",
+      "name": "卫清越",
+      "active": true
+    },
+    {
+      "id": "s45",
+      "name": "蒋白露",
+      "active": true
+    },
+    {
+      "id": "s46",
+      "name": "沈雨桐",
+      "active": true
+    },
+    {
+      "id": "s47",
+      "name": "韩知远",
+      "active": true
+    },
+    {
+      "id": "s48",
+      "name": "杨望舒",
+      "active": true
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+/* 编辑态：深棕"木桌"，和浅色贴纸大屏强行区分。
+   同一套语言（粗描边、便签、黄按钮），但底色翻过来——
+   老师一眼知道"现在改的东西学生看得见"，学生也知道屏幕进了另一个模式。 */
+.edit-root{
+  position:fixed;inset:0;z-index:100;display:none;
+  background:#241A13;color:#FBF3DF;font-family:inherit;
+  background-image:
+    linear-gradient(to right,rgba(251,243,223,.035) 1px,transparent 1px),
+    linear-gradient(to bottom,rgba(251,243,223,.035) 1px,transparent 1px);
+  background-size:5.2vmin 5.2vmin;
+}
+.edit-root.show{display:block}
+
+/* ---------- 验证码 ---------- */
+.gate{position:absolute;inset:0;display:none;flex-direction:column;
+      align-items:center;justify-content:center;gap:2.4vmin}
+.gate-brand{font-size:2.2vmin;letter-spacing:.32em;color:#8E7B66}
+.gate-box{width:56vmin;background:#33251B;border-radius:3vmin 2.4vmin 3.2vmin 2.2vmin;
+          padding:4vmin 4vmin 3vmin;
+          border:.42vmin solid #F1E3C6;
+          box-shadow:1.2vmin 1.2vmin 0 rgba(0,0,0,.35)}
+.gate-tip{font-size:2.3vmin;color:#C1B09A;text-align:center;letter-spacing:.08em}
+.gate-tip.bad{color:#F08A7E}
+.gate-q{font-size:7.6vmin;font-weight:900;text-align:center;margin:2.6vmin 0 1.4vmin;
+        font-variant-numeric:tabular-nums;letter-spacing:.04em;color:#FFD64F}
+.gate-val{font-size:5vmin;text-align:center;min-height:8vmin;color:#FFD64F;
+          letter-spacing:.5em;line-height:8vmin;font-variant-numeric:tabular-nums}
+.gate-val.shake{animation:shake .32s}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-1.4vmin)}
+                 75%{transform:translateX(1.4vmin)}}
+.gate-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2vmin;margin-top:1.6vmin}
+.gk{font:inherit;font-size:3.4vmin;font-weight:800;padding:2.2vmin 0;
+    border:.28vmin solid #6B5641;border-radius:1.6vmin;
+    background:#3D2D20;color:#FBF3DF;cursor:pointer;
+    transition:transform .12s ease,background-color .12s ease}
+.gk:active{background:#4A3828;transform:scale(.97)}
+.gk.wide{font-size:2.7vmin}
+.gk.primary{background:#FFD64F;color:#2B1D10;border-color:#F1E3C6}
+.gate-cancel{margin:2.6vmin auto 0;display:block;background:none;border:none;
+             font:inherit;font-size:2.3vmin;color:#8E7B66;cursor:pointer;padding:1.4vmin}
+
+/* ---------- 面板 ---------- */
+.ep{position:absolute;inset:0;display:none;flex-direction:column}
+.ep-head{display:flex;align-items:center;gap:2.2vmin;padding:2vmin 3vmin;
+         border-bottom:.3vmin dashed rgba(241,227,198,.28);flex:none}
+.ep-title{font-size:2.8vmin;font-weight:900;letter-spacing:.06em}
+.ep-hint{font-size:2.1vmin;color:#9C8974;margin-left:auto}
+.ep-close{font:inherit;font-size:2.7vmin;font-weight:900;padding:1.1vmin 2.8vmin;
+          border:.3vmin solid #F1E3C6;border-radius:1.4vmin;
+          background:#FFD64F;color:#2B1D10;cursor:pointer}
+
+.ep-tabs{display:flex;gap:1vmin;padding:1.4vmin 3vmin;flex:none;
+         border-bottom:.3vmin dashed rgba(241,227,198,.28)}
+.ep-tabs button{font:inherit;font-size:2.5vmin;font-weight:800;padding:1.1vmin 2.4vmin;
+                border:.26vmin solid transparent;border-radius:1.2vmin;
+                background:#3A2A1E;color:#C1B09A;cursor:pointer}
+.ep-tabs button.on{background:#F1E3C6;color:#2B1D10;border-color:#F1E3C6}
+.ep-undo{margin-left:auto;background:#3A2A1E!important;color:#E2D4BC!important;
+         border-color:#6B5641!important}
+
+.ep-body{flex:1;overflow:auto;padding:2.4vmin 3vmin 5vmin;
+         display:grid;grid-template-columns:1fr 1fr;gap:2.2vmin;align-content:start}
+
+.ep-sec{background:#33251B;border:.3vmin solid #6B5641;border-radius:2.4vmin;
+        padding:2.4vmin;box-shadow:.7vmin .7vmin 0 rgba(0,0,0,.28)}
+.ep-sec h3{font-size:2.7vmin;font-weight:900;letter-spacing:.08em;margin-bottom:1.6vmin;color:#FBF3DF}
+.ep-sec.wide{grid-column:1/-1}
+.ep-note{font-size:2.1vmin;color:#A8957E;line-height:1.7}
+
+/* 一行一条：左边是"这是哪儿的字"，右边是输入框 */
+.ep-field{display:flex;align-items:center;gap:1.4vmin;margin-top:1.2vmin}
+.ep-flabel{width:24vmin;flex:none;font-size:2.2vmin;color:#C1B09A;line-height:1.4}
+.ep-field .ep-input{flex:1;min-width:0}
+
+.ep-input{font:inherit;font-size:2.8vmin;width:100%;padding:1.5vmin 1.7vmin;border-radius:1.3vmin;
+          background:#241A13;border:.28vmin solid #6B5641;color:#FBF3DF;outline:none;resize:vertical}
+textarea.ep-input{min-height:12vmin;line-height:1.55}
+.ep-input:focus{border-color:#FFD64F}
+.ep-input::placeholder{color:#7C6A56}
+
+.ep-hintrow{margin-top:1.3vmin}
+.ep-warn{display:flex;align-items:center;gap:1.5vmin;flex-wrap:wrap;
+         font-size:2.2vmin;color:#2B1D10;background:#FFD64F;
+         border:.26vmin solid #F1E3C6;border-radius:1.1vmin;padding:1.1vmin 1.5vmin}
+.ep-oknote{font-size:2.2vmin;color:#A8CE7E}
+.ep-mini{font:inherit;font-size:2.1vmin;font-weight:800;padding:.9vmin 1.5vmin;border-radius:1vmin;
+         border:.24vmin solid #6B5641;background:#3D2D20;color:#E2D4BC;cursor:pointer}
+.ep-mini.danger{color:#F08A7E;border-color:#6E3A32}
+.ep-mini.danger:hover{background:#402A22}
+
+.ep-opts{display:flex;flex-wrap:wrap;gap:1vmin;margin-top:1.7vmin}
+.ep-opt{font:inherit;font-size:2.4vmin;font-weight:800;padding:1.1vmin 2vmin;border-radius:1.2vmin;
+        border:.26vmin solid #6B5641;background:#3D2D20;color:#DCCDB6;cursor:pointer}
+.ep-opt.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10}
+.ep-opt.urgent.on{background:#DE3B34;border-color:#F1E3C6;color:#FFF6F3}
+
+.ep-recall{display:flex;flex-wrap:wrap;gap:.9vmin;margin-top:1.5vmin;align-items:center}
+.ep-recall-label{font-size:2vmin;color:#8E7B66;letter-spacing:.14em}
+.ep-pill{font:inherit;font-size:2.1vmin;padding:.9vmin 1.5vmin;border-radius:2vmin;
+         border:.24vmin solid #6B5641;background:#2C2017;color:#C1B09A;cursor:pointer;
+         max-width:44vmin;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ep-pill:hover{border-color:#FFD64F;color:#FBF3DF}
+
+.ep-check{display:flex;align-items:center;gap:1.1vmin;margin-top:1.7vmin;
+          font-size:2.2vmin;color:#C1B09A;cursor:pointer}
+.ep-check input{width:2.3vmin;height:2.3vmin;accent-color:#FFD64F}
+
+.ep-actrow{display:flex;gap:1.3vmin;margin-top:2vmin;align-items:center}
+.ep-primary{font:inherit;font-size:2.8vmin;font-weight:900;padding:1.5vmin 3.2vmin;
+            border:.3vmin solid #F1E3C6;border-radius:1.4vmin;
+            background:#FFD64F;color:#2B1D10;cursor:pointer}
+.ep-primary:active{transform:translateY(.2vmin)}
+.ep-ghost{font:inherit;font-size:2.4vmin;padding:1.4vmin 2.4vmin;border-radius:1.3vmin;
+          border:.26vmin solid #6B5641;background:transparent;color:#C1B09A;cursor:pointer}
+
+.ep-rows{display:flex;flex-direction:column;gap:.8vmin;max-height:54vmin;overflow:auto}
+.ep-row{display:flex;align-items:center;gap:1.5vmin;width:100%;text-align:left;
+        font:inherit;font-size:2.5vmin;padding:1.3vmin 1.5vmin;border-radius:1.2vmin;
+        border:.22vmin solid transparent;background:#2C2017;color:#E2D4BC;cursor:pointer}
+.ep-row.static{cursor:default}
+.ep-row:hover{background:#3A2A1E}
+.ep-row.changed{box-shadow:inset .6vmin 0 0 #FFD64F;border-color:#6B5641}
+.ep-row .p{width:15vmin;flex:none;font-weight:800}
+.ep-row .s{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#C1B09A}
+.ep-row .t{color:#8E7B66;font-size:2.2vmin;width:13vmin;flex:none;
+           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ep-row .x{color:#7C6A56;font-size:2.1vmin;flex:none}
+
+.ep-dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+           width:62vmin;max-height:82vmin;overflow:auto;background:#33251B;
+           border:.32vmin solid #F1E3C6;border-radius:2.8vmin;padding:2.8vmin;
+           box-shadow:1.4vmin 1.4vmin 0 rgba(0,0,0,.4);z-index:120}
+.ep-dialog.picker{width:78vmin}
+.ep-dialog-title{font-size:2.9vmin;font-weight:900;margin-bottom:1.8vmin}
+.ep-dialog .ep-input{margin-bottom:1.3vmin}
+
+.ep-people{display:grid;grid-template-columns:repeat(4,1fr);gap:.9vmin;margin-top:1.3vmin;
+           max-height:42vmin;overflow:auto}
+.ep-person{font:inherit;font-size:2.6vmin;padding:1.4vmin .8vmin;border-radius:1.2vmin;
+           border:.24vmin solid #6B5641;background:#3D2D20;color:#E2D4BC;cursor:pointer}
+.ep-person.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10;font-weight:900}
+
+.ep-flash{position:fixed;left:50%;bottom:6vmin;transform:translate(-50%,2vmin);
+          background:#FFD64F;color:#2B1D10;font-size:2.5vmin;font-weight:900;
+          padding:1.4vmin 2.8vmin;border-radius:2vmin;
+          border:.28vmin solid #F1E3C6;
+          opacity:0;pointer-events:none;transition:.2s;z-index:130}
+.ep-flash.show{opacity:1;transform:translate(-50%,0)}
+.ep-stamp{grid-column:1/-1;font-size:2vmin;color:#8E7B66;margin-top:.5vmin}
+
+/* 导出 / 导入：设置只在这台机器上，得能整车搬走 */
+.ep-backup{display:flex;gap:1vmin;flex-wrap:wrap;margin-top:1.6vmin}
+.ep-dump{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.9vmin;
+         line-height:1.5;width:100%;margin-top:1.4vmin;padding:1.5vmin;
+         border-radius:1.3vmin;border:.26vmin solid #6B5641;background:#241A13;
+         color:#C1B09A;resize:vertical;word-break:break-all}
+.ep-dump:focus{outline:none;border-color:#FFD64F}
+
+/* 早读：一天一行，科目 / 任务 / 带什么 */
+.ep-read{display:grid;grid-template-columns:7vmin 15vmin 1fr;
+         gap:1vmin;align-items:center;margin-top:1.1vmin}
+.ep-read.head{margin-top:2vmin;margin-bottom:.4vmin}
+.ep-read-day{font-size:2.2vmin;font-weight:800;color:#C1B09A;letter-spacing:.06em}
+.ep-read-tag{font-size:2vmin;color:#8E7B66;letter-spacing:.12em}
+.ep-read .ep-input{padding:1.1vmin 1.4vmin;font-size:2.4vmin}

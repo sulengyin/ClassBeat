@@ -1,0 +1,236 @@
+{
+  "id": "sch-cj-55-2026s",
+  "school": "示例小学",
+  "class": "五（1）班",
+  "headTeacher": "张老师",
+  "effectiveFrom": "2026-09-01",
+  "termStart": "2026-09-01",
+  "source": "示例素材（已隐去）",
+  "status": "CONFIRMED",
+  "note": "课表不含任何时间字段；periodNo 是唯一连接键",
+  "entries": [
+    {
+      "weekday": 1,
+      "periodNo": 1,
+      "subject": "英语",
+      "teacher": "李老师"
+    },
+    {
+      "weekday": 1,
+      "periodNo": 2,
+      "subject": "语文",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 1,
+      "periodNo": 3,
+      "subject": "数学",
+      "teacher": "张老师"
+    },
+    {
+      "weekday": 1,
+      "periodNo": 4,
+      "subject": "劳综短课",
+      "teacher": "李老师"
+    },
+    {
+      "weekday": 1,
+      "periodNo": 5,
+      "subject": "体育一",
+      "teacher": "刘老师"
+    },
+    {
+      "weekday": 1,
+      "periodNo": 6,
+      "subject": "道法",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 1,
+      "periodNo": 7,
+      "subject": "音乐",
+      "teacher": "陈老师"
+    },
+    {
+      "weekday": 2,
+      "periodNo": 1,
+      "subject": "语文",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 2,
+      "periodNo": 2,
+      "subject": "科学",
+      "teacher": "杨老师"
+    },
+    {
+      "weekday": 2,
+      "periodNo": 3,
+      "subject": "数学",
+      "teacher": "张老师"
+    },
+    {
+      "weekday": 2,
+      "periodNo": 4,
+      "subject": "劳综短课",
+      "teacher": "李老师"
+    },
+    {
+      "weekday": 2,
+      "periodNo": 5,
+      "subject": "体育二",
+      "teacher": "赵老师"
+    },
+    {
+      "weekday": 2,
+      "periodNo": 6,
+      "subject": "道法",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 2,
+      "periodNo": 7,
+      "subject": "美术",
+      "teacher": "黄老师"
+    },
+    {
+      "weekday": 3,
+      "periodNo": 1,
+      "subject": "语文",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 3,
+      "periodNo": 2,
+      "subject": "数学",
+      "teacher": "张老师"
+    },
+    {
+      "weekday": 3,
+      "periodNo": 3,
+      "subject": "科学",
+      "teacher": "杨老师"
+    },
+    {
+      "weekday": 3,
+      "periodNo": 4,
+      "subject": "五年级选修",
+      "teacher": "张老师",
+      "place": "选修教室",
+      "note": "全年级张老师，不在本班教室；具体教室待确认"
+    },
+    {
+      "weekday": 3,
+      "periodNo": 5,
+      "subject": "美术",
+      "teacher": "黄老师"
+    },
+    {
+      "weekday": 3,
+      "periodNo": 6,
+      "subject": "体育一",
+      "teacher": "刘老师"
+    },
+    {
+      "weekday": 3,
+      "periodNo": 7,
+      "subject": "信息",
+      "teacher": "张老师",
+      "place": "机房"
+    },
+    {
+      "weekday": 4,
+      "periodNo": 1,
+      "subject": "语文",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 4,
+      "periodNo": 2,
+      "subject": "数学",
+      "teacher": "张老师"
+    },
+    {
+      "weekday": 4,
+      "periodNo": 3,
+      "subject": "英语",
+      "teacher": "李老师"
+    },
+    {
+      "weekday": 4,
+      "periodNo": 4,
+      "subject": "书法",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 4,
+      "periodNo": 5,
+      "subject": "体育一",
+      "teacher": "刘老师"
+    },
+    {
+      "weekday": 4,
+      "periodNo": 6,
+      "subject": "语文",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 4,
+      "periodNo": 7,
+      "subject": "音乐",
+      "teacher": "陈老师"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 1,
+      "subject": "数学",
+      "teacher": "张老师"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 2,
+      "subject": "语文",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 3,
+      "subject": "英语",
+      "teacher": "李老师"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 4,
+      "subject": "书法",
+      "teacher": "王老师"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 5,
+      "subject": "劳综一",
+      "teacher": "李老师"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 6,
+      "subject": "体育三",
+      "teacher": "李老师"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 7,
+      "subject": "心理/班队",
+      "teacher": "张老师",
+      "weekRule": "odd",
+      "note": "单周由班主任上"
+    },
+    {
+      "weekday": 5,
+      "periodNo": 7,
+      "subject": "心理/班队",
+      "teacher": "李老师",
+      "weekRule": "even",
+      "note": "双周由心理老师上；哪一周算双周尚未确认"
+    }
+  ]
+}
