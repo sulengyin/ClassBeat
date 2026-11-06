@@ -96,8 +96,20 @@ test("验证码挡住乱输，答对才进设置", async ({ page, request }) => 
   await expect(page.locator("#epTitle")).toContainText(ping.class);
 });
 
+test("7:29 还没到早读，屏上写「到校」", async ({ page }) => {
+  await openScreen(page, "2026-11-05T07:29:00+08:00");
+  await expect(page.locator("#bandText")).toHaveText("到校");
+  await expect(page.locator(".reminder-line")).toHaveCount(0);
+});
+
+test("7:30 早读开始，提醒事项贴纸上屏", async ({ page }) => {
+  await openScreen(page, "2026-11-05T07:30:00+08:00");
+  await expect(page.locator("#bandText")).toHaveText("早读");
+  await expect(page.locator(".reminder-line")).toContainText("戴好红领巾");
+});
+
 test("早读 8:10 结束，屏上立刻换成第一节课的准备清单", async ({ page }) => {
-  // 早读在作息表里是 07:50–08:10 的一段，8:10 的下一段是准备课间
+  // 早读在作息表里是 07:30–08:10 的一段，8:10 的下一段是准备课间
   await openScreen(page, "2026-11-05T08:10:00+08:00");
   await expect(page.locator("#bandText")).toHaveText("课间");
   await expect(page.locator("#heroSub")).toContainText("下一节");

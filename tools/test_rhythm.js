@@ -117,15 +117,15 @@ s = at("2026-11-07", "10:00");
 check(s.kind === "holiday" && s.title === "今天不上学", "周六显示不上学");
 
 /* 两头的话也能改：到校前、放学后、休息日不在作息表里，但老师最常改的正是这几句 */
-s = at("2026-11-05", "07:45");
-check(s.kind === "before" && s.title === "早上好", "7:45 显示到校（早读还没开始）", s.title);
+s = at("2026-11-05", "07:25");
+check(s.kind === "before" && s.title === "早上好", "7:25 显示到校（早读还没开始）", s.title);
 check(s.note.indexOf("交作业") >= 0, "到校前那句默认是交作业", s.note);
-check(s.arrived === true, "7:45 已经到校（顶部标签不应再写「还没到校」）");
+check(s.arrived === true, "7:25 已经到校（顶部标签不应再写「还没到校」）");
 
-s = at("2026-11-05", "07:30");
-check(s.arrived === false, "7:30 还没到校");
+s = at("2026-11-05", "07:15");
+check(s.arrived === false, "7:15 还没到校");
 
-s = at("2026-11-05", "07:45", {
+s = at("2026-11-05", "07:25", {
   texts: { stage: { before: { title: "早读开始", note: "交作业、交回执" } } }
 });
 check(s.title === "早读开始" && s.note === "交作业、交回执", "到校前的话能被老师改",
@@ -164,30 +164,33 @@ s = at("2026-11-05", "08:30", { countdownMode: "all" });
 check(s.countdown.visible, "全部显示时上课也倒计时", s.countdown.text);
 
 /* ---------- 早读 ---------- */
-/* 11-05 是周四。早读在作息表里是一段真实的块（07:50–08:10），
+/* 11-05 是周四。早读在作息表里是一段真实的块（07:30–08:10），
    读什么按星期配；配了才显示科目，没配不猜。 */
 const rd = { texts: { reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } } } };
 
-s = at("2026-11-05", "07:50", rd);
-check(s.kind === "reading" && s.title === "英语早读", "周四 7:50 是英语早读", s.title);
+s = at("2026-11-05", "07:30", rd);
+check(s.kind === "reading" && s.title === "英语早读", "周四 7:30 开始早读", s.title);
 check(s.reading === true, "标了 reading，顶栏写「早读」");
 check(s.lines.length === 1 && s.lines[0].label === "早读建议"
   && s.lines[0].items[0] === "读 Unit 4 单词", "早读建议单独一行上屏",
   JSON.stringify(s.lines));
 check(s.items.length === 0, "早读不出准备清单", s.items.join("、") || "空");
 
-s = at("2026-11-05", "07:30", rd);
-check(s.kind === "before" && s.title === "早上好", "7:40 前人还没到，不催早读", s.title);
+s = at("2026-11-05", "08:09", rd);
+check(s.kind === "reading", "8:09 早读还没下课", s.kind);
 
-s = at("2026-11-06", "07:50", rd);
+s = at("2026-11-05", "07:29", rd);
+check(s.kind === "before" && s.title === "早上好", "7:29 还没到早读，不提前催", s.title);
+
+s = at("2026-11-06", "07:30", rd);
 check(s.kind === "reading" && s.title === "早读" && s.lines.length === 0,
   "周五没配科目：只显示「早读」，不猜科目", s.title);
 
-s = at("2026-11-05", "07:50", { texts: { reading: { "4": { subject: "英语" } } } });
+s = at("2026-11-05", "07:30", { texts: { reading: { "4": { subject: "英语" } } } });
 check(s.title === "英语早读" && s.lines.length === 0, "没写建议就只上一个大字", s.title);
 
 /* 提醒事项：单独一块，排在早读建议前面；按天覆盖「每天」 */
-s = at("2026-11-05", "07:50", {
+s = at("2026-11-05", "07:30", {
   texts: {
     reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } },
     reminders: { "default": "带齐回执", "4": "今天穿校服" }
@@ -199,7 +202,7 @@ check(s.lines[0].kind === "reminder" && s.lines[0].label === "提醒事项"
 check(s.lines[1].label === "早读建议", "提醒事项之外的早读建议仍在",
   JSON.stringify(s.lines[1]));
 
-s = at("2026-11-06", "07:50", {
+s = at("2026-11-06", "07:30", {
   texts: { reminders: { "default": "带齐回执" } }
 });
 check(s.lines.length === 1 && s.lines[0].items[0] === "带齐回执",

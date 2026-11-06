@@ -39,7 +39,7 @@ def main() -> None:
     ap.add_argument("--data", help="数据目录，默认 data/，没有就用 sample/")
     args = ap.parse_args()
 
-    data_dir = Path(args.data) if args.data else DATA
+    data_dir = Path(args.data).resolve() if args.data else DATA
     if args.data:
         set_data(data_dir)
     if not (data_dir / "students.json").exists():

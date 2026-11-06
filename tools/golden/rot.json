@@ -501,9 +501,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -532,7 +532,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -825,7 +825,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -1379,9 +1379,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -1410,7 +1410,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -1699,7 +1699,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -2287,9 +2287,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -2318,7 +2318,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -2586,7 +2586,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -3154,9 +3154,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -3194,7 +3194,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -3477,7 +3477,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -4021,9 +4021,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -4052,7 +4052,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -4321,7 +4321,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -4865,9 +4865,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -4896,7 +4896,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -5168,7 +5168,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -5712,9 +5712,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -5743,7 +5743,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -6011,7 +6011,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -6572,9 +6572,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -6603,7 +6603,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -6871,7 +6871,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -7438,9 +7438,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -7478,7 +7478,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -7761,7 +7761,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -8304,9 +8304,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -8335,7 +8335,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -8604,7 +8604,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -9147,9 +9147,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -9178,7 +9178,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -9450,7 +9450,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -9993,9 +9993,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -10024,7 +10024,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -10292,7 +10292,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -10854,9 +10854,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -10885,7 +10885,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -11153,7 +11153,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -11721,9 +11721,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -11761,7 +11761,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -12044,7 +12044,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -12588,9 +12588,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -12619,7 +12619,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -12888,7 +12888,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -13432,9 +13432,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -13463,7 +13463,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -13735,7 +13735,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -14279,9 +14279,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -14310,7 +14310,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -14578,7 +14578,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -15139,9 +15139,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -15170,7 +15170,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -15438,7 +15438,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -16005,9 +16005,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -16045,7 +16045,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -16328,7 +16328,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -16871,9 +16871,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -16902,7 +16902,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -17171,7 +17171,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -17714,9 +17714,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -17745,7 +17745,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -18017,7 +18017,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -18560,9 +18560,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -18591,7 +18591,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -18859,7 +18859,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -19421,9 +19421,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -19452,7 +19452,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -19720,7 +19720,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -20288,9 +20288,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -20328,7 +20328,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -20611,7 +20611,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -21155,9 +21155,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -21186,7 +21186,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -21455,7 +21455,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -22061,9 +22061,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -22092,7 +22092,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -22364,7 +22364,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -22907,9 +22907,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -22938,7 +22938,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -23206,7 +23206,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -23749,9 +23749,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -23780,7 +23780,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -24048,7 +24048,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -24601,9 +24601,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -24632,7 +24632,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -24900,7 +24900,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -25468,9 +25468,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -25508,7 +25508,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -25791,7 +25791,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -26335,9 +26335,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -26366,7 +26366,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -26635,7 +26635,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -27179,9 +27179,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -27210,7 +27210,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -27482,7 +27482,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -28026,9 +28026,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -28057,7 +28057,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -28325,7 +28325,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -28886,9 +28886,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -28917,7 +28917,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -29185,7 +29185,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -29752,9 +29752,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -29792,7 +29792,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -30075,7 +30075,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -30618,9 +30618,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -30649,7 +30649,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -30918,7 +30918,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -31461,9 +31461,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -31492,7 +31492,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -31764,7 +31764,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -32307,9 +32307,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -32338,7 +32338,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -32606,7 +32606,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -33168,9 +33168,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -33199,7 +33199,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -33467,7 +33467,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -34035,9 +34035,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -34075,7 +34075,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -34358,7 +34358,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -34902,9 +34902,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -34933,7 +34933,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -35202,7 +35202,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -35746,9 +35746,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -35777,7 +35777,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -36049,7 +36049,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",
@@ -36593,9 +36593,9 @@
    "inSchool": true,
    "marks": [
     {
-     "at": "07:40",
+     "at": "07:20",
      "kind": "arrive",
-     "note": "原表未写；按劳动委员 7:50 检查倒推，需老师确认",
+     "note": "早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认",
      "status": "ASSUMED"
     },
     {
@@ -36624,7 +36624,7 @@
      "end": "08:10",
      "name": "早读",
      "seq": "0a",
-     "start": "07:50",
+     "start": "07:30",
      "type": "reading"
     },
     {
@@ -36892,7 +36892,7 @@
    "warnings": [
     {
      "code": "MARK_ASSUMED",
-     "message": "07:40 arrive：原表未写；按劳动委员 7:50 检查倒推，需老师确认"
+     "message": "07:20 arrive：早读 07:30 开始，学生通常提前到校；暂按 07:20 到校，需老师确认"
     },
     {
      "code": "MARK_CONFLICT",

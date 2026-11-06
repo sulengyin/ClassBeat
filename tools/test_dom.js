@@ -134,7 +134,7 @@ bandEl.appendChild(bandTextEl);
 
 const demoBar = () => document.getElementById("demo");
 /* 演练条的跳转按钮：querySelectorAll(".d-jump") 要能找到 */
-["07:50", "10:16", "10:23", "11:42", "17:12"].forEach(t => {
+["07:20", "10:16", "10:23", "11:42", "17:12"].forEach(t => {
   const b = new El("button");
   b.className = "d-btn d-jump";
   b.dataset.t = t;
@@ -208,7 +208,7 @@ check(!!heroText(), "主视觉已渲染", heroText());
 check(String(hero.style.fontSize).indexOf("vmin") > 0, "字号按字数算出", hero.style.fontSize);
 
 /* 每个时段都跑一遍，确认没有分支报错，并抽查文案 */
-const times = ["07:50", "08:30", "09:10", "10:12", "10:24", "11:25", "11:45",
+const times = ["07:35", "08:30", "09:10", "10:12", "10:24", "11:25", "11:45",
                "12:20", "12:55", "13:20", "15:45", "16:35", "17:15", "18:00"];
 const Screen = global.Screen;
 let err = null;
@@ -229,15 +229,15 @@ check((seen["08:30"] || "").indexOf("语文") > 0, "第 1 节语文上屏", seen
 check(seen["10:24"] !== seen["10:12"], "焦点随时间真的变了",
   seen["10:12"] + " → " + seen["10:24"]);
 
-/* 早读：7:50–8:10 是真实的一段；提醒事项单独一块，比建议更醒目 */
+/* 早读：7:30–8:10 是真实的一段；提醒事项单独一块，比建议更醒目 */
 global.__rhythmDate = "2026-11-05";
-global.__rhythmTime = 7 * 60 + 50;
+global.__rhythmTime = 7 * 60 + 30;
 global.Store.patchTexts({
   reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } },
   reminders: { "default": "带齐回执" }
 });
 Screen.render();
-check(heroText() === "英语早读", "周四 7:50 上早读", heroText());
+check(heroText() === "英语早读", "周四 7:30 上早读", heroText());
 const remRow = document.querySelector(".reminder-line");
 check(!!remRow && remRow.textContent.indexOf("带齐回执") >= 0,
   "提醒事项单独一块上屏", remRow ? remRow.textContent : "缺失");

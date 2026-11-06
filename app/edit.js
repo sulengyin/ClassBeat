@@ -556,9 +556,14 @@
 
     var secR = h("section", "ep-sec wide");
     secR.appendChild(h("h3", null, "早读"));
+    /* 时间从作息里读，不写死：老师改了早读起止，这句话要跟着变 */
+    var rb = ((RT && RT.config && RT.config().timetable) || {}).blocks || [];
+    var rc = rb.filter(function (b) { return b.type === "reading"; })[0];
     secR.appendChild(h("p", "ep-note",
-      "早读在「作息」里是一段真实时间（现在是 07:50–08:10）。按星期填科目和读什么，"
-      + "科目空着这天就只显示「早读」，不猜。8:10 之后自动切到第一节课的准备清单。"));
+      "早读在「作息」里是一段真实时间"
+      + (rc ? "（现在 " + rc.start + "–" + rc.end + "）" : "") + "。"
+      + "按星期填科目和读什么，科目空着这天就只显示「早读」，不猜。"
+      + "早读一下课就自动切到第一节课的准备清单。"));
     var rd = T.reading || {};
 
     var head = h("div", "ep-read head");
