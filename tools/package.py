@@ -53,17 +53,49 @@ SERVER_FILES = ["rhythm_server.py", "phone.html"]
 # .bat 内容保持纯 ASCII：cmd 默认 GBK，中文容易花
 BAT_SCREEN = "@echo off\r\nstart \"\" \"%~dp0app\\index.html\"\r\n"
 BAT_DEMO = "@echo off\r\nstart \"\" \"%~dp0app\\preview.html\"\r\n"
+# 中文写在 chcp 65001 之后：cmd 逐行读 bat，改了代码页后面的行才按 UTF-8 解。
+# 第一、二行必须是纯 ASCII，否则中文系统会先按 GBK 读错。
+# Python 探测顺序 py -3 → python → python3：官方安装包的 launcher 最可靠，
+# 而 Windows 自带的 python.exe 可能只是个跳应用商店的 stub。
 BAT_SERVER = (
     "@echo off\r\n"
     "chcp 65001 >nul\r\n"
+    "title 手机消息服务 · 这个窗口不要关\r\n"
     "cd /d \"%~dp0server\"\r\n"
-    "python rhythm_server.py\r\n"
-    "if errorlevel 1 (\r\n"
-    "  echo.\r\n"
-    "  echo [!] Python not found. Install Python 3 and tick \"Add to PATH\".\r\n"
-    "  echo.\r\n"
-    "  pause\r\n"
+    "\r\n"
+    "set \"PY=\"\r\n"
+    "py -3 -c \"import sys\" >nul 2>&1\r\n"
+    "if not errorlevel 1 set \"PY=py -3\"\r\n"
+    "if not defined PY (\r\n"
+    "  python -c \"import sys\" >nul 2>&1\r\n"
+    "  if not errorlevel 1 set \"PY=python\"\r\n"
     ")\r\n"
+    "if not defined PY (\r\n"
+    "  python3 -c \"import sys\" >nul 2>&1\r\n"
+    "  if not errorlevel 1 set \"PY=python3\"\r\n"
+    ")\r\n"
+    "\r\n"
+    "if not defined PY goto nopython\r\n"
+    "\r\n"
+    "echo 正在启动手机消息服务，这个窗口最小化就好，不要关。\r\n"
+    "echo.\r\n"
+    "%PY% rhythm_server.py\r\n"
+    "echo.\r\n"
+    "echo 服务已停止（上面几行是最后的输出）。\r\n"
+    "pause\r\n"
+    "exit /b 0\r\n"
+    "\r\n"
+    ":nopython\r\n"
+    "echo.\r\n"
+    "echo   这台电脑没找到 Python 3。\r\n"
+    "echo.\r\n"
+    "echo   大屏不受影响：双击「打开大屏.bat」照样能用，\r\n"
+    "echo   只是「手机发消息」这一个功能需要 Python。\r\n"
+    "echo.\r\n"
+    "echo   要装的话：到 python.org 下载 Python 3，\r\n"
+    "echo   安装第一屏左下角一定要勾上 \"Add Python to PATH\"，再一路下一步。\r\n"
+    "echo.\r\n"
+    "pause\r\n"
 )
 
 README = """{klass} · 班级节律屏
@@ -117,6 +149,9 @@ Windows 也可以用文件夹里的：
 需要一台装了 Python 3 的电脑，和一体机连同一个 WiFi。
 
 1. 电脑上双击「启动手机服务.bat」
+   ——双击就行，不用"选择用什么程序打开"。会弹出一个黑色窗口，
+   里面出现地址之后把它最小化，不要关：关了手机就连不上。
+   窗口里如果写"没找到 Python 3"，说明这台电脑没装，按提示装一下。
 2. 大屏上点右下角「⋯」→「手机」，屏幕上会出一个二维码
 3. 手机连同一个 WiFi，扫码（或直接输入屏上那行地址）
 4. 写一句话点发送，大屏立刻就出现，不用刷新
@@ -229,9 +264,9 @@ def main() -> None:
 
         z.write(single_path, f"{PACK_NAME}/{PACK_NAME}-单文件版.html")
         z.writestr(f"{PACK_NAME}/使用说明.txt", readme.encode("utf-8-sig"))
-        z.writestr(f"{PACK_NAME}/打开大屏.bat", BAT_SCREEN.encode("ascii"))
-        z.writestr(f"{PACK_NAME}/打开演练版.bat", BAT_DEMO.encode("ascii"))
-        z.writestr(f"{PACK_NAME}/启动手机服务.bat", BAT_SERVER.encode("ascii"))
+        z.writestr(f"{PACK_NAME}/打开大屏.bat", BAT_SCREEN.encode("utf-8"))
+        z.writestr(f"{PACK_NAME}/打开演练版.bat", BAT_DEMO.encode("utf-8"))
+        z.writestr(f"{PACK_NAME}/启动手机服务.bat", BAT_SERVER.encode("utf-8"))
 
     size = zip_path.stat().st_size / 1024
     one = single_path.stat().st_size / 1024
