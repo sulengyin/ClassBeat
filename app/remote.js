@@ -51,6 +51,24 @@
     }
   }
 
+  /* 设备时钟可能走偏（一体机常年不关机、系统时区被改过）。
+     服务在同一局域网时，用它的时间校准一次；校不到就继续用系统时间，
+     绝不因为校时失败挡住大屏。 */
+  function syncClock() {
+    try {
+      return fetch(HUB + "/api/time", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var ok = !!(d && root.Clock && root.Clock.sync(d.now));
+          if (ok && Screen.render) { Screen.render(); }
+          return ok;
+        })
+        .catch(function () { return false; });
+    } catch (e) {
+      return null;
+    }
+  }
+
   function apply(msg) {
     if (msg && msg.type === "clear") { clearNotice(); return; }
     if (msg && msg.retractedAt) { return; }
@@ -97,6 +115,10 @@
   }
 
   function boot() {
+    if (root.Clock) syncClock();
+    /* 一台屏可能开一整天，隔一段时间再校一次，避免慢慢走偏 */
+    if (root.setInterval) root.setInterval(syncClock, 10 * 60 * 1000);
+
     /* 先取最新一条：大屏重启时，如果那条还没过期，应该还在屏上 */
     fetch(HUB + "/api/messages?n=8", { cache: "no-store" })
       .then(function (r) { return r.json(); })
@@ -115,7 +137,7 @@
       });
   }
 
-  root.Remote = { hub: HUB, connect: connect, retract: retract };
+  root.Remote = { hub: HUB, connect: connect, retract: retract, syncClock: syncClock };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
   } else {

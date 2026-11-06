@@ -24,7 +24,7 @@ def check(ok: bool, title: str, detail: str = "") -> None:
     results.append((ok, title, detail))
 
 
-# ① 块结构：21 块、首尾相接、无重叠空洞
+# ① 块结构：23 块、首尾相接、无重叠空洞
 tt = load("timetable.json")
 blocks = sorted(tt["blocks"], key=lambda b: t2m(b["start"]))
 gaps = [
@@ -35,11 +35,12 @@ gaps = [
 kinds = {}
 for b in blocks:
     kinds[b["type"]] = kinds.get(b["type"], 0) + 1
-check(len(blocks) == 21, "① 作息共 21 块", f"实际 {len(blocks)} 块")
-check(not gaps, "① 块首尾相接", "、" .join(gaps) if gaps else "08:20→17:20 连续")
+check(len(blocks) == 23, "① 作息共 23 块", f"实际 {len(blocks)} 块")
+check(not gaps, "① 块首尾相接", "、".join(gaps) if gaps else "从到校到放学连续")
 check(kinds.get("class") == 7, "① 7 节正课", str(kinds))
 check(kinds.get("ritual") == 4, "① 4 个固定仪式", str(kinds))
-check(kinds.get("break") == 6, "① 6 段课间", str(kinds))
+check(kinds.get("break") == 7, "① 7 段课间", str(kinds))
+check(kinds.get("reading") == 1, "① 1 段早读", str(kinds))
 
 # ② 第 4 节 11:20–11:40（课表笔误 11:30，以作息为准）
 d_thu = build(dt.date(2026, 11, 5))

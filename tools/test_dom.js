@@ -179,7 +179,7 @@ function loadBrowserScript(f) {
   new Function("module", "exports", "require", "self", code)(undefined, undefined, undefined, global);
 }
 
-["app/data.js", "app/engine/schedule.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/edit.js", "app/demo.js"]
+["app/data.js", "app/engine/schedule.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/edit.js", "app/demo.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
@@ -228,6 +228,20 @@ check((seen["11:25"] || "").indexOf("书法") > 0, "第 4 节书法上屏", seen
 check((seen["08:30"] || "").indexOf("语文") > 0, "第 1 节语文上屏", seen["08:30"]);
 check(seen["10:24"] !== seen["10:12"], "焦点随时间真的变了",
   seen["10:12"] + " → " + seen["10:24"]);
+
+/* 早读：7:50–8:10 是真实的一段；提醒事项单独一块，比建议更醒目 */
+global.__rhythmDate = "2026-11-05";
+global.__rhythmTime = 7 * 60 + 50;
+global.Store.patchTexts({
+  reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } },
+  reminders: { "default": "带齐回执" }
+});
+Screen.render();
+check(heroText() === "英语早读", "周四 7:50 上早读", heroText());
+const remRow = document.querySelector(".reminder-line");
+check(!!remRow && remRow.textContent.indexOf("带齐回执") >= 0,
+  "提醒事项单独一块上屏", remRow ? remRow.textContent : "缺失");
+global.Store.resetTexts();
 
 /* 紧急通知：红色只由老师手动发，文字要能占住主区 */
 const Store = global.Store;
@@ -333,11 +347,14 @@ const mon1 = global.Runtime.day("2026-11-09").timeline
 check(beforeShift.indexOf("第 1 节") < 0, "08:10 还没上第一节", beforeShift);
 
 const moved = JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable));
-moved.blocks[0].start = "08:00";
+/* 第一节前面还有早读和准备课间，不能拿 blocks[0] 当第一节 */
+const classIdx = moved.blocks.findIndex(b => b.type === "class");
+moved.blocks[classIdx - 1].end = "08:05";
+moved.blocks[classIdx].start = "08:05";
 global.Runtime.patch({ timetable: moved });
 const afterShift = heroText();
 check(afterShift.indexOf("第 1 节") >= 0 && afterShift.indexOf(mon1) >= 0,
-  "把第一节提前 20 分钟，屏上立刻改成" + mon1, beforeShift + " → " + afterShift);
+  "把第一节提前到 08:05，屏上立刻改成" + mon1, beforeShift + " → " + afterShift);
 check(global.Runtime.rev() > 0, "配置改过之后版本号变了", "rev=" + global.Runtime.rev());
 
 /* 还原，别影响后面的用例。不能用 patch 把当前值再写一遍——
@@ -388,20 +405,21 @@ check(rows.length >= 10, "作息表按段列出", rows.length + " 段");
 check(document.querySelectorAll(".tt-time").length === rows.length * 2,
   "每段两个时间框", String(document.querySelectorAll(".tt-time").length));
 
-/* 改第一段上课时间：不点保存——输入框 change 就该立刻生效 */
+/* 改第一段（早读）的开始时间：不点保存——输入框 change 就该立刻生效。
+   第一段前面没有别的段，改开始时间不会破坏首尾相接。 */
 const beforeTime = global.Runtime.day("2026-11-09").timeline[0].start;
 const firstTime = document.querySelectorAll(".tt-time")[0];
-firstTime.value = "08:10";
+firstTime.value = "07:45";
 firstTime._h.change();
 const afterTime = global.Runtime.day("2026-11-09").timeline[0].start;
-check(afterTime === "08:10" && beforeTime !== afterTime,
-  "在面板里改上课时间，配置立刻重算", beforeTime + " → " + afterTime);
+check(afterTime === "07:45" && beforeTime !== afterTime,
+  "在面板里改早读开始时间，配置立刻重算", beforeTime + " → " + afterTime);
 
 /* 校验：把结束时间改到开始之前，必须拒绝，不能写成断档 */
 const endTime = document.querySelectorAll(".tt-time")[1];
 endTime.value = "07:00";
 endTime._h.change();
-check(global.Runtime.day("2026-11-09").timeline[0].end === "09:00",
+check(global.Runtime.day("2026-11-09").timeline[0].end === "08:10",
   "结束早于开始时不写入", global.Runtime.day("2026-11-09").timeline[0].end);
 
 global.Store.resetConfig();

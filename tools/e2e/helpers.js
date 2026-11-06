@@ -2,7 +2,7 @@
 
 const { expect } = require("@playwright/test");
 
-const SCREEN_PATH = "/app/index.html?hub=127.0.0.1:8765";
+const SCREEN_PATH = "/app/index.html?hub=127.0.0.1:8765&nosync=1";
 
 /** 把服务端攒下的旧消息全部撤回，免得上一轮的通知串到这一轮。 */
 async function clearHub(request) {

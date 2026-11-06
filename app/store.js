@@ -54,6 +54,8 @@
 
   /* ---------- 日期 ---------- */
   function dayKey(d) {
+    /* 不传日期时以北京时间为准：设备时区不对，覆盖层不能写到昨天去 */
+    if (!d && root.Clock && root.Clock.dayKey) return root.Clock.dayKey();
     d = d || new Date();
     var p = function (n) { return (n < 10 ? "0" : "") + n; };
     return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
@@ -318,7 +320,9 @@
   }
 
   function patchTexts(patch) {
-    var cur = read(KEY.texts, {}) || {};
+    /* 从当前生效的文案起步，而不是从空对象起步：
+       包里烤了 data/texts.json 时，第一次改任意一项不能把其余默认值抹掉。 */
+    var cur = clone(texts()) || {};
     Object.keys(patch).forEach(function (k) {
       if (patch[k] == null) delete cur[k];
       else cur[k] = patch[k];

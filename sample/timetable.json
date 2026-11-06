@@ -8,6 +8,20 @@
   "note": "锚点由学校定；午间的开始与结束不是锚点，见 noonBand",
   "blocks": [
     {
+      "seq": "0a",
+      "start": "07:50",
+      "end": "08:10",
+      "type": "reading",
+      "name": "早读"
+    },
+    {
+      "seq": "0b",
+      "start": "08:10",
+      "end": "08:20",
+      "type": "break",
+      "name": "课间"
+    },
+    {
       "seq": 1,
       "start": "08:20",
       "end": "09:00",

@@ -94,6 +94,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -112,6 +129,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -494,6 +528,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -924,6 +972,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -942,6 +1007,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -1324,6 +1406,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -1770,6 +1866,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -1788,6 +1901,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -2185,6 +2315,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -2565,6 +2709,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -2583,6 +2744,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -3013,6 +3191,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -3408,6 +3600,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -3426,6 +3635,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -3822,6 +4048,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -4204,6 +4444,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -4222,6 +4479,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -4618,6 +4892,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -5003,6 +5291,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -5021,6 +5326,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -5417,6 +5739,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -5816,6 +6152,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -5834,6 +6187,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -6230,6 +6600,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -6610,6 +6994,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -6628,6 +7029,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -7057,6 +7475,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -7452,6 +7884,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -7470,6 +7919,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -7865,6 +8331,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -8247,6 +8727,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -8265,6 +8762,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -8660,6 +9174,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -9045,6 +9573,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -9063,6 +9608,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -9458,6 +10020,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -9857,6 +10433,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -9875,6 +10468,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -10272,6 +10882,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -10652,6 +11276,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -10670,6 +11311,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -11100,6 +11758,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -11495,6 +12167,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -11513,6 +12202,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -11909,6 +12615,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -12291,6 +13011,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -12309,6 +13046,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -12705,6 +13459,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -13090,6 +13858,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -13108,6 +13893,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -13504,6 +14306,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -13903,6 +14719,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -13921,6 +14754,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -14317,6 +15167,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -14697,6 +15561,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -14715,6 +15596,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -15144,6 +16042,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -15539,6 +16451,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -15557,6 +16486,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -15952,6 +16898,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -16334,6 +17294,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -16352,6 +17329,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -16747,6 +17741,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -17132,6 +18140,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -17150,6 +18175,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -17545,6 +18587,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -17944,6 +19000,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -17962,6 +19035,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -18359,6 +19449,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -18739,6 +19843,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -18757,6 +19878,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -19187,6 +20325,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -19582,6 +20734,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -19600,6 +20769,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -19996,6 +21182,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -20441,6 +21641,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -20459,6 +21676,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -20854,6 +22088,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -21239,6 +22487,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -21257,6 +22522,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -21652,6 +22934,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -22033,6 +23329,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -22051,6 +23364,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -22446,6 +23776,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -22836,6 +24180,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -22854,6 +24215,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -23251,6 +24629,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -23631,6 +25023,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -23649,6 +25058,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -24079,6 +25505,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -24474,6 +25914,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -24492,6 +25949,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -24888,6 +26362,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -25270,6 +26758,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -25288,6 +26793,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -25684,6 +27206,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -26069,6 +27605,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -26087,6 +27640,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -26483,6 +28053,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -26882,6 +28466,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -26900,6 +28501,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -27296,6 +28914,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -27676,6 +29308,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -27694,6 +29343,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -28123,6 +29789,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -28518,6 +30198,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -28536,6 +30233,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -28931,6 +30645,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -29313,6 +31041,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -29331,6 +31076,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -29726,6 +31488,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -30111,6 +31887,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -30129,6 +31922,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -30524,6 +32334,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -30923,6 +32747,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -30941,6 +32782,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -31338,6 +33196,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -31718,6 +33590,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -31736,6 +33625,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -32166,6 +34072,20 @@
    },
    "timeline": [
     {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
+    {
      "end": "09:00",
      "periodNo": 1,
      "place": null,
@@ -32561,6 +34481,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -32579,6 +34516,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -32975,6 +34929,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -33357,6 +35325,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -33375,6 +35360,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -33771,6 +35773,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,
@@ -34156,6 +36172,23 @@
     {
      "assign": "fixed",
      "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "讲台清理师",
+     "order": 12,
+     "people": [
+      "杨望舒"
+     ],
+     "reason": null,
+     "roleId": "r10",
+     "status": "ok",
+     "substitute": []
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
      "block": null,
      "end": "08:26",
      "freqKind": "daily",
@@ -34174,6 +36207,23 @@
        "note": "特殊情况帮忙擦黑板"
       }
      ]
+    },
+    {
+     "assign": "fixed",
+     "at": "08:10",
+     "block": "0b",
+     "end": "08:20",
+     "freqKind": "each",
+     "grp": null,
+     "name": "多媒体管理员",
+     "order": 15,
+     "people": [
+      "吴书瑶"
+     ],
+     "reason": null,
+     "roleId": "r05",
+     "status": "ok",
+     "substitute": []
     },
     {
      "assign": "fixed",
@@ -34570,6 +36620,20 @@
     "title": "午间休息"
    },
    "timeline": [
+    {
+     "end": "08:10",
+     "name": "早读",
+     "seq": "0a",
+     "start": "07:50",
+     "type": "reading"
+    },
+    {
+     "end": "08:20",
+     "name": "课间",
+     "seq": "0b",
+     "start": "08:10",
+     "type": "break"
+    },
     {
      "end": "09:00",
      "periodNo": 1,

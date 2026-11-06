@@ -11,6 +11,7 @@
   var CD = {
     class:  { mode: "off" },
     ritual: { mode: "off" },
+    reading: { mode: "off" },
     break:  { mode: "untilNext", showFrom: 10 },
     meal:   { mode: "untilEnd",  showFrom: 5 },
     noon:   { mode: "untilEnd",  showFrom: 10 },
@@ -22,7 +23,7 @@
   /* 四色语义：绿=可以动，蓝=专注，琥珀=准备，红=立刻停。
      红不在这里产生——红色只由老师手动发出的紧急通知触发，见 PLAN 2.20。 */
   var TONE = {
-    class: "blue", ritual: "blue",
+    class: "blue", ritual: "blue", reading: "blue",
     break: "green", meal: "green", noon: "green", after: "green",
     before: "green", closed: "green",
     action: "amber", holiday: "neutral"
@@ -81,12 +82,25 @@
     return null;
   }
 
-  /* 准备清单按 level 决定什么时候出现：3/2 全程，1 只在最后 2 分钟 */
-  function prepVisible(prep, remainMin) {
-    if (!prep || !prep.items || !prep.items.length) return false;
-    if (prep.level >= 2) return true;
-    if (prep.level === 1) return remainMin <= 2;
+  /* 早读不出准备清单——课前那点时间，列书单没用。
+     老师要的是一句"今天读什么"，所以改成一条建议。
+     准备清单只在紧邻上课的课间出现，见下面 break 分支。 */
+
+  function hasReadingBlock(timeline) {
+    for (var i = 0; i < timeline.length; i += 1) {
+      if (timeline[i].type === "reading") return true;
+    }
     return false;
+  }
+
+  /* 「提醒事项」按星期配；没配这一天就用「每天」那条。
+     它比早读建议更重要，所以单独一块、单独上色，不和普通清单混在一起。 */
+  function reminderFor(opts, day) {
+    var R = opts && opts.texts && opts.texts.reminders;
+    if (!R) return "";
+    var v = R[String(day.weekday)];
+    if (v == null || String(v).trim() === "") v = R["default"];
+    return (v == null ? "" : String(v)).trim();
   }
 
   function countdownFor(kind, remainMin, mode) {
@@ -119,9 +133,9 @@
     return m ? t2m(m.at) : null;
   }
 
-  /* 早读不在作息表里——它是到校后到第 1 节之间那 40 分钟。
-     读什么、读多久、读哪一课，班班不同，所以按星期配，老师自己填。
-     没填就不显示：宁可不说，也不要猜一个科目出来。 */
+  /* 早读读什么，按星期配，老师自己填；没填不猜科目。
+     时间在作息表里是一段真实的块（reading），不再从"到校后到第 1 节"推算——
+     这样老师才能把结束时间定在 8:10，8:10 之后交给准备课间。 */
   function readingFor(opts, day, arrived) {
     if (!arrived || !day) return null;
     var r = opts && opts.texts && opts.texts.reading;
@@ -130,9 +144,6 @@
     if (!x || !(x.subject || "").trim()) return null;
     return x;
   }
-
-  /* 早读不出准备清单——课前那点时间，列书单没用。
-     老师要的是一句"今天读什么"，所以改成一条建议。 */
 
   function coreStateAt(day, minutes, opts) {
     opts = opts || {};
@@ -157,7 +168,9 @@
         var c0 = t.filter(function (b) { return b.type === "class"; })[0];
         var arr = arriveOf(day);
         var arrived = arr != null && minutes >= arr;
-        var rd = readingFor(opts, day, arrived);
+        /* 作息表里已经有早读块时，不再把"到校后到第 1 节"整段算成早读，
+           否则 7:45 就会提前上早读，把真正的到校时间吞掉。 */
+        var rd = hasReadingBlock(t) ? null : readingFor(opts, day, arrived);
 
         if (rd) {
           var advice = (rd.task || "").trim();
@@ -209,15 +222,29 @@
                          start: b.start, end: b.end, index: i,
                          next: t[i + 1] ? { type: t[i + 1].type, name: t[i + 1].name } : null } };
 
+    if (b.type === "reading") {
+      var firstClass = t.filter(function (x) { return x.type === "class"; })[0];
+      var rdToday = readingFor(opts, day, true);
+      var rem = reminderFor(opts, day);
+      card.title = (rdToday && rdToday.subject ? rdToday.subject + "早读" : (b.name || "早读"));
+      card.sub = firstClass && firstClass.subject ? "第 1 节 " + firstClass.subject : "";
+      card.note = "";
+      card.items = [];
+      card.reading = true;
+      card.lines = [];
+      /* 提醒事项排在早读建议前面：它是今天必须记住的那一件，
+         不能埋在"读第几课"下面。 */
+      if (rem) card.lines.push({ kind: "reminder", label: "提醒事项", items: [rem] });
+      if (rdToday && (rdToday.task || "").trim()) {
+        card.lines.push({ kind: "prep", label: "早读建议", items: [rdToday.task.trim()] });
+      }
+    }
+
     if (b.type === "class") {
       card.title = "第 " + b.periodNo + " 节 · " + (b.subject || "—");
       card.sub = b.teacher || "";
       card.note = "";
       if (b.place) card.meta.push({ label: "地点", value: b.place });
-      if (b.prep && b.prep.level >= 3 && b.prep.items.length) {
-        card.items = b.prep.items;
-        card.note = "这一节要用的东西，课前摆好";
-      }
     }
 
     if (b.type === "break") {
@@ -228,10 +255,11 @@
       if (nc) {
         if (nc.teacher) card.meta.push({ label: "任课", value: nc.teacher });
         if (nc.place) card.meta.push({ label: "地点", value: nc.place });
-        card._hasPrep = !!(nc.prep && nc.prep.items && nc.prep.items.length);
-        if (prepVisible(nc.prep, remain)) {
+        /* 上课铃响之前这一段，才是准备用品的时间。从课间第一秒就列出来，
+           不再分 level、也不再等最后 2 分钟——学生要有整段课间去拿东西。 */
+        if (nc.prep && nc.prep.items && nc.prep.items.length) {
           card.items = nc.prep.items;
-          card.note = nc.prep.level >= 3 ? "提前准备，别到上课才找" : "别忘了带";
+          card.note = "下节课要用，现在就摆好";
         }
       }
       card._next = nc ? { subject: nc.subject, teacher: nc.teacher, periodNo: nc.periodNo } : null;
@@ -313,7 +341,6 @@
 
     card.lines = linesFor(card, kind, opts);
     delete card._ctx;
-    delete card._hasPrep;
     return card;
   }
 
@@ -322,22 +349,16 @@
   var TASK_KIND = { noon: 1, action: 1, meal: 1 };
 
   function linesFor(card, kind, opts) {
-    /* 早读的行是 coreStateAt 里直接给的（一条建议，不是清单），别再拼一遍 */
+    /* 早读的行是 coreStateAt 里直接给的（建议 + 提醒），别再拼一遍 */
     if (card.reading) return card.lines || [];
     var T = (opts && opts.texts) || {};
     var label = T.prepLabel || "准备好";
     var out = [];
     var items = card.items || [];
 
-    if (!items.length) {
-      /* 没到点列清单时，也说一句"准备好"，只是不给具体物品 */
-      if (kind === "break" && card._hasPrep) {
-        out.push({ kind: "prep", label: label, items: [T.genericPrep || "下节课的书"] });
-      }
-    } else if (TASK_KIND[kind]) {
-      out.push({ kind: "action", items: items });
-    } else {
-      out.push({ kind: "prep", label: label, items: items });
+    if (items.length) {
+      if (TASK_KIND[kind]) out.push({ kind: "action", items: items });
+      else out.push({ kind: "prep", label: label, items: items });
     }
 
     if (card.hints && card.hints.length) out.unshift({ kind: "action", items: card.hints });

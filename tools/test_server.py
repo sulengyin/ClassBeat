@@ -72,6 +72,14 @@ def main():
         check(code == 200 and d.get("ok") and d.get("class") == "测试班",
               "① 大屏能探测到服务", f'{code} {d.get("class")}')
 
+        # ①b 校时：给毫秒时间戳，并明确按 UTC+8
+        code, _, raw = req(port, "/api/time")
+        t = json.loads(raw)
+        ok_time = (code == 200 and t.get("ok") and t.get("offsetMinutes") == 480
+                   and isinstance(t.get("now"), int) and t["now"] > 1_600_000_000_000
+                   and "+08:00" in str(t.get("beijing", "")))
+        check(ok_time, "①b /api/time 给出北京时间戳", f'{t.get("beijing")} {t.get("now")}')
+
         # ② CORS：大屏是 file:// 打开的，origin 为 null，必须允许 *
         check(head.get("Access-Control-Allow-Origin") == "*",
               "② 允许 file:// 跨域访问", head.get("Access-Control-Allow-Origin"))

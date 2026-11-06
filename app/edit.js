@@ -508,6 +508,14 @@
     S.patchTexts({ reading: Object.keys(r).length ? r : null });
   }
 
+  /* 提醒事项：单独一条，按天覆盖「每天」。留空 = 用每天那条。 */
+  function setReminder(key, v) {
+    var r = Object.assign({}, S.texts().reminders);
+    v = (v || "").trim();
+    if (v) r[key] = v; else delete r[key];
+    S.patchTexts({ reminders: Object.keys(r).length ? r : null });
+  }
+
   function readInput(ph, value, onSave) {
     var inp = document.createElement("input");
     inp.className = "ep-input";
@@ -549,8 +557,8 @@
     var secR = h("section", "ep-sec wide");
     secR.appendChild(h("h3", null, "早读"));
     secR.appendChild(h("p", "ep-note",
-      "到校后到第 1 节前这一段。按星期填，科目空着这天就不显示早读。"
-      + "第二格是今天读什么，留空就只上一个大字。"));
+      "早读在「作息」里是一段真实时间（现在是 07:50–08:10）。按星期填科目和读什么，"
+      + "科目空着这天就只显示「早读」，不猜。8:10 之后自动切到第一节课的准备清单。"));
     var rd = T.reading || {};
 
     var head = h("div", "ep-read head");
@@ -571,6 +579,33 @@
     });
     bodyEl.appendChild(secR);
 
+    /* 提醒事项：黄色贴纸，单独一块。每天一条，某天要换就单独填。 */
+    var secM = h("section", "ep-sec wide");
+    secM.appendChild(h("h3", null, "早读 · 提醒事项"));
+    secM.appendChild(h("p", "ep-note",
+      "这块会用黄色贴纸单独显示，比早读建议更醒目，适合放今天必须记住的事"
+      + "（带回执、穿校服、带水杯）。留空的星期就用「每天」这一条。"));
+    var rems = T.reminders || {};
+
+    var mhead = h("div", "ep-read ep-rem head");
+    mhead.appendChild(h("span", "ep-read-day", ""));
+    mhead.appendChild(h("span", "ep-read-tag", "提醒文字（留空 = 不显示）"));
+    secM.appendChild(mhead);
+
+    var mrows = [{ key: "default", label: "每天", ph: "带齐今天要用的书和作业，课前摆好。" }]
+      .concat(WEEKDAYS.map(function (w) {
+        return { key: String(w.n), label: w.label, ph: rems["default"] || "" };
+      }));
+
+    mrows.forEach(function (m) {
+      var row = h("div", "ep-read ep-rem");
+      row.appendChild(h("span", "ep-read-day", m.label));
+      row.appendChild(readInput(m.ph, rems[m.key] || "",
+        function (v) { setReminder(m.key, v); }));
+      secM.appendChild(row);
+    });
+    bodyEl.appendChild(secM);
+
     var sec1 = h("section", "ep-sec wide");
     sec1.appendChild(h("h3", null, "课间这一屏"));
     sec1.appendChild(h("p", "ep-note",
@@ -582,8 +617,6 @@
       function (v) { S.patchTexts({ breakActions: splitWords(v) }); }));
     sec1.appendChild(field("第二行开头", "准备好", T.prepLabel,
       function (v) { S.patchTexts({ prepLabel: v.trim() || null }); }));
-    sec1.appendChild(field("还没到列清单时先写", "下节课的书", T.genericPrep,
-      function (v) { S.patchTexts({ genericPrep: v.trim() || null }); }));
     bodyEl.appendChild(sec1);
 
     var sec2 = h("section", "ep-sec wide");
@@ -640,6 +673,7 @@
   var TT_TYPES = [
     { key: "class",  label: "正课", locked: true },
     { key: "break",  label: "课间" },
+    { key: "reading",label: "早读" },
     { key: "ritual", label: "集会 / 眼操" },
     { key: "meal",   label: "午餐", locked: true },
     { key: "noon",   label: "午间", locked: true },
@@ -758,7 +792,36 @@
       row.appendChild(st);
       row.appendChild(h("span", "tt-dash", "—"));
       row.appendChild(en);
-      row.appendChild(h("span", "tt-tag", meta ? meta.label : (b.type || "?")));
+
+      /* 正课 / 午餐 / 午间跟课表绑着，类型不能动；
+         其余段落让老师自己选，作息里多一段早读就能直接改出来。 */
+      var curType = b.type;
+      var curLabel = meta ? meta.label : "";
+      if (meta && meta.locked) {
+        row.appendChild(h("span", "tt-tag", meta.label));
+      } else {
+        var sel = document.createElement("select");
+        sel.className = "tt-type";
+        TT_TYPES.filter(function (t) { return !t.locked; }).forEach(function (t) {
+          var o = document.createElement("option");
+          o.value = t.key;
+          o.textContent = t.label;
+          sel.appendChild(o);
+        });
+        sel.value = TT_TYPES.some(function (t) { return !t.locked && t.key === b.type; })
+          ? b.type : "break";
+        curType = sel.value;
+        sel.addEventListener("change", function () {
+          var pick = TT_TYPES.filter(function (t) { return t.key === sel.value; })[0];
+          var newLabel = pick ? pick.label : "";
+          /* 原来那行叫「课间」，改成早读后名称也跟着改，别留下「课间」当早读标题 */
+          if (!name.value.trim() || name.value.trim() === curLabel) name.value = newLabel;
+          curLabel = newLabel;
+          curType = sel.value;
+          commit();
+        });
+        row.appendChild(sel);
+      }
       row.appendChild(name);
 
       /* 只改时间时不重绘整块，否则输入框会失焦 */
@@ -767,7 +830,8 @@
         var next = blocks.map(function (x, i) {
           if (i !== idx) return x;
           return Object.assign({}, x, {
-            start: st.value, end: en.value, name: name.value.trim() || x.name
+            start: st.value, end: en.value, name: name.value.trim() || x.name,
+            type: curType
           });
         });
         var bad = hoursProblem(next);

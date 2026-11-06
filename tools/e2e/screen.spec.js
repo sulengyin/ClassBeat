@@ -96,6 +96,15 @@ test("验证码挡住乱输，答对才进设置", async ({ page, request }) => 
   await expect(page.locator("#epTitle")).toContainText(ping.class);
 });
 
+test("早读 8:10 结束，屏上立刻换成第一节课的准备清单", async ({ page }) => {
+  // 早读在作息表里是 07:50–08:10 的一段，8:10 的下一段是准备课间
+  await openScreen(page, "2026-11-05T08:10:00+08:00");
+  await expect(page.locator("#bandText")).toHaveText("课间");
+  await expect(page.locator("#heroSub")).toContainText("下一节");
+  await expect(page.locator("#chips")).toContainText("语文书");
+  await expect(page.locator("#chips")).toContainText("准备好");
+});
+
 test("放学前值日条有内容", async ({ page }) => {
   await openScreen(page, "2026-11-05T17:12:00+08:00");
   await expect(page.locator("#duty .duty").first()).toBeVisible();

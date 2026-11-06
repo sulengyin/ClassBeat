@@ -10,7 +10,6 @@
 
   var params = new URLSearchParams(root.location ? root.location.search : "");
   var fixedTime = params.get("t");
-  var fixedDate = params.get("date");
 
   var el = {};
   function $(id) { return document.getElementById(id); }
@@ -29,17 +28,16 @@
   function setText(node, v) { if (node && node.textContent !== v) node.textContent = v; }
 
   function todayKey() {
-    /* 测试与演练的注入点：跟 __rhythmTime 一样，设了就不看系统日期。
-       跨午夜的行为不靠它保证——render 每秒重算一次 todayKey()，
-       到了零点 key 变了，取到的自然是新的一天。 */
-    if (root.__rhythmDate) return root.__rhythmDate;
-    if (fixedDate) return fixedDate;
+    /* 日期一律走 Clock：北京时间，不看设备时区。
+       测试与演练的注入点仍在 Clock 里（__rhythmDate / ?date=）。 */
+    if (root.Clock) return root.Clock.dayKey();
     var d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
 
   function nowMinutes() {
-    /* 测试与调试用的注入点：设了就不看系统时间 */
+    /* 测试与调试用的注入点：__rhythmTime / ?t= 都由 Clock 统一处理 */
+    if (root.Clock) return root.Clock.minutes();
     if (root.__rhythmTime != null) return root.__rhythmTime;
     if (fixedTime) {
       var p = fixedTime.split(":");
@@ -150,6 +148,7 @@
       if (s.reading) return "早读";
       return s.arrived ? "到校" : "还没到校";
     }
+    if (s.kind === "reading") return "早读";
     if (s.kind === "ritual") return s.title || "固定安排";
     if (s.kind === "noon") return s.title || "午间";
     return BAND[s.kind] || "";
@@ -519,9 +518,21 @@
 
     (lines || []).forEach(function (line) {
       var row = document.createElement("div");
-      row.className = line.kind === "prep" ? "prep-line" : "chip-row";
+      row.className = line.kind === "prep" ? "prep-line"
+        : (line.kind === "reminder" ? "reminder-line" : "chip-row");
 
-      if (line.kind === "prep") {
+      if (line.kind === "reminder") {
+        var rl = document.createElement("span");
+        rl.className = "rlabel";
+        rl.textContent = line.label || "提醒事项";
+        row.appendChild(rl);
+        (line.items || []).forEach(function (text) {
+          var r = document.createElement("span");
+          r.className = "ritem";
+          r.textContent = dot(text);
+          row.appendChild(r);
+        });
+      } else if (line.kind === "prep") {
         var lb = document.createElement("span");
         lb.className = "plabel";
         lb.textContent = line.label || "准备好";
@@ -624,7 +635,8 @@
 
   function settled(notice) {
     if (!notice || !notice.createdAt) return false;
-    return Date.now() - notice.createdAt > 60000;
+    var now = root.Clock ? root.Clock.nowMs() : Date.now();
+    return now - notice.createdAt > 60000;
   }
 
   function reduced() {
