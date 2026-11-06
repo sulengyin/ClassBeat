@@ -59,6 +59,7 @@
 /* 语义色按"现在该干什么"分配，不按好看分配。
    只给标签、数字、脊柱这些小面积上色，整张卡不再跟着时段换衣服。 */
 body[data-kind="class"]{--accent:#2E6FBF}
+body[data-kind="reading"]{--accent:#2E6FBF}
 body[data-kind="break"]{--accent:#996008}
 body[data-kind="meal"],
 body[data-kind="noon"]{--accent:#A55C0C}
@@ -204,6 +205,7 @@ main{
   transition:opacity var(--d-move) var(--e-soft),background-color var(--d-move) var(--e-soft);
 }
 .spine .seg.class{background:#8FB6E4}
+.spine .seg.reading{background:#8FB6E4}
 .spine .seg.break{background:#8CC46F}
 .spine .seg.meal,.spine .seg.noon{background:#EFB65C}
 .spine .seg.ritual{background:#B7A5E0}
@@ -322,6 +324,31 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
   content:"·";margin:0 1.1vmin;font-weight:400;opacity:.45;
 }
 
+/* 提醒事项：整块黄色贴纸 + 深色感叹号。
+   它比"早读建议"重要，所以不跟普通清单共用一行样式：
+   贴在纸上、字号更大、颜色更亮，八米外第一眼看到的是它。 */
+.reminder-line{
+  display:flex;align-items:center;gap:1.6vmin;flex-wrap:wrap;max-width:100%;
+  padding:1.4vmin 2.2vmin;
+  background:var(--yellow);color:#31231A;
+  border:.42vmin solid var(--line);
+  border-radius:1.2vmin 2.2vmin 1.4vmin 1.6vmin;
+  box-shadow:.6vmin .6vmin 0 rgba(58,42,30,.22);
+  transform:rotate(-.4deg);
+  animation:chip-in .46s var(--e-spring) backwards;
+}
+.reminder-line .rlabel{
+  display:inline-flex;align-items:center;gap:.9vmin;flex:none;
+  font-size:3vmin;font-weight:900;letter-spacing:.08em;
+}
+.reminder-line .rlabel::before{
+  content:"!";display:inline-flex;align-items:center;justify-content:center;
+  width:4.2vmin;height:4.2vmin;border-radius:50%;
+  background:#3A2A1E;color:#FFD64F;
+  font-size:2.9vmin;font-weight:900;line-height:1;
+}
+.reminder-line .ritem{font-size:3.9vmin;font-weight:900;line-height:1.3;min-width:0}
+
 /* 老师发的普通通知：一张贴了引号的便签 */
 .notice-bar{
   position:relative;z-index:1;
@@ -428,7 +455,7 @@ body[data-alert="1"][data-settled="1"] .alert-frame::before{animation:none;opaci
 
 /* 减少动态：系统偏好 + 手动开关 */
 @media (prefers-reduced-motion: reduce){
-  .aura,.spine .seg.now,.band .dot,.alert-frame::before,.hero-main,.chips .chip{animation:none!important}
+  .aura,.spine .seg.now,.band .dot,.alert-frame::before,.hero-main,.chips .chip,.reminder-line{animation:none!important}
   .tk-strip{transition:none!important}
 }
 body[data-reduce="1"] .aura,
@@ -438,6 +465,7 @@ body[data-reduce="1"] .alert-frame::before,
 body[data-reduce="1"] .hero-main,
 body[data-reduce="1"] .chip,
 body[data-reduce="1"] .notice-bar{animation:none!important}
+body[data-reduce="1"] .reminder-line{animation:none!important}
 body[data-reduce="1"] .tk-strip{transition:none!important}
 
 /* 状态切换：只播一次 */
@@ -600,13 +628,13 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 
 <div class="demo" id="demo">
   <button class="d-btn d-play" id="d-play" aria-label="播放">▶</button>
-  <div class="d-now" id="d-now">07:40</div>
+  <div class="d-now" id="d-now">07:15</div>
   <div class="d-slot">
     <div class="d-ribbon" id="d-ribbon"></div>
-    <input class="d-range" id="d-range" type="range" min="460" max="1080" step="0.5" value="460" aria-label="时间轴">
+    <input class="d-range" id="d-range" type="range" min="435" max="1080" step="0.5" value="435" aria-label="时间轴">
   </div>
   <div class="d-jumps">
-    <button class="d-btn d-jump" data-t="07:50">到校</button>
+    <button class="d-btn d-jump" data-t="07:20">到校</button>
     <button class="d-btn d-jump" data-t="10:16">课间</button>
     <button class="d-btn d-jump" data-t="10:23">倒计时</button>
     <button class="d-btn d-jump" data-t="11:42">午餐</button>
@@ -623,6 +651,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 
 <script src="data.js"></script>
 <script src="engine/schedule.js"></script>
+<script src="clock.js"></script>
 <script src="config.js"></script>
 <script src="rhythm.js"></script>
 <script src="store.js"></script>

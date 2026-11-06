@@ -31,6 +31,9 @@ APP_DIR = os.path.abspath(os.path.join(BASE, "..", "app"))
 
 CONF = {"port": 8765, "klass": ""}
 
+# 消息的 at / until 是给教室看的，一律按北京时间算，不跟服务器的本地时区走。
+BEIJING = dt.timezone(dt.timedelta(hours=8))
+
 
 def detect_class() -> str:
     """班级名从数据里读，不在代码里写死——别人 clone 下来就是别人的班。
@@ -97,7 +100,7 @@ def save_messages():
 # ---------------------------------------------------------------- 业务
 
 def hhmm(minutes_from_now=0):
-    t = dt.datetime.now() + dt.timedelta(minutes=minutes_from_now)
+    t = dt.datetime.now(BEIJING) + dt.timedelta(minutes=minutes_from_now)
     return t.strftime("%H:%M")
 
 
@@ -226,6 +229,15 @@ class Handler(BaseHTTPRequestHandler):
                 "class": CONF["klass"],
                 "port": CONF["port"],
                 "now": hhmm(0),
+                "time": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
+            })
+        # 大屏用它校准设备时钟。给毫秒时间戳，客户端自己换算北京时间。
+        if path == "/api/time":
+            return self._json({
+                "ok": True,
+                "now": int(time.time() * 1000),
+                "beijing": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
+                "offsetMinutes": 480,
             })
         if path == "/api/messages":
             q = parse_qs(u.query)

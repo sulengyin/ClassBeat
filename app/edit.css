@@ -163,6 +163,8 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-read-day{font-size:2.2vmin;font-weight:800;color:#C1B09A;letter-spacing:.06em}
 .ep-read-tag{font-size:2vmin;color:#8E7B66;letter-spacing:.12em}
 .ep-read .ep-input{padding:1.1vmin 1.4vmin;font-size:2.4vmin}
+/* 提醒事项只有两列：星期 + 一条文字 */
+.ep-read.ep-rem{grid-template-columns:7vmin 1fr}
 
 
 /* 作息：每行两段时间 + 类型 + 名称。窄屏自动换行，不挤成一条 */
@@ -178,6 +180,10 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .tt-dash{color:#8A7660;font-size:2.2vmin}
 .tt-tag{font-size:1.9vmin;padding:.5vmin 1vmin;border-radius:1.6vmin;
         background:#3E2D20;color:#C1B09A;border:.2vmin solid #6B5641;white-space:nowrap}
+.tt-type{font:inherit;font-size:2.1vmin;padding:.7vmin 1vmin;border-radius:1vmin;
+        background:#241A13;border:.24vmin solid #6B5641;color:#FBF3DF;outline:none;
+        max-width:22vmin;flex:none}
+.tt-type:focus{border-color:#FFD64F}
 .tt-name{font:inherit;font-size:2.3vmin;flex:1;min-width:18vmin;
         padding:.9vmin 1.2vmin;border-radius:1vmin;background:#241A13;
         border:.26vmin solid #6B5641;color:#FBF3DF;outline:none}

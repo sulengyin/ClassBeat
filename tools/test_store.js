@@ -147,6 +147,20 @@ const rOk = S.importAll(JSON.parse(JSON.stringify(dump)));
 check(rOk.ok === true && S.texts().breakTitle === "课间休息",
   "导入后文字回来了", "n=" + rOk.n);
 
+/* ---------- 烤进包里的文字不能被一次小修改抹掉 ---------- */
+D.texts = {
+  reading: { "4": { subject: "英语" } },
+  reminders: { "default": "带齐回执" }
+};
+S.resetTexts();
+S.patchTexts({ breakTitle: "课间十分钟" });
+var baked = S.texts();
+check(baked.breakTitle === "课间十分钟" && baked.reading && baked.reading["4"]
+  && baked.reminders && baked.reminders["default"] === "带齐回执",
+  "改一项文字不会抹掉包里烤好的早读和提醒", JSON.stringify(baked));
+S.resetTexts();
+delete D.texts;
+
 /* ---------- 验证码 ---------- */
 var okShape = true;
 for (var j = 0; j < 30; j++) {

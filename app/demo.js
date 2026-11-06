@@ -9,7 +9,7 @@
   var params = new URLSearchParams((root.location && root.location.search) || "");
   var hash = String((root.location && root.location.hash) || "").replace(/^#/, "");
 
-  var T0 = 7 * 60 + 40;   /* 07:40 到校前 */
+  var T0 = 7 * 60 + 15;   /* 07:15 到校前 */
   var T1 = 18 * 60;       /* 18:00 放学后 */
   var SPEEDS = [30, 120, 480];
 

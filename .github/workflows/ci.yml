@@ -36,6 +36,9 @@ jobs:
       - name: 节律逻辑
         run: node tools/test_rhythm.js
 
+      - name: 北京时间
+        run: node tools/test_clock.js
+
       - name: 本地存储
         run: node tools/test_store.js
 
