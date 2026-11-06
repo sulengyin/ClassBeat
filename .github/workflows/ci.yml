@@ -100,8 +100,25 @@ jobs:
         run: npm ci
 
       # Chromium ≈ 安卓/鸿蒙/Windows 一体机，WebKit ≈ iPhone/iPad Safari
+      #
+      # 浏览器约 300 MB，从 CDN 下载偶尔会卡到十几分钟（2026-11-06 就卡过一次）。
+      # 所以缓存 ~/.cache/ms-playwright，并且给下载单独设上限：
+      # 挂住时宁可在这一步失败，也不要吃掉整个 job 的 25 分钟。
+      - name: 缓存浏览器
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 安装浏览器系统依赖
+        timeout-minutes: 8
+        run: npx playwright install-deps chromium webkit
+
       - name: 安装浏览器
-        run: npx playwright install --with-deps chromium webkit
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 12
+        run: npx playwright install chromium webkit
 
       - name: 生成示例数据
         run: python3 tools/bundle.py --data sample
