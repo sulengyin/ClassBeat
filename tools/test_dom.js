@@ -429,5 +429,26 @@ check(global.Runtime.day("2026-11-09").timeline[0].end === "08:10",
 global.Store.resetConfig();
 global.Edit.close();
 
+/* remote.js 的 hub 选择：从服务打开时同源，双击文件时才用本机 8765。
+   以前默认写死 127.0.0.1，服务在另一台电脑上就永远连不上。 */
+function hubFor(loc) {
+  const win = {
+    location: loc,
+    document: { readyState: "loading", addEventListener() {} },
+    Screen: {}, Store: {}
+  };
+  new Function("window", "document", "URLSearchParams",
+    fs.readFileSync(path.join(ROOT, "app/remote.js"), "utf8")
+  )(win, win.document, URLSearchParams);
+  return win.Remote && win.Remote.hub;
+}
+
+check(hubFor({ search: "", protocol: "http:", host: "192.168.1.5:8765" })
+  === "http://192.168.1.5:8765", "从服务打开时同源连，不用手写 IP");
+check(hubFor({ search: "", protocol: "file:", host: "" }) === "http://127.0.0.1:8765",
+  "双击 html 打开时退回本机 8765");
+check(hubFor({ search: "?hub=10.0.0.2:9000", protocol: "http:", host: "1.2.3.4:8765" })
+  === "http://10.0.0.2:9000", "URL 上写了 hub 就听 URL 的");
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

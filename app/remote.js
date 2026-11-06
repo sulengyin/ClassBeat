@@ -14,7 +14,11 @@
   if (!Screen || !Store) return;
 
   var params = new URLSearchParams((root.location && root.location.search) || "");
-  var raw = params.get("hub") || "127.0.0.1:8765";
+  /* 从服务打开的（/screen 或 http://IP:8765/screen）就同源连，不用再传 IP；
+     只有双击 html（file://）时才回落到本机 8765。 */
+  var sameHost = (root.location && /^https?:$/.test(root.location.protocol))
+    ? root.location.host : "";
+  var raw = params.get("hub") || sameHost || "127.0.0.1:8765";
   var HUB = /^https?:\/\//.test(raw) ? raw.replace(/\/$/, "") : "http://" + raw;
 
   var es = null;
