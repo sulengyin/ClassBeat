@@ -53,13 +53,16 @@ SERVER_FILES = ["rhythm_server.py", "phone.html"]
 # .bat 内容保持纯 ASCII：cmd 默认 GBK，中文容易花
 BAT_SCREEN = "@echo off\r\nstart \"\" \"%~dp0app\\index.html\"\r\n"
 BAT_DEMO = "@echo off\r\nstart \"\" \"%~dp0app\\preview.html\"\r\n"
-# 中文写在 chcp 65001 之后：cmd 逐行读 bat，改了代码页后面的行才按 UTF-8 解。
-# 第一、二行必须是纯 ASCII，否则中文系统会先按 GBK 读错。
+# 编码用 GBK，不用 UTF-8 + chcp 65001。
+# 实测（2026-11-06，一体机）：UTF-8 + chcp 65001 下 cmd 逐行解码会在长中文行上错位，
+# 把 "安装第一屏...勾上 Add Python to PATH" 那一行拆开，后半截被当成命令执行，
+# 屏上直接报 "is not recognized as an internal or external command"。
+# 中文 Windows 的 cmd 默认代码页就是 936，按 GBK 存盘最稳，也不需要 chcp。
+# 另外：echo 里不要出现英文双引号，少一个让 cmd 误解析的机会。
 # Python 探测顺序 py -3 → python → python3：官方安装包的 launcher 最可靠，
 # 而 Windows 自带的 python.exe 可能只是个跳应用商店的 stub。
 BAT_SERVER = (
     "@echo off\r\n"
-    "chcp 65001 >nul\r\n"
     "title 手机消息服务 · 这个窗口不要关\r\n"
     "cd /d \"%~dp0server\"\r\n"
     "\r\n"
@@ -89,14 +92,27 @@ BAT_SERVER = (
     "echo.\r\n"
     "echo   这台电脑没找到 Python 3。\r\n"
     "echo.\r\n"
-    "echo   大屏不受影响：双击「打开大屏.bat」照样能用，\r\n"
-    "echo   只是「手机发消息」这一个功能需要 Python。\r\n"
+    "echo   大屏不受影响，双击「打开大屏.bat」照样能用。\r\n"
+    "echo   只有「手机发消息」这一个功能需要 Python。\r\n"
     "echo.\r\n"
-    "echo   要装的话：到 python.org 下载 Python 3，\r\n"
-    "echo   安装第一屏左下角一定要勾上 \"Add Python to PATH\"，再一路下一步。\r\n"
+    "echo   要装的话，到 python.org 下载 Python 3。\r\n"
+    "echo   安装第一屏最下面有个 Add Python to PATH 的勾，一定要勾上，\r\n"
+    "echo   然后一路点下一步。装完再双击一次本文件。\r\n"
     "echo.\r\n"
+    "echo   现在可以直接关掉这个窗口，不影响大屏。\r\n"
     "pause\r\n"
 )
+
+
+def bat_bytes(text):
+    """bat 用 GBK 写盘：中文 Windows 的 cmd 默认代码页是 936。
+
+    GBK 编不了的字符（emoji 之类）直接报错，别让它悄悄变成问号。
+    """
+    try:
+        return text.encode("gbk")
+    except UnicodeEncodeError as e:
+        raise SystemExit(f"bat 里有 GBK 编不了的字符：{e}\n{text!r}")
 
 README = """{klass} · 班级节律屏
 测试包（{date} 生成）
@@ -264,9 +280,9 @@ def main() -> None:
 
         z.write(single_path, f"{PACK_NAME}/{PACK_NAME}-单文件版.html")
         z.writestr(f"{PACK_NAME}/使用说明.txt", readme.encode("utf-8-sig"))
-        z.writestr(f"{PACK_NAME}/打开大屏.bat", BAT_SCREEN.encode("utf-8"))
-        z.writestr(f"{PACK_NAME}/打开演练版.bat", BAT_DEMO.encode("utf-8"))
-        z.writestr(f"{PACK_NAME}/启动手机服务.bat", BAT_SERVER.encode("utf-8"))
+        z.writestr(f"{PACK_NAME}/打开大屏.bat", bat_bytes(BAT_SCREEN))
+        z.writestr(f"{PACK_NAME}/打开演练版.bat", bat_bytes(BAT_DEMO))
+        z.writestr(f"{PACK_NAME}/启动手机服务.bat", bat_bytes(BAT_SERVER))
 
     size = zip_path.stat().st_size / 1024
     one = single_path.stat().st_size / 1024
