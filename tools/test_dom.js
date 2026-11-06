@@ -345,6 +345,10 @@ const mon1 = global.Runtime.day("2026-11-09").timeline
 /* 早读标题里也会出现科目名（「英语早读」），所以不能拿科目名判断；
    上课卡一定是「第 1 节 · 科目」 */
 check(beforeShift.indexOf("第 1 节") < 0, "08:10 还没上第一节", beforeShift);
+/* 「下一节 语文」写在主视觉下面那行 #after 上，不是 #heroSub。
+   这条是 CI 抓出来的：e2e 按 #heroSub 断言，三台大屏一起红。 */
+const afterTxt = document.getElementById("after").textContent;
+check(afterTxt.indexOf("下一节") >= 0, "08:10 课间写清楚下一节是什么", afterTxt);
 
 const moved = JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable));
 /* 第一节前面还有早读和准备课间，不能拿 blocks[0] 当第一节 */

@@ -112,7 +112,9 @@ test("早读 8:10 结束，屏上立刻换成第一节课的准备清单", async
   // 早读在作息表里是 07:30–08:10 的一段，8:10 的下一段是准备课间
   await openScreen(page, "2026-11-05T08:10:00+08:00");
   await expect(page.locator("#bandText")).toHaveText("课间");
-  await expect(page.locator("#heroSub")).toContainText("下一节");
+  // 「下一节 语文」走的是主视觉下面那行（#after），不是 #heroSub：
+  // #heroSub 只在倒计时接管时写「后上课」。
+  await expect(page.locator("#after")).toContainText("下一节");
   await expect(page.locator("#chips")).toContainText("语文书");
   await expect(page.locator("#chips")).toContainText("准备好");
 });
