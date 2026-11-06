@@ -623,6 +623,92 @@
     if (el.noticeText.textContent !== txt) el.noticeText.textContent = txt;
   }
 
+  /* ---------- 手机消息弹窗 ----------
+     只在"新消息刚到时"弹。刷新页面恢复的那条不弹——老师早上发的通知，
+     中午开机不该再吓一次全班。 */
+  var msgCloseTimer = 0;
+
+  /* 字数越多，字号降一档。底宽 124vmin 大约一行放得下 14~26 个字，
+     按视觉宽度算而不是按字符数，中英混排才不会估歪。 */
+  function msgFont(text) {
+    var w = weight(text);
+    if (w <= 16) return 8;
+    if (w <= 30) return 7;
+    if (w <= 52) return 5.8;
+    if (w <= 84) return 4.9;
+    return 4.2;
+  }
+
+  function showMessage(notice) {
+    if (!el.msgModal || !el.msgCard || !notice) return;
+    var urgent = notice.level === "urgent";
+    var wasOpen = el.msgModal.classList.contains("open");
+
+    el.msgModal.dataset.level = urgent ? "urgent" : "normal";
+    el.msgTitle.textContent = urgent ? "紧急通知" : "老师通知";
+    el.msgTime.textContent = notice.at ? "老师发出 " + notice.at : "";
+    el.msgBody.textContent = notice.text;
+    el.msgBody.style.fontSize = msgFont(notice.text) + "vmin";
+
+    clearTimeout(msgCloseTimer);
+    el.msgModal.classList.add("open");
+    el.msgModal.setAttribute("aria-hidden", "false");
+    el.msgCard.dataset.expanded = "false";
+    el.msgCard.style.height = "";
+
+    /* 量出展开后的自然高度。宽高都要过渡，就不能写死高度：
+       老师发的句子从四个字到四行都有，写死要么空一大片，要么把字裁掉。 */
+    var h = 0;
+    el.msgCard.classList.add("measure");
+    if (el.msgContent && el.msgContent.getBoundingClientRect) {
+      h = el.msgContent.getBoundingClientRect().height;
+    }
+    el.msgCard.classList.remove("measure");
+
+    var vh = root.innerHeight || 800;
+    if (!h) h = vh * .52;
+    /* 卡片是 border-box，高度要连上下描边一起算，否则底部会被圆角裁掉一条 */
+    var vmin = Math.min(root.innerWidth || 1280, vh) / 100;
+    h = Math.min(h + 1.1 * vmin, vh * .8);
+
+    /* 卡片已经在屏上（老师连发两条）：只换字和高度，不要从卡片再长一遍 */
+    if (wasOpen) {
+      el.msgCard.dataset.expanded = "true";
+      el.msgCard.style.height = h + "px";
+      return;
+    }
+
+    /* 量完立刻把宽度收回小卡状态，中间不能有过渡帧，否则会闪一下大卡 */
+    el.msgCard.classList.add("pre");
+    void el.msgCard.offsetWidth;
+    el.msgCard.classList.remove("pre");
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (!el.msgModal.classList.contains("open")) return;
+        el.msgModal.classList.add("shown");
+        el.msgCard.dataset.expanded = "true";
+        el.msgCard.style.height = h + "px";
+        try { el.msgClose.focus({ preventScroll: true }); } catch (e) {}
+      });
+    });
+  }
+
+  /* dismiss=true 表示老师主动关掉：连顶部便签一起撤，并告诉服务端，
+     否则刷新一次又回来。服务撤回（clear）时只收卡片，不重复发请求。 */
+  function hideMessage(dismiss) {
+    if (!el.msgModal || !el.msgModal.classList.contains("open")) return;
+    el.msgCard.dataset.expanded = "false";
+    el.msgCard.style.height = "";
+    el.msgModal.classList.remove("shown");
+    clearTimeout(msgCloseTimer);
+    msgCloseTimer = setTimeout(function () {
+      el.msgModal.classList.remove("open");
+      el.msgModal.setAttribute("aria-hidden", "true");
+    }, 480);
+    if (dismiss) dismissNotice();
+  }
+
   /* ---------- 通知有效期 ---------- */
   function activeNotice(ov) {
     if (!ov || !ov.notice || !ov.notice.text) return null;
@@ -672,6 +758,9 @@
       corner: $("corner"), btnCd: $("btn-cd"), btnFull: $("btn-full"),
       btnReduce: $("btn-reduce"), btnEdit: $("btn-edit"), btnGear: $("btn-gear"),
       btnTheme: $("btn-theme"),
+      msgModal: $("msgModal"), msgCard: $("msgCard"), msgContent: $("msgContent"),
+      msgBody: $("msgBody"), msgTitle: $("msgTitle"), msgTime: $("msgTime"),
+      msgClose: $("msgClose"),
       noticeBar: null
     };
 
@@ -715,6 +804,14 @@
       if (root.Edit) root.Edit.open();
     });
 
+    /* 弹窗关闭：同样按住才生效，学生乱点关不掉 */
+    if (el.msgClose) bindHold(el.msgClose, function () { hideMessage(true); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && el.msgModal && el.msgModal.classList.contains("open")) {
+        hideMessage(true);
+      }
+    });
+
     paintControls();
     if (pt) document.body.dataset.theme = pt;
     render();
@@ -726,7 +823,8 @@
 
   root.Screen = {
     render: render, todayKey: todayKey, nowMinutes: nowMinutes,
-    boot: boot, applyTheme: applyTheme
+    boot: boot, applyTheme: applyTheme,
+    showMessage: showMessage, hideMessage: hideMessage
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

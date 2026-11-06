@@ -140,8 +140,24 @@ test("手机发的那条会出现在屏上，撤回后消失", async ({ page, re
 
   await expect(page.locator(".notice-text")).toContainText(text);
 
+  /* 新消息要弹卡片，而且不能顶到屏幕边：宽高都按 vmin 算，
+     这里用实际外接框卡一遍，改 CSS 改过头会立刻红。 */
+  await expect(page.locator("#msgModal")).toHaveClass(/open/);
+  await expect(page.locator("#msgBody")).toContainText(text);
+  const card = await page.locator("#msgCard").boundingBox();
+  const vp = page.viewportSize();
+  expect(card.x, "左边留白").toBeGreaterThan(8);
+  expect(card.y, "上边留白").toBeGreaterThan(8);
+  expect(card.x + card.width, "右边留白").toBeLessThan(vp.width - 8);
+  expect(card.y + card.height, "下边留白").toBeLessThan(vp.height - 8);
+  const bodyFont = await page.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById("msgBody")).fontSize)
+  );
+  expect(bodyFont, `弹窗正文 ${bodyFont}px，最后一排看不清`).toBeGreaterThanOrEqual(28);
+
   await request.post("/api/retract");
   await expect(page.locator(".notice-text")).toHaveCount(0);
+  await expect(page.locator("#msgModal")).not.toHaveClass(/open/);
 });
 
 test("「手机」面板出二维码，地址就是手机要打开的那个", async ({ page }) => {

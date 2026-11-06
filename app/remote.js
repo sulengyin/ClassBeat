@@ -44,6 +44,7 @@
     try {
       Store.patchDayOverride(Screen.todayKey(), { notice: null });
     } catch (e) { return; }
+    if (Screen.hideMessage) Screen.hideMessage();
     if (Screen.render) Screen.render();
   }
 
@@ -75,24 +76,26 @@
     }
   }
 
-  function apply(msg) {
+  /* fresh=true 才是"刚到的消息"，要弹卡片；开机恢复的那条只贴便签。
+     否则早上发的一条通知，中午重启大屏会再吓全班一次。 */
+  function apply(msg, fresh) {
     if (msg && msg.type === "clear") { clearNotice(); return; }
     if (msg && msg.retractedAt) { return; }
     if (!visible(msg)) return;
+    var notice = {
+      text: msg.text,
+      level: msg.level === "urgent" ? "urgent" : "normal",
+      at: msg.at || "",
+      until: msg.until || "",
+      createdAt: msg.createdAt || Date.now()
+    };
     try {
-      Store.patchDayOverride(Screen.todayKey(), {
-        notice: {
-          text: msg.text,
-          level: msg.level === "urgent" ? "urgent" : "normal",
-          at: msg.at || "",
-          until: msg.until || "",
-          createdAt: msg.createdAt || Date.now()
-        }
-      });
+      Store.patchDayOverride(Screen.todayKey(), { notice: notice });
     } catch (e) {
       return;               // 存储坏了也不能把大屏搞挂
     }
     if (Screen.render) Screen.render();
+    if (fresh && Screen.showMessage) Screen.showMessage(notice);
   }
 
   function connect(baseline) {
@@ -109,7 +112,7 @@
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
       if (msg.seq && msg.seq > lastSeq) lastSeq = msg.seq;
-      apply(msg);
+      apply(msg, true);
     };
 
     /* 断线由 EventSource 自己重连；重连要从 lastSeq 续，不然会重复上屏 */
@@ -150,7 +153,7 @@
         if (list.length) lastSeq = list[list.length - 1].seq || 0;
         /* 只恢复「没撤回、没过期」的那条，否则一开机把上午的旧通知弹回来 */
         for (var i = list.length - 1; i >= 0; i--) {
-          if (!list[i].retractedAt && visible(list[i])) { apply(list[i]); break; }
+          if (!list[i].retractedAt && visible(list[i])) { apply(list[i], false); break; }
         }
         connect(lastSeq);
       })

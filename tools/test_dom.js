@@ -122,6 +122,7 @@ const document = {
  "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner",
  "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
  "qr-panel", "qr-url", "qr-empty", "qr-close",
+ "msgModal", "msgCard", "msgContent", "msgBody", "msgTitle", "msgTime", "msgClose",
  "demo", "d-play", "d-now", "d-ribbon", "d-range", "d-speed", "d-close"].forEach(id => {
   const e = new El(id.indexOf("btn") === 0 || id === "warn-title" ? "button" : "div");
   e.id = id;
@@ -354,6 +355,44 @@ check(document.body.dataset.demo === "0" && global.__rhythmTime === null,
 
   es.onmessage({ data: "这不是 json" });
   check(true, "坏消息不让页面崩");
+
+  /* ---------- 手机消息弹窗：卡片展开 ----------
+     真机验收的是"最后一排看不看得清"，这里只保证结构对：
+     消息一来就弹、紧急换红标签、按住能关且撤回。 */
+  const modal = document.getElementById("msgModal");
+  const card = document.getElementById("msgCard");
+  check(!!modal && !!card, "页面里有消息弹窗");
+
+  es.onmessage({ data: JSON.stringify({
+    seq: 11, text: "明天体检，早上空腹，不要吃早饭", level: "normal",
+    at: "11:11", until: "23:59", forWhom: "class"
+  }) });
+  check(modal.classList.contains("open"), "新消息到达，弹窗打开");
+  check(document.getElementById("msgBody").textContent.indexOf("体检") >= 0,
+        "正文是老师那句话", document.getElementById("msgBody").textContent);
+
+  /* 展开要等两帧：第一帧遮罩，第二帧卡片 */
+  global.__raf(); global.__raf();
+  check(card.dataset.expanded === "true", "卡片按宽高展开，不是缩放");
+  const msgFs = parseFloat(document.getElementById("msgBody").style.fontSize);
+  check(msgFs >= 5, "正文比通知条大两档", msgFs + "vmin");
+
+  es.onmessage({ data: JSON.stringify({
+    seq: 12, text: "立即停止活动", level: "urgent",
+    at: "11:12", until: "23:59", forWhom: "class"
+  }) });
+  check(modal.dataset.level === "urgent", "紧急消息换红标签");
+  check(document.getElementById("msgTitle").textContent === "紧急通知", "标签写紧急通知");
+
+  const mc = document.getElementById("msgClose");
+  const realST2 = global.setTimeout;
+  global.setTimeout = fn => { fn(); return 1; };
+  mc._h.pointerdown({ preventDefault() {} });
+  global.setTimeout = realST2;
+  check(!modal.classList.contains("shown"), "按住后卡片先收起");
+  check(!modal.classList.contains("open"), "收起后整层撤掉");
+  const all2 = JSON.parse(localStorage.getItem(key) || "{}");
+  check(!(all2[today] && all2[today].notice), "关闭弹窗同时撤回这条消息");
 })();
 
 /* ---------- 运行时：改一条作息，下一次重绘就变 ---------- */

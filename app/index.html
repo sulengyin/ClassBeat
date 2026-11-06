@@ -389,6 +389,115 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
 @keyframes hold-fill{to{transform:scaleX(1)}}
 @keyframes toast-in{from{opacity:0;transform:rotate(-.5deg) translateY(1.4vmin) scale(.97)}to{opacity:1;transform:rotate(-.5deg)}}
 
+/* ---------- 手机消息弹窗：卡片展开 ----------
+   顶栏那条 2.9vmin 的通知，8 米外最后一排看不清。老师从手机发来的话
+   要压过屏上一切，所以做成一张从中间展开的卡片：
+   · 宽高一起长，不用 scale——scale 会把字拉扁，笔画比例全变
+   · 四周留白，最大只占屏高 80%，永不顶到边
+   · 背景压暗 + 模糊，背后还在走的作息退成一张底图
+   · 字比正文大一档，长句自动降一档，避免撑出卡片
+   关闭沿用通知条的约定：按住 0.9 秒。学生路过点一下不会消失。 */
+.msg-modal{
+  position:fixed;inset:0;z-index:90;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(26,17,10,.5);
+  -webkit-backdrop-filter:blur(7px) saturate(.9);
+  backdrop-filter:blur(7px) saturate(.9);
+  opacity:0;transition:opacity .26s var(--e-soft);
+}
+.msg-modal.open{display:flex}
+.msg-modal.shown{opacity:1}
+
+.msg-card{
+  --msg-w:min(124vmin,86vw);
+  position:relative;flex:none;
+  width:26vmin;height:16vmin;
+  background:var(--cream);
+  border:.55vmin solid var(--line);
+  border-radius:2.4vmin 2vmin 2.6vmin 2vmin;
+  box-shadow:.9vmin 1vmin 0 rgba(58,42,30,.16),0 3vmin 9vmin rgba(26,17,10,.22);
+  overflow:hidden;
+  transform:rotate(-.4deg);
+  transition:width .46s var(--e-out),height .46s var(--e-out),
+             border-radius .46s var(--e-out),background-color var(--d-slow) var(--e-soft);
+}
+.msg-card[data-expanded="true"]{
+  width:var(--msg-w);
+  border-radius:3.6vmin 2.8vmin 3.4vmin 2.6vmin;
+}
+/* 量高度：宽度先按展开值排一遍，高度随内容，但不进过渡，量完立刻撤回 */
+.msg-card.measure{width:var(--msg-w);height:auto;transition:none}
+.msg-card.pre{transition:none}
+
+.msg-card-content{
+  position:absolute;left:0;top:0;right:0;
+  display:flex;flex-direction:column;gap:2.6vmin;
+  padding:5.2vmin 6.4vmin 5vmin;
+  opacity:0;transform:translateY(1.2vmin);
+  transition:opacity .2s .16s var(--e-soft),transform .2s .16s var(--e-soft);
+}
+.msg-card[data-expanded="true"] .msg-card-content{opacity:1;transform:none}
+
+.msg-head{display:flex;align-items:center;gap:2vmin}
+.msg-pill{
+  display:inline-flex;align-items:center;gap:1vmin;flex:none;
+  background:var(--accent);color:var(--band-ink);
+  font-size:2.7vmin;font-weight:900;letter-spacing:.16em;
+  padding:.9vmin 2vmin 1vmin;
+  border:.34vmin solid var(--line);
+  border-radius:1.1vmin 1.7vmin 1.3vmin .9vmin;
+  box-shadow:.4vmin .4vmin 0 rgba(58,42,30,.18);
+  transform:rotate(-1deg);
+}
+.msg-pill::before{
+  content:"";width:1vmin;height:1vmin;border-radius:50%;flex:none;
+  background:currentColor;opacity:.85;
+}
+.msg-modal[data-level="urgent"] .msg-pill{background:var(--red);color:#FFF8E7}
+.msg-time{
+  margin-left:auto;font-family:var(--hand);font-size:2.3vmin;
+  color:var(--ink-3);letter-spacing:.08em;white-space:nowrap;
+}
+
+.msg-body{
+  font-size:6.4vmin;font-weight:900;line-height:1.42;
+  color:var(--card-ink);letter-spacing:.01em;
+  word-break:break-word;white-space:pre-wrap;
+  transition:font-size .2s var(--e-soft);
+}
+.msg-modal[data-level="urgent"] .msg-body{color:var(--red)}
+body[data-theme="dark"] .msg-modal[data-level="urgent"] .msg-body{color:#FF8A80}
+
+.msg-foot{display:flex;align-items:center;gap:2.2vmin;margin-top:.4vmin}
+.msg-close{
+  position:relative;overflow:hidden;flex:none;
+  font-family:inherit;font-weight:800;font-size:2.8vmin;line-height:1;
+  padding:1.5vmin 3.6vmin 1.6vmin;
+  color:#31231A;background:var(--yellow);
+  border:.36vmin solid var(--line);
+  border-radius:1.4vmin 2vmin 1.6vmin 1.2vmin;
+  box-shadow:.44vmin .44vmin 0 rgba(58,42,30,.18);
+  cursor:pointer;touch-action:none;
+  -webkit-user-select:none;user-select:none;
+  transition:background .2s var(--e-out),transform .2s var(--e-out);
+}
+.msg-close:hover{background:#FFE07A}
+.msg-close:active{transform:translateY(.2vmin)}
+/* 按住进度条：填满就是关闭，松手会弹回去 */
+.msg-close::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:.62vmin;
+  background:var(--line);transform:scaleX(0);transform-origin:left;
+}
+.msg-close.holding::after{animation:msg-hold .9s linear forwards}
+@keyframes msg-hold{to{transform:scaleX(1)}}
+.msg-hint{font-size:2.3vmin;font-weight:600;color:var(--ink-3);line-height:1.5}
+
+body[data-reduce="1"] .msg-modal,
+body[data-reduce="1"] .msg-card,
+body[data-reduce="1"] .msg-card-content,
+body[data-reduce="1"] .msg-close{transition:none!important}
+body[data-reduce="1"] .msg-close.holding::after{animation-duration:.9s}
+
 /* ---------- 值日条 ---------- */
 footer{
   position:relative;z-index:3;
@@ -655,6 +764,22 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
     <button id="btn-edit">编辑</button>
   </div>
   <button class="gear" id="btn-gear" aria-label="设置">⋯</button>
+</div>
+
+<div class="msg-modal" id="msgModal" data-level="normal" aria-hidden="true">
+  <section class="msg-card" id="msgCard" data-expanded="false" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
+    <div class="msg-card-content" id="msgContent">
+      <div class="msg-head">
+        <span class="msg-pill" id="msgTitle">老师通知</span>
+        <span class="msg-time" id="msgTime"></span>
+      </div>
+      <div class="msg-body" id="msgBody"></div>
+      <div class="msg-foot">
+        <button type="button" class="msg-close" id="msgClose">按住关闭</button>
+        <span class="msg-hint">按住 1 秒才关掉，学生路过点一下不会消失</span>
+      </div>
+    </div>
+  </section>
 </div>
 
 <div class="qr-panel" id="qr-panel">
