@@ -15,23 +15,30 @@
   var lastKey = null, lastRev = -1, lastDay = null;
 
   function data() { return root.RHYTHM_DATA || {}; }
+  function local() {
+    return (root.Store && root.Store.config) ? root.Store.config() : {};
+  }
 
+  /* 出厂配置（data.js）+ 本机改动（localStorage），本机优先。
+     meta 逐字段合并：改了班名不该把学校名一起抹掉。 */
   function config() {
-    var d = data();
+    var d = data(), o = local();
+    function pick(k) { return o[k] !== undefined ? o[k] : d[k]; }
     return {
-      timetable: d.timetable,
-      schedule: d.schedule,
-      content: d.content,
-      roles: d.roles,
-      noon: d.noon,
-      calendar: d.calendar || { days: {} }
+      meta: Object.assign({}, d.meta || {}, o.meta || {}),
+      timetable: pick("timetable"),
+      schedule: pick("schedule"),
+      content: pick("content"),
+      roles: pick("roles"),
+      noon: pick("noon"),
+      calendar: pick("calendar") || { days: {} }
     };
   }
 
   /* 配置齐不齐。缺了不是"今天没数据"，是包本身没生成对。 */
   function ready() {
-    var d = data();
-    return !!(Engine && d.timetable && d.schedule && d.roles && d.content && d.noon);
+    var c = config();
+    return !!(Engine && c.timetable && c.schedule && c.roles && c.content && c.noon);
   }
 
   function day(key) {
@@ -49,11 +56,21 @@
     return lastDay;
   }
 
-  /* 改了作息 / 课表 / 岗位之后调用。大屏每秒重绘一次，
-     所以最迟一秒就会变，不需要刷新，也不需要重新打包。 */
+  /* 改了作息 / 课表 / 岗位之后调用。写进本机配置，下一次重绘就是新时间。
+     大屏每秒重绘一次，所以最迟一秒就会变，不需要刷新，也不需要重新打包。 */
   function patch(part) {
+    if (root.Store && root.Store.patchConfig) {
+      root.Store.patchConfig(part);
+      return;
+    }
     var d = data();
     Object.keys(part || {}).forEach(function (k) { d[k] = part[k]; });
+    rev++;
+    if (root.Screen && root.Screen.render) root.Screen.render();
+  }
+
+  /* 配置被别处（导入、撤销）改过：让下一次 day() 重算 */
+  function reload() {
     rev++;
     if (root.Screen && root.Screen.render) root.Screen.render();
   }
@@ -80,6 +97,7 @@
     config: config,
     ready: ready,
     patch: patch,
+    reload: reload,
     weekKeys: weekKeys,
     rev: function () { return rev; }
   };

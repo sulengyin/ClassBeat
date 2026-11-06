@@ -11,7 +11,8 @@
     prefs:     "rhythm.prefs.v1",
     picked:    "rhythm.picked.v1",
     lock:      "rhythm.lock.v1",
-    texts:     "rhythm.texts.v1"
+    texts:     "rhythm.texts.v1",
+    config:    "rhythm.config.v1"
   };
 
   var mem = {};
@@ -331,6 +332,44 @@
     return {};
   }
 
+  /* ---------- 本机配置：作息 / 课表 / 班级信息 ---------- */
+  /* data.js 里的配置是出厂值，老师在设置里改的存这里，读时盖在出厂值上。
+     整块替换而不是逐字段深合并：一张作息表改一条边界，本来就是整表重写，
+     深合并只会留下「删掉的那一段又冒回来」这种怪事。 */
+  var CONFIG_BLOCKS = ["meta", "timetable", "schedule", "roles",
+                       "content", "noon", "calendar", "students"];
+
+  function config() {
+    var c = read(KEY.config, null);
+    if (!c || typeof c !== "object") return {};
+    var out = {};
+    CONFIG_BLOCKS.forEach(function (k) {
+      if (c[k] !== undefined && c[k] !== null) out[k] = c[k];
+    });
+    return out;
+  }
+
+  function patchConfig(patch) {
+    var cur = config();
+    Object.keys(patch || {}).forEach(function (k) {
+      if (CONFIG_BLOCKS.indexOf(k) < 0) return;
+      if (patch[k] === null) delete cur[k];
+      else if (patch[k] !== undefined) cur[k] = patch[k];
+    });
+    write(KEY.config, cur);
+    /* 大屏每秒重绘，但改完设置最好立刻看到，所以这里主动通知一次 */
+    if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
+    if (root.Screen && root.Screen.render) root.Screen.render();
+    return cur;
+  }
+
+  function resetConfig() {
+    write(KEY.config, {});
+    if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
+    if (root.Screen && root.Screen.render) root.Screen.render();
+    return {};
+  }
+
   /* ---------- 偏好 ---------- */
   function prefs() { return read(KEY.prefs, { cdMode: "auto", reduce: false }); }
   function setPref(k, v) {
@@ -348,6 +387,7 @@
       savedAt: new Date().toISOString(),
       texts: read(KEY.texts, {}) || {},
       overrides: read(KEY.overrides, {}) || {},
+      config: config(),
       phrases: allPhrases(),
       prefs: prefs()
     };
@@ -360,9 +400,11 @@
     var n = 0;
     if (obj.texts && typeof obj.texts === "object") { write(KEY.texts, obj.texts); n++; }
     if (obj.overrides && typeof obj.overrides === "object") { write(KEY.overrides, obj.overrides); n++; }
+    if (obj.config && typeof obj.config === "object") { write(KEY.config, obj.config); n++; }
     if (Array.isArray(obj.phrases)) { write(KEY.phrases, trimPhrases(obj.phrases)); n++; }
     if (obj.prefs && typeof obj.prefs === "object") { write(KEY.prefs, obj.prefs); n++; }
     if (!n) return { ok: false, why: "文件里没有可导入的内容" };
+    if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
     return { ok: true, n: n };
   }
 
@@ -375,6 +417,7 @@
     recall: recall, remember: remember, allPhrases: allPhrases, removePhrase: removePhrase,
     findTimeWords: findTimeWords,
     texts: texts, patchTexts: patchTexts, resetTexts: resetTexts,
+    config: config, patchConfig: patchConfig, resetConfig: resetConfig,
     exportAll: exportAll, importAll: importAll,
     makeChallenge: makeChallenge, lockState: lockState,
     recordFail: recordFail, resetFail: resetFail,

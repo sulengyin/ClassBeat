@@ -72,6 +72,7 @@ class El {
   }
   addEventListener(type, fn) { (this._h || (this._h = {}))[type] = fn; }
   setAttribute(k, v) { this["attr_" + k] = v; }
+  appendData() {}
   focus() {}
   querySelectorAll(sel) {
     const cls = (sel.match(/\.([\w-]+)/g) || []).map(s => s.slice(1));
@@ -161,6 +162,12 @@ global.fetch = () => Promise.reject(new Error("no hub"));
 global.EventSource = class {
   constructor(url) { this.url = url; this.readyState = 0; global.__es = this; }
   close() { this.readyState = 2; }
+};
+
+document.createTextNode = function (t) {
+  const n = new El("#text");
+  n._text = String(t);
+  return n;
 };
 
 /* ---------- 加载 ---------- */
@@ -333,20 +340,21 @@ check(afterShift.indexOf("第 1 节") >= 0 && afterShift.indexOf(mon1) >= 0,
   "把第一节提前 20 分钟，屏上立刻改成" + mon1, beforeShift + " → " + afterShift);
 check(global.Runtime.rev() > 0, "配置改过之后版本号变了", "rev=" + global.Runtime.rev());
 
-/* 还原，别影响后面的用例 */
-global.Runtime.patch({ timetable: JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable)) });
+/* 还原，别影响后面的用例。不能用 patch 把当前值再写一遍——
+   那样写进去的是已经改过的 08:00，等于没还原。 */
+global.Store.resetConfig();
 
 /* ---------- 跨午夜：日期变了就取新的一天 ---------- */
 global.__rhythmDate = "2026-11-06";
 global.__rhythmTime = 18 * 60 + 30;  /* 周五放学后 */
 Screen.render();
 const fri = heroText();
-global.__rhythmDate = "2026-11-09";  /* 周一早上 */
-global.__rhythmTime = 8 * 60;
+global.__rhythmDate = "2026-11-09";  /* 周一早上，第一节 08:20 已经开始 */
+global.__rhythmTime = 8 * 60 + 30;
 Screen.render();
 const mon = heroText();
 check(fri !== mon && mon.indexOf("第 1 节") >= 0,
-  "过了零点自动换到新的一天", "周五 18:30「" + fri + "」→ 周一 08:00「" + mon + "」");
+  "过了零点自动换到新的一天", "周五 18:30「" + fri + "」→ 周一 08:30「" + mon + "」");
 
 /* 编辑面板 */
 try {
@@ -357,6 +365,47 @@ try {
 check(!err, "编辑面板能打开", err ? err.message : "无异常");
 check(!!document.getElementById("gateQ"), "先出验证码，不直接进面板",
   document.getElementById("gateQ") ? document.getElementById("gateQ").textContent : "缺失");
+
+/* ---------- 验证码答对后进面板，切到「作息」 ---------- */
+const qText = document.getElementById("gateQ").textContent.replace(" = ?", "");
+const answer = String(qText.split("×").map(x => parseInt(x, 10)).reduce((a, b) => a * b, 1));
+const gks = document.querySelectorAll(".gk");
+answer.split("").forEach(d => {
+  const b = gks.filter(k => k.textContent === d)[0];
+  if (b) b._h.click();
+});
+gks.filter(k => k.textContent === "进入")[0]._h.click();
+check(!!document.getElementById("epTitle"), "验证码答对后进入面板");
+check(document.getElementById("epTitle").textContent.indexOf("·") > 0,
+  "面板抬头带班名", document.getElementById("epTitle").textContent);
+
+const tabs = document.querySelectorAll(".ep-tab");
+const hoursTab = tabs.filter(b => b.textContent === "作息")[0];
+check(!!hoursTab, "面板里有「作息」这一页");
+hoursTab._h.click();
+const rows = document.querySelectorAll(".tt-row");
+check(rows.length >= 10, "作息表按段列出", rows.length + " 段");
+check(document.querySelectorAll(".tt-time").length === rows.length * 2,
+  "每段两个时间框", String(document.querySelectorAll(".tt-time").length));
+
+/* 改第一段上课时间：不点保存——输入框 change 就该立刻生效 */
+const beforeTime = global.Runtime.day("2026-11-09").timeline[0].start;
+const firstTime = document.querySelectorAll(".tt-time")[0];
+firstTime.value = "08:10";
+firstTime._h.change();
+const afterTime = global.Runtime.day("2026-11-09").timeline[0].start;
+check(afterTime === "08:10" && beforeTime !== afterTime,
+  "在面板里改上课时间，配置立刻重算", beforeTime + " → " + afterTime);
+
+/* 校验：把结束时间改到开始之前，必须拒绝，不能写成断档 */
+const endTime = document.querySelectorAll(".tt-time")[1];
+endTime.value = "07:00";
+endTime._h.change();
+check(global.Runtime.day("2026-11-09").timeline[0].end === "09:00",
+  "结束早于开始时不写入", global.Runtime.day("2026-11-09").timeline[0].end);
+
+global.Store.resetConfig();
+global.Edit.close();
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

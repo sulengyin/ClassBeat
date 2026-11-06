@@ -95,8 +95,8 @@
     panelEl.appendChild(head);
 
     var tabs = h("nav", "ep-tabs");
-    [["today", "今天"], ["duty", "值日"], ["text", "文字"], ["phrase", "话术"]].forEach(function (t) {
-      var b = h("button", null, t[1]);
+    [["today", "今天"], ["duty", "值日"], ["hours", "作息"], ["text", "文字"], ["phrase", "话术"]].forEach(function (t) {
+      var b = h("button", "ep-tab", t[1]);
       b.dataset.tab = t[0];
       b.addEventListener("click", function () { tab = t[0]; paintTabs(); renderBody(); });
       tabs.appendChild(b);
@@ -180,7 +180,7 @@
   }
 
   function paintTabs() {
-    Array.prototype.forEach.call(panelEl.querySelectorAll(".ep-tabs button[data-tab]"), function (b) {
+    Array.prototype.forEach.call(panelEl.querySelectorAll(".ep-tab"), function (b) {
       b.classList.toggle("on", b.dataset.tab === tab);
     });
   }
@@ -205,6 +205,7 @@
 
     if (tab === "today") renderToday(ov, key);
     if (tab === "duty") renderDuty(ov, key);
+    if (tab === "hours") renderHours();
     if (tab === "text") renderText();
     if (tab === "phrase") renderPhrase();
   }
@@ -630,6 +631,205 @@
     bodyEl.appendChild(sec4);
 
     renderBackup();
+  }
+
+  /* ---------- Tab：作息 ---------- */
+  /* 只改时间，不增删正课段：正课段的数量跟课表 entries 的 periodNo 绑着，
+     在这里加一节，课表就少一节的内容，屏上会直接空掉。
+     所以正课 / 午餐 / 午间三类的行不给删；要加减节次得先改课表。 */
+  var TT_TYPES = [
+    { key: "class",  label: "正课", locked: true },
+    { key: "break",  label: "课间" },
+    { key: "ritual", label: "集会 / 眼操" },
+    { key: "meal",   label: "午餐", locked: true },
+    { key: "noon",   label: "午间", locked: true },
+    { key: "action", label: "活动" },
+    { key: "after",  label: "课后服务" }
+  ];
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function toMin(t) { var p = String(t).split(":"); return (+p[0]) * 60 + (+p[1]); }
+  function toTime(m) { return pad2(Math.floor(m / 60)) + ":" + pad2(m % 60); }
+
+  function timetableNow() {
+    var c = RT ? RT.config() : {};
+    return c.timetable ? JSON.parse(JSON.stringify(c.timetable)) : null;
+  }
+
+  /* 首尾相接才算一张完整的作息表：中间留空，屏上那段时间就没有状态。 */
+  function hoursProblem(blocks) {
+    for (var i = 0; i < blocks.length; i += 1) {
+      var b = blocks[i];
+      if (!b.start || !b.end) return "第 " + (i + 1) + " 段还没填时间";
+      if (toMin(b.start) >= toMin(b.end)) return "第 " + (i + 1) + " 段：开始时间要早于结束时间";
+      if (i && blocks[i - 1].end !== b.start) {
+        return "第 " + i + " 段和第 " + (i + 1) + " 段之间有断档或重叠";
+      }
+    }
+    return "";
+  }
+
+  function saveHours(blocks) {
+    var tt = timetableNow();
+    if (!tt) return;
+    tt.blocks = blocks;
+    /* noonBand 是午餐 / 午间的三个分界点，改块时间就得一起改，
+       否则「午餐压缩 + 午间动作」会算到旧时间上。 */
+    var band = Object.assign({}, tt.noonBand || {});
+    blocks.forEach(function (b) {
+      if (b.type === "meal") band.lunchEnd = b.end;
+      if (b.type === "noon") { band.bell = b.start; band.noonEnd = b.end; }
+    });
+    tt.noonBand = band;
+    S.patchConfig({ timetable: tt });
+  }
+
+  /* 某一行后面插一段，后面所有段整体后移，保持首尾相接 */
+  function insertAfter(blocks, idx, dur) {
+    var next = blocks.slice();
+    var at = toMin(blocks[idx].end);
+    for (var i = idx + 1; i < next.length; i += 1) {
+      next[i] = Object.assign({}, next[i], {
+        start: toTime(toMin(next[i].start) + dur),
+        end: toTime(toMin(next[i].end) + dur)
+      });
+    }
+    next.splice(idx + 1, 0, {
+      seq: nextSeq(blocks), start: toTime(at), end: toTime(at + dur),
+      type: "break", name: "课间"
+    });
+    return next;
+  }
+
+  /* 删一段，后面整体前移，不留空档 */
+  function removeAt(blocks, idx) {
+    var dur = toMin(blocks[idx].end) - toMin(blocks[idx].start);
+    var next = [];
+    blocks.forEach(function (b, i) {
+      if (i === idx) return;
+      if (i < idx) next.push(b);
+      else next.push(Object.assign({}, b, {
+        start: toTime(toMin(b.start) - dur),
+        end: toTime(toMin(b.end) - dur)
+      }));
+    });
+    return next;
+  }
+
+  function nextSeq(blocks) {
+    var max = 0;
+    blocks.forEach(function (b) {
+      var n = parseInt(b.seq, 10);
+      if (!isNaN(n) && n > max) max = n;
+    });
+    max += 1;
+    return max === 9 ? 10 : max;   /* 9 留给午餐，旧表里的习惯 */
+  }
+
+  function renderHours() {
+    var tt = timetableNow();
+    var sec = h("section", "ep-sec wide");
+    sec.appendChild(h("h3", null, "一天的作息"));
+    sec.appendChild(h("p", "ep-note",
+      "改完立刻生效，不用重新打包。相邻两段必须首尾相接——中间留空，屏上那段时间就没有状态。"));
+
+    if (!tt) {
+      sec.appendChild(h("p", "ep-note", "没有读到作息表。"));
+      bodyEl.appendChild(sec);
+      return;
+    }
+
+    var blocks = tt.blocks || [];
+    var rows = h("div", "ep-rows tt-rows");
+
+    blocks.forEach(function (b, idx) {
+      var row = h("div", "tt-row");
+      var st = document.createElement("input");
+      st.type = "time"; st.className = "tt-time"; st.value = b.start || "";
+      var en = document.createElement("input");
+      en.type = "time"; en.className = "tt-time"; en.value = b.end || "";
+
+      var meta = TT_TYPES.filter(function (t) { return t.key === b.type; })[0];
+      var name = document.createElement("input");
+      name.type = "text"; name.className = "tt-name";
+      name.value = b.name || (meta ? meta.label : "");
+      name.placeholder = "名称";
+
+      row.appendChild(st);
+      row.appendChild(h("span", "tt-dash", "—"));
+      row.appendChild(en);
+      row.appendChild(h("span", "tt-tag", meta ? meta.label : (b.type || "?")));
+      row.appendChild(name);
+
+      /* 只改时间时不重绘整块，否则输入框会失焦 */
+      function commit() {
+        row.classList.remove("bad");
+        var next = blocks.map(function (x, i) {
+          if (i !== idx) return x;
+          return Object.assign({}, x, {
+            start: st.value, end: en.value, name: name.value.trim() || x.name
+          });
+        });
+        var bad = hoursProblem(next);
+        if (bad) { row.classList.add("bad"); flash(bad); return; }
+        blocks = next;
+        saveHours(blocks);
+        flash("已保存，大屏已经换了");
+      }
+      st.addEventListener("change", commit);
+      en.addEventListener("change", commit);
+      name.addEventListener("change", commit);
+
+      var ins = h("button", "tt-mini", "＋");
+      ins.title = "在后面插一段 10 分钟的课间";
+      ins.addEventListener("click", function () {
+        var next = insertAfter(blocks, idx, 10);
+        var bad = hoursProblem(next);
+        if (bad) { flash(bad); return; }
+        saveHours(next);
+        flash("插了一段课间，后面整体后移 10 分钟");
+        renderBody();
+      });
+      row.appendChild(ins);
+
+      var del = h("button", "tt-mini", "删");
+      if (meta && meta.locked) {
+        del.disabled = true;
+        del.title = "这一段跟课表绑着，不能删";
+        del.classList.add("off");
+      } else {
+        del.addEventListener("click", function () {
+          if (blocks.length <= 2) { flash("至少留两段"); return; }
+          var next = removeAt(blocks, idx);
+          var bad = hoursProblem(next);
+          if (bad) { flash(bad); return; }
+          saveHours(next);
+          flash("已删掉这一段，后面整体前移");
+          renderBody();
+        });
+      }
+      row.appendChild(del);
+      rows.appendChild(row);
+    });
+
+    sec.appendChild(rows);
+
+    var actions = h("div", "tt-actions");
+    var reset = h("button", "ep-ghost", "恢复出厂作息");
+    reset.addEventListener("click", function () {
+      S.patchConfig({ timetable: null });
+      flash("已恢复出厂作息");
+      renderBody();
+    });
+    actions.appendChild(reset);
+    sec.appendChild(actions);
+
+    var classCount = blocks.filter(function (b) { return b.type === "class"; }).length;
+    sec.appendChild(h("p", "tt-sum",
+      "共 " + blocks.length + " 段，其中 " + classCount + " 节正课。正课段的数量跟课表绑着，要加减节次得先改课表。"));
+    sec.appendChild(h("p", "ep-note", "改完点右上角「完成」回大屏。"));
+
+    bodyEl.appendChild(sec);
   }
 
   /* ---------- Tab：值日 ---------- */

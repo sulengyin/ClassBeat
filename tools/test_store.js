@@ -114,6 +114,22 @@ check(S.canUndo(K), "改完可以撤销");
 S.undo(K);
 check(!S.getDayOverride(K) || !S.getDayOverride(K).notice, "撤销后恢复原状");
 
+/* ---------- 本机配置：改作息立刻重算 ---------- */
+const base = RT.day("2026-11-05").timeline[0].start;
+const tt = JSON.parse(JSON.stringify(D.timetable));
+tt.blocks[0].start = "08:00";
+S.patchConfig({ timetable: tt });
+check(RT.day("2026-11-05").timeline[0].start === "08:00",
+  "改作息后当天立刻重算", RT.day("2026-11-05").timeline[0].start);
+check(S.config().timetable.blocks[0].start === "08:00", "本机配置只留改过的块");
+check(S.exportAll().config.timetable.blocks[0].start === "08:00", "导出带上作息");
+check(S.config().badKey === undefined, "不认识的配置块不写进去");
+
+S.resetConfig();
+check(RT.day("2026-11-05").timeline[0].start === base,
+  "恢复出厂后回到原来的时间", RT.day("2026-11-05").timeline[0].start);
+check(Object.keys(S.config()).length === 0, "恢复出厂后本机配置为空");
+
 /* ---------- 导出 / 导入 ---------- */
 S.patchTexts({ breakTitle: "课间休息" });
 S.patchDayOverride("2026-12-02", { note: "临时" });

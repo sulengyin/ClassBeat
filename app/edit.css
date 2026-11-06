@@ -163,3 +163,28 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-read-day{font-size:2.2vmin;font-weight:800;color:#C1B09A;letter-spacing:.06em}
 .ep-read-tag{font-size:2vmin;color:#8E7B66;letter-spacing:.12em}
 .ep-read .ep-input{padding:1.1vmin 1.4vmin;font-size:2.4vmin}
+
+
+/* 作息：每行两段时间 + 类型 + 名称。窄屏自动换行，不挤成一条 */
+.tt-rows{gap:.3vmin}
+.tt-row{display:flex;align-items:center;gap:1vmin;padding:.9vmin 0;
+        border-bottom:.18vmin dashed rgba(241,227,198,.14);flex-wrap:wrap}
+.tt-row.bad{background:rgba(214,69,44,.16);border-radius:1vmin;
+        box-shadow:inset 0 0 0 .2vmin rgba(214,69,44,.5)}
+.tt-time{font:inherit;font-size:2.3vmin;font-weight:700;width:13.5vmin;
+        padding:.9vmin 1.1vmin;border-radius:1vmin;background:#241A13;
+        border:.26vmin solid #6B5641;color:#FBF3DF;outline:none}
+.tt-time:focus{border-color:#FFD64F}
+.tt-dash{color:#8A7660;font-size:2.2vmin}
+.tt-tag{font-size:1.9vmin;padding:.5vmin 1vmin;border-radius:1.6vmin;
+        background:#3E2D20;color:#C1B09A;border:.2vmin solid #6B5641;white-space:nowrap}
+.tt-name{font:inherit;font-size:2.3vmin;flex:1;min-width:18vmin;
+        padding:.9vmin 1.2vmin;border-radius:1vmin;background:#241A13;
+        border:.26vmin solid #6B5641;color:#FBF3DF;outline:none}
+.tt-name:focus{border-color:#FFD64F}
+.tt-mini{font:inherit;font-size:2.1vmin;width:6.5vmin;height:6.5vmin;flex:none;
+        border-radius:1vmin;border:.24vmin solid #6B5641;background:#2C2017;
+        color:#C1B09A;cursor:pointer}
+.tt-mini.off{opacity:.28;cursor:not-allowed}
+.tt-actions{display:flex;gap:1.2vmin;margin-top:1.6vmin}
+.tt-sum{font-size:2.1vmin;color:#A8957E;line-height:1.7;margin-top:1.2vmin}

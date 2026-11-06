@@ -9,7 +9,14 @@
 (function (root) {
   "use strict";
 
+  /* meta 可能被本机设置改过（班名、校名），所以先问 Runtime；
+     Runtime 还没起来（脚本顺序变了）就退回 data.js 里的出厂值。 */
   function meta() {
+    var r = root.Runtime;
+    if (r && r.config) {
+      var c = r.config();
+      if (c && c.meta) return c.meta;
+    }
     var d = root.RHYTHM_DATA;
     return (d && d.meta) || {};
   }
