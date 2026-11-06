@@ -6,7 +6,7 @@
 产物：dist/<班名>节律屏-测试包-YYYYMMDD.zip
 
 只装运行需要的东西：
-  · app/      大屏本体（file:// 直接能开，数据已内联在 data.js）
+  · app/      大屏本体（file:// 直接能开，配置已内联在 data.js）
   · server/   手机发消息（可选，需要电脑装 Python）
 不带 tools / data / out，老师用不到，反而会误改。
 """
@@ -44,8 +44,8 @@ PACK_NAME = class_name().replace("（", "").replace("）", "") + "节律屏-测�
 # 大屏运行需要的文件，逐个列出来——比整目录拷安全，免得把调试残留带进去
 APP_FILES = [
     "index.html", "preview.html", "edit.css",
-    "data.js", "rhythm.js", "store.js", "screen.js",
-    "remote.js", "edit.js", "demo.js", "config.js",
+    "data.js", "engine/schedule.js", "rhythm.js", "store.js",
+    "runtime.js", "screen.js", "remote.js", "edit.js", "demo.js", "config.js",
 ]
 SERVER_FILES = ["rhythm_server.py", "phone.html"]
 
@@ -139,7 +139,8 @@ Windows 也可以用文件夹里的：
 想恢复出厂：编辑 → 文字 → 「全部恢复系统默认」。
 想重来一遍今天的改动：编辑 → 「撤销上一步」。
 
-数据覆盖到 {end}，之后需要重新生成一次数据包。
+配置包里没有「哪几天」，当天的课表是大屏自己按作息和课表现算的。
+所以它不会过期，跨学期换课表时才需要重新运行一次 bundle.py。
 """
 
 
@@ -201,14 +202,7 @@ def main() -> None:
     zip_path = DIST / f"{PACK_NAME}-{today.strftime('%Y%m%d')}.zip"
     single_path = DIST / f"{PACK_NAME}-单文件版.html"
 
-    # 数据覆盖到哪天，写在说明里，免得老师过了期还在找原因
-    end = "未知"
-    data_js = (APP / "data.js").read_text(encoding="utf-8", errors="ignore")
-    key = '"end":"'
-    if key in data_js:
-        end = data_js.split(key, 1)[1].split('"', 1)[0]
-
-    readme = README.format(date=today.isoformat(), end=end, klass=PACK_NAME.split("节律屏")[0])
+    readme = README.format(date=today.isoformat(), klass=PACK_NAME.split("节律屏")[0])
 
     build_single(single_path)
 
@@ -225,7 +219,7 @@ def main() -> None:
     size = zip_path.stat().st_size / 1024
     one = single_path.stat().st_size / 1024
     print(f"已生成 {zip_path}")
-    print(f"  {len(items) + 5} 个文件，{size:.0f} KB，数据覆盖到 {end}")
+    print(f"  {len(items) + 5} 个文件，{size:.0f} KB")
     print(f"已生成 {single_path}")
     print(f"  单文件 {one:.0f} KB，任何系统双击即开（没有手机发消息）")
 

@@ -7,6 +7,7 @@
 
   var S = root.Store;
   var DATA = root.RHYTHM_DATA || {};
+  var RT = root.Runtime;
   var R = root.Rhythm;
 
   var rootEl = null;
@@ -210,7 +211,7 @@
 
   /* ---------- Tab：今天 ---------- */
   function renderToday(ov, key) {
-    var raw = DATA.days ? DATA.days[key] : null;
+    var raw = RT ? RT.day(key) : null;
     /* 面板上要显示"改完之后长什么样"，所以套上覆盖再列 */
     var day = raw ? S.applyOverrides(raw, ov) : null;
 
@@ -218,7 +219,7 @@
     var sec1 = h("section", "ep-sec");
     sec1.appendChild(h("h3", null, "发一条通知"));
     if (!day) {
-      sec1.appendChild(h("p", "ep-note", "今天的数据不在包里，先重新生成 data.js 再改。"));
+      sec1.appendChild(h("p", "ep-note", "今天的课表算不出来，先看配置是不是缺了文件。"));
     }
 
     var ta = document.createElement("textarea");
@@ -461,12 +462,14 @@
     return row;
   }
 
-  /* 一天里出现过的非上课时段，按第一次出现的顺序排 */
+  /* 一天里出现过的非上课时段，按第一次出现的顺序排。
+     现算的话不能遍历 35 天，算这一周就够——同一个班的时段名是按周重复的。 */
   function blockNames() {
     var seen = {}, out = [];
-    var days = DATA.days || {};
-    Object.keys(days).sort().forEach(function (k) {
-      (days[k].timeline || []).forEach(function (b) {
+    if (!RT) return out;
+    RT.weekKeys(S.dayKey()).forEach(function (k) {
+      var d = RT.day(k);
+      ((d && d.timeline) || []).forEach(function (b) {
         if (b.type === "class" || !b.name || seen[b.name]) return;
         seen[b.name] = 1;
         out.push({ name: b.name, tip: b.tip || "" });
@@ -635,7 +638,7 @@
     sec.appendChild(h("h3", null, "换人只改这一条"));
     sec.appendChild(h("p", "ep-note", "点一下岗位，从名单里选。改的是今天，不影响以后的排班。"));
 
-    var roles = DATA.roles || [];
+    var roles = (DATA.roles && DATA.roles.roles) || [];
     var list = h("div", "ep-rows");
     roles.forEach(function (r) {
       var changed = ov.roles && ov.roles[r.id];

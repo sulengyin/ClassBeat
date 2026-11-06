@@ -4,12 +4,18 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-global.window = {};
-["app/data.js", "app/rhythm.js", "app/store.js"].forEach(function (f) {
-  eval(fs.readFileSync(path.join(ROOT, f), "utf8"));
-});
+global.window = global;
+/* 在 node 里跑浏览器脚本：藏掉 module/exports，让 UMD 走浏览器分支，
+   否则 engine 会把自己挂到 module.exports，window.Schedule 就是空的。
+   self 显式指向全局，模拟浏览器。 */
+function loadBrowserScript(f) {
+  const code = fs.readFileSync(path.join(ROOT, f), "utf8");
+  new Function("module", "exports", "require", "self", code)(undefined, undefined, undefined, global);
+}
+["app/data.js", "app/engine/schedule.js", "app/rhythm.js", "app/store.js", "app/runtime.js"].forEach(loadBrowserScript);
 
 const D = global.window.RHYTHM_DATA;
+const RT = global.window.Runtime;
 const S = global.window.Store;
 
 let pass = 0, fail = 0;
@@ -18,8 +24,18 @@ function check(ok, title, detail) {
   ok ? pass++ : fail++;
 }
 
+/* ---------- 出厂文字：本机没改过时吃包里烤好的那份 ---------- */
+/* 模拟 bundle.py 把老师导出的 texts.json 烤进 data.js */
+D.texts = { breakActions: ["喝水", "上厕所", "洗手"], genericPrep: "下节课的书" };
+check(S.texts().breakActions.length === 3,
+  "没本机改动时，用包里烤好的文字", (S.texts().breakActions || []).join("/"));
+S.patchTexts({ genericPrep: "课本" });
+check(S.texts().genericPrep === "课本", "本机改过就听本机的");
+S.patchTexts({ genericPrep: null });
+delete D.texts;
+
 /* ---------- 覆盖：只改指定的一节 ---------- */
-const thu = D.days["2026-11-05"];
+const thu = RT.day("2026-11-05");
 const out = S.applyOverrides(thu, { lessons: { 4: { subject: "自习", teacher: "代课老师" } } });
 const p4 = out.timeline.filter(b => b.type === "class" && b.periodNo === 4)[0];
 const p5 = out.timeline.filter(b => b.type === "class" && b.periodNo === 5)[0];
@@ -31,7 +47,7 @@ check(thu.timeline.filter(b => b.type === "class" && b.periodNo === 4)[0].subjec
   "原数据没被改动（纯函数）");
 
 /* ---------- 覆盖：换人只动那条岗位 ---------- */
-const tue = D.days["2026-11-10"];
+const tue = RT.day("2026-11-10");
 const before = tue.duties.filter(d => d.at === "17:10");
 check(before.filter(d => d.roleId === "r15")[0].status === "unknown", "换人前 r15 是 unknown");
 

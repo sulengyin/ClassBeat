@@ -31,7 +31,7 @@ jobs:
 
       # 仓库里没有 data/，全部用 sample/ 的化名数据构建
       - name: Build data
-        run: python3 tools/bundle.py --data sample --start 2026-11-05
+        run: python3 tools/bundle.py --data sample
 
       - name: 节律逻辑
         run: node tools/test_rhythm.js
@@ -104,7 +104,7 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
 
       - name: 生成示例数据
-        run: python3 tools/bundle.py --data sample --start 2026-11-05
+        run: python3 tools/bundle.py --data sample
 
       - name: 跑浏览器测试
         run: npx playwright test

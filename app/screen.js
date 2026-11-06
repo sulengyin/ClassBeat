@@ -4,7 +4,7 @@
 (function (root) {
   "use strict";
 
-  var DATA = root.RHYTHM_DATA || { days: {} };
+  var RT = root.Runtime;
   var R = root.Rhythm;
   var S = root.Store;
 
@@ -29,6 +29,10 @@
   function setText(node, v) { if (node && node.textContent !== v) node.textContent = v; }
 
   function todayKey() {
+    /* 测试与演练的注入点：跟 __rhythmTime 一样，设了就不看系统日期。
+       跨午夜的行为不靠它保证——render 每秒重算一次 todayKey()，
+       到了零点 key 变了，取到的自然是新的一天。 */
+    if (root.__rhythmDate) return root.__rhythmDate;
     if (fixedDate) return fixedDate;
     var d = new Date();
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
@@ -389,10 +393,11 @@
     if (!el.main) return;
 
     var key = todayKey();
-    var raw = DATA.days ? DATA.days[key] : null;
+    /* 现算，不再从预生成的 days 里查：改作息、跨午夜都不需要重新打包 */
+    var raw = RT ? RT.day(key) : null;
     var ov = S.getDayOverride(key);
     var day = raw ? S.applyOverrides(raw, ov) : null;
-    /* applyOverrides 在没有覆盖时返回的是打包数据本身，不能就地改 */
+    /* applyOverrides 在没有覆盖时返回的是运行时缓存本身，不能就地改 */
     if (day && day === raw) day = S.clone(raw);
     if (day) applyTexts(day);
     var minutes = nowMinutes();
@@ -405,8 +410,10 @@
 
     if (!day) {
       el.warn.classList.add("show");
-      setText(el.warnTitle, "数据不包含今天（" + key + "）");
-      el.warnText.innerHTML = "请在电脑上重新生成：<br><code>python3 tools/bundle.py</code>";
+      setText(el.warnTitle, RT && RT.ready() ? "今天算不出来（" + key + "）" : "配置还没生成");
+      el.warnText.innerHTML = RT && RT.ready()
+        ? "数据里有写不通的地方，先在浏览器控制台看报错。"
+        : "请在电脑上运行：<br><code>python3 tools/bundle.py</code>";
       setText(el.bandText, ""); setHeroText("");
       setText(el.heroSub, ""); setText(el.after, ""); el.chips.innerHTML = ""; el.duty.innerHTML = "";
       return;

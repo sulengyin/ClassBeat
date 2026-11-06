@@ -5,7 +5,7 @@
   "use strict";
 
   var R = root.Rhythm;
-  var DATA = root.RHYTHM_DATA || { days: {} };
+  var RT = root.Runtime;
   var params = new URLSearchParams((root.location && root.location.search) || "");
   var hash = String((root.location && root.location.hash) || "").replace(/^#/, "");
 
@@ -30,7 +30,7 @@
 
   /* ---------- 一天的结构条：哪段上课、哪段课间，一眼看出节奏 ---------- */
   function buildRibbon() {
-    var day = DATA.days[dayKey()];
+    var day = RT ? RT.day(dayKey()) : null;
     el.ribbon.innerHTML = "";
     if (!day) return;
     day.timeline.forEach(function (b) {

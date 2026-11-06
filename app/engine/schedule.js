@@ -148,9 +148,11 @@
     return null;
   }
 
+  /* content 是 content.json 里的 subjects 数组（不是整个文件）。
+     只认数组：别处传整个对象就会静默拿不到准备清单。 */
   function contentFor(content, subject) {
     if (!subject) return null;
-    var list = (content && content.subjects) || [];
+    var list = content || [];
     for (var i = 0; i < list.length; i += 1) {
       var s = list[i];
       if ((s.labels || []).indexOf(subject) >= 0) {

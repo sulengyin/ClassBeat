@@ -1,4 +1,4 @@
-/* 节律计算：只依赖 data.js 里的 day 对象，不碰 DOM。
+/* 节律计算：只依赖「某一天」的对象（运行时由 Runtime.day 现算），不碰 DOM。
    stateAt(day, 分钟) → 屏上该显示什么；dutiesAt(day, 分钟) → 值日条。
 
    两层：

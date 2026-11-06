@@ -95,6 +95,10 @@ cp -r sample data
 1. **课表不存时间**，时间只来自作息表。调一次作息，全周跟着变。
 2. **没写的就留空**。`unset` 不上屏，宁可少显示，也不猜一个错的值。
 
+`python3 tools/bundle.py` 生成的是**配置包**，不生成任何一天。当天的课表由
+`app/engine/schedule.js` 在浏览器里按作息和课表现算，所以它不会「过期」，
+不需要每周重跑；只有改了 `data/` 里的文件才需要重新 bundle 一次。
+
 ### 值日轮岗怎么算
 
 `roles.json` 里的 `dutyCycle` 管 A/B 组什么时候换：
@@ -150,7 +154,7 @@ python3 tools/backup.py
 | 层 | 命令 | 管什么 |
 |---|---|---|
 | 逻辑 | `node tools/test_rhythm.js` 等 | 时段判断、岗位、存储、消息服务，162 项，秒级 |
-| 引擎对拍 | `node tools/test_engine.js` | `engine/schedule.js` 与 Python 编译器 132 天逐字段一致（基准在 `tools/golden/`） |
+| 引擎对拍 | `node tools/test_engine.js` | `app/engine/schedule.js` 与 Python 编译器 132 天逐字段一致（基准在 `tools/golden/`） |
 | 换学校 | `python3 tools/test_variants.py` | 4 套作息 × 5 套岗位 × 4 份校历 = 80 套配置，每套连编 70 天 |
 | 真浏览器 | `npx playwright test` | 49 例 / 6 个项目：一体机 1920/1366、iPad、iPhone、iPhone SE、安卓、鸿蒙视口 |
 
@@ -164,7 +168,7 @@ python3 tools/backup.py
 ```bash
 npm ci
 npx playwright install chromium webkit
-python3 tools/bundle.py --data sample --start 2026-11-05
+python3 tools/bundle.py --data sample
 npx playwright test
 ```
 

@@ -4,11 +4,18 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-global.window = {};
-eval(fs.readFileSync(path.join(ROOT, "app/data.js"), "utf8"));
-eval(fs.readFileSync(path.join(ROOT, "app/rhythm.js"), "utf8"));
+global.window = global;
+/* 在 node 里跑浏览器脚本：藏掉 module/exports，让 UMD 走浏览器分支，
+   否则 engine 会把自己挂到 module.exports，window.Schedule 就是空的。
+   self 显式指向全局，模拟浏览器。 */
+function loadBrowserScript(f) {
+  const code = fs.readFileSync(path.join(ROOT, f), "utf8");
+  new Function("module", "exports", "require", "self", code)(undefined, undefined, undefined, global);
+}
+["app/data.js", "app/engine/schedule.js", "app/rhythm.js", "app/runtime.js"].forEach(loadBrowserScript);
 
-const DATA = global.window.RHYTHM_DATA;
+/* 不再从 data.js 里取现成的一天：测试和页面走同一条路，现算。 */
+const RT = global.window.Runtime;
 const R = global.window.Rhythm;
 
 let pass = 0, fail = 0;
@@ -17,18 +24,18 @@ function check(ok, title, detail) {
   ok ? pass++ : fail++;
 }
 function at(date, hhmm, opts) {
-  const day = DATA.days[date];
+  const day = RT.day(date);
   const p = hhmm.split(":").map(Number);
   return R.stateAt(day, p[0] * 60 + p[1], opts);
 }
 function duty(date, hhmm) {
-  const day = DATA.days[date];
+  const day = RT.day(date);
   const p = hhmm.split(":").map(Number);
   return R.dutiesAt(day, p[0] * 60 + p[1]);
 }
 
 /* 周四：7 节正课，第 4 节书法 */
-const first = DATA.days["2026-11-05"].timeline.filter(b => b.type === "class" && b.periodNo === 1)[0];
+const first = RT.day("2026-11-05").timeline.filter(b => b.type === "class" && b.periodNo === 1)[0];
 let s = at("2026-11-05", "08:30");
 check(s.kind === "class" && s.title === "第 1 节 · 语文" && s.sub === first.teacher,
   "上课卡：第 1 节 语文 / " + first.teacher, s.title + " / " + s.sub);

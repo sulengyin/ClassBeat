@@ -305,12 +305,14 @@
   /* ---------- 屏上文字 ---------- */
   /* 只存"老师改过的"，没改的沿用系统默认。
      这样以后改了默认文案，老师没动过的地方会自动跟上。 */
-  /* 打包时可以把某位老师改好的文字烤成本包的默认值（DATA.texts）。
-     本机没改过就吃包里的默认，改过就吃本机的——换机器不会丢。 */
+  /* 打包时可以把某位老师改好的文字烤成本包的默认值（RHYTHM_DATA.texts）。
+     本机没改过就吃包里的默认，改过就吃本机的——换机器不会丢。
+     注意是 RHYTHM_DATA：早先这里写成了 root.DATA，那个全局从来不存在，
+     烤进去的文案一直是死的，只有本机 localStorage 在起作用。 */
   function texts() {
     var local = read(KEY.texts, null);
     if (local && Object.keys(local).length) return local;
-    var baked = root.DATA && root.DATA.texts;
+    var baked = root.RHYTHM_DATA && root.RHYTHM_DATA.texts;
     return (baked && typeof baked === "object") ? baked : (local || {});
   }
 

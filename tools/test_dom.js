@@ -164,8 +164,16 @@ global.EventSource = class {
 };
 
 /* ---------- 加载 ---------- */
-["app/data.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/screen.js", "app/remote.js", "app/edit.js", "app/demo.js"]
-  .forEach(f => eval(fs.readFileSync(path.join(ROOT, f), "utf8")));
+/* 在 node 里跑浏览器脚本：藏掉 module/exports，让 UMD 走浏览器分支，
+   否则 engine 会把自己挂到 module.exports，window.Schedule 就是空的。
+   self 显式指向全局，模拟浏览器。 */
+function loadBrowserScript(f) {
+  const code = fs.readFileSync(path.join(ROOT, f), "utf8");
+  new Function("module", "exports", "require", "self", code)(undefined, undefined, undefined, global);
+}
+
+["app/data.js", "app/engine/schedule.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/edit.js", "app/demo.js"]
+  .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
 
@@ -303,6 +311,42 @@ check(document.body.dataset.demo === "0" && global.__rhythmTime === null,
   es.onmessage({ data: "这不是 json" });
   check(true, "坏消息不让页面崩");
 })();
+
+/* ---------- 运行时：改一条作息，下一次重绘就变 ---------- */
+/* 换一天做，避开上面那条通知覆盖 */
+global.__rhythmDate = "2026-11-09";
+global.__rhythmTime = 8 * 60 + 10;   /* 08:10：第一节 08:20 还没开始 */
+Screen.render();
+const beforeShift = heroText();
+/* 周一第一节是什么科，从当天的课表里取，不写死 */
+const mon1 = global.Runtime.day("2026-11-09").timeline
+  .filter(b => b.type === "class")[0].subject;
+/* 早读标题里也会出现科目名（「英语早读」），所以不能拿科目名判断；
+   上课卡一定是「第 1 节 · 科目」 */
+check(beforeShift.indexOf("第 1 节") < 0, "08:10 还没上第一节", beforeShift);
+
+const moved = JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable));
+moved.blocks[0].start = "08:00";
+global.Runtime.patch({ timetable: moved });
+const afterShift = heroText();
+check(afterShift.indexOf("第 1 节") >= 0 && afterShift.indexOf(mon1) >= 0,
+  "把第一节提前 20 分钟，屏上立刻改成" + mon1, beforeShift + " → " + afterShift);
+check(global.Runtime.rev() > 0, "配置改过之后版本号变了", "rev=" + global.Runtime.rev());
+
+/* 还原，别影响后面的用例 */
+global.Runtime.patch({ timetable: JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable)) });
+
+/* ---------- 跨午夜：日期变了就取新的一天 ---------- */
+global.__rhythmDate = "2026-11-06";
+global.__rhythmTime = 18 * 60 + 30;  /* 周五放学后 */
+Screen.render();
+const fri = heroText();
+global.__rhythmDate = "2026-11-09";  /* 周一早上 */
+global.__rhythmTime = 8 * 60;
+Screen.render();
+const mon = heroText();
+check(fri !== mon && mon.indexOf("第 1 节") >= 0,
+  "过了零点自动换到新的一天", "周五 18:30「" + fri + "」→ 周一 08:00「" + mon + "」");
 
 /* 编辑面板 */
 try {

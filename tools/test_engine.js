@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* 引擎对拍：engine/schedule.js 的输出必须与 tools/golden/ 里的 Python 基准逐字段一致。
+/* 引擎对拍：app/engine/schedule.js 的输出必须与 tools/golden/ 里的 Python 基准逐字段一致。
  *
  * 为什么不写「断言某天第 3 节是数学」这种用例：规则本身会变，写死的期望值
  * 每次改规则都要重写一遍。基准是把整份 Python 输出冻住，改规则时基准跟着变，
@@ -10,13 +10,14 @@
 
 const fs = require("fs");
 const path = require("path");
-const Schedule = require("../engine/schedule.js");
+const Schedule = require("../app/engine/schedule.js");
 
 const ROOT = path.join(__dirname, "..");
 const GOLDEN = path.join(__dirname, "golden");
 const SAMPLE = path.join(ROOT, "sample");
 
-const FILES = ["timetable", "schedule", "content", "roles", "noon"];
+/* content 取 subjects 数组，与 data.js / 浏览器里保持同一形态 */
+const FILES = ["timetable", "schedule", "roles", "noon"];
 
 function readJson(p) {
   return JSON.parse(fs.readFileSync(p, "utf8"));
@@ -25,6 +26,7 @@ function readJson(p) {
 function loadConfig(patch) {
   const cfg = {};
   for (const name of FILES) cfg[name] = readJson(path.join(SAMPLE, `${name}.json`));
+  cfg.content = readJson(path.join(SAMPLE, "content.json")).subjects;
   const calPath = path.join(SAMPLE, "calendar.json");
   cfg.calendar = fs.existsSync(calPath) ? readJson(calPath) : { days: {} };
 
