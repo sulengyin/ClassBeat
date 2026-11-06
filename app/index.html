@@ -492,6 +492,36 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
 }
 .corner:hover .gear,.corner.open .gear{opacity:.95}
 
+/* ---------- 手机发消息：二维码面板 ---------- */
+.qr-panel{
+  position:fixed;inset:0;z-index:80;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(30,20,12,.58);
+}
+.qr-panel.open{display:flex}
+.qr-card{
+  background:#fff;color:#1B140E;border-radius:2.4vmin;
+  padding:3.2vmin 4vmin 3vmin;text-align:center;max-width:80vmin;
+  box-shadow:0 3vmin 9vmin rgba(0,0,0,.38);
+}
+.qr-card h2{font:700 3.1vmin/1.25 inherit;margin:0 0 2vmin}
+#qr-canvas{width:40vmin;height:40vmin;display:block;margin:0 auto;background:#fff}
+.qr-url{
+  font:600 2.1vmin/1.4 ui-monospace,Consolas,monospace;
+  margin:1.8vmin 0 .6vmin;color:#4A3B2C;word-break:break-all;
+}
+.qr-empty{
+  font-size:2.2vmin;line-height:1.65;color:#7A3B18;
+  background:#FFF4E2;border:.24vmin solid #E4C79A;border-radius:1.6vmin;
+  padding:2vmin 2.4vmin;margin:0 auto 1vmin;max-width:64vmin;
+}
+.qr-tip{font-size:1.9vmin;line-height:1.6;color:#6B5641;margin:1.2vmin 0 2vmin}
+#qr-close{
+  font:700 2.1vmin/1 inherit;padding:1.3vmin 3vmin;border-radius:1.2vmin;
+  border:.24vmin solid #C9B79E;background:#FBF3DF;color:#3E2D20;cursor:pointer;
+}
+#qr-close:hover{background:#F3E6CB}
+
 /* ---------- 演练条：老师工具，故意做成深色木桌，和屏幕区分 ---------- */
 .demo{
   position:fixed;left:0;right:0;bottom:0;z-index:58;
@@ -621,9 +651,25 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
     <button id="btn-demo">演练</button>
     <button id="btn-cd">倒计时 · 按推荐</button>
     <button id="btn-reduce">减少动效</button>
+    <button id="btn-phone">手机</button>
     <button id="btn-edit">编辑</button>
   </div>
   <button class="gear" id="btn-gear" aria-label="设置">⋯</button>
+</div>
+
+<div class="qr-panel" id="qr-panel">
+  <div class="qr-card">
+    <h2>手机发消息上屏</h2>
+    <canvas id="qr-canvas" width="512" height="512" aria-label="手机发消息地址二维码"></canvas>
+    <p class="qr-url" id="qr-url"></p>
+    <p class="qr-empty" id="qr-empty" hidden>
+      还没找到手机能用的地址。<br>
+      先在一台电脑上双击「启动手机服务.bat」，<br>
+      再用它打印的那行地址打开大屏。
+    </p>
+    <p class="qr-tip">手机和这台电脑连同一个 WiFi。第一次启动时 Windows 会问“是否允许访问网络”，要点「允许」。</p>
+    <button id="qr-close">关闭</button>
+  </div>
 </div>
 
 <div class="demo" id="demo">
@@ -651,6 +697,8 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 
 <script src="data.js"></script>
 <script src="engine/schedule.js"></script>
+<script src="vendor/qrcode.min.js"></script>
+<script src="qr.js"></script>
 <script src="clock.js"></script>
 <script src="config.js"></script>
 <script src="rhythm.js"></script>
@@ -658,6 +706,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 <script src="runtime.js"></script>
 <script src="screen.js"></script>
 <script src="remote.js"></script>
+<script src="phoneui.js"></script>
 <script src="edit.js"></script>
 <script src="demo.js"></script>
 </body>

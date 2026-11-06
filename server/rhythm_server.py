@@ -228,6 +228,8 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": True,
                 "class": CONF["klass"],
                 "port": CONF["port"],
+                # 大屏拿它画二维码：手机要打开的是这个地址，不是 127.0.0.1
+                "lan": CONF.get("lan") or f"http://127.0.0.1:{CONF['port']}",
                 "now": hhmm(0),
                 "time": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
             })
@@ -390,7 +392,11 @@ def main():
     srv.daemon_threads = True
 
     ip = lan_ip()
+    CONF["lan"] = f"http://{ip}:{a.port}"
     print("教室消息服务已启动")
+    if ip == "127.0.0.1":
+        # 没连上局域网时，手机那行地址是打不开的，说清楚比让人瞎试强
+        print("  [!] 没找到局域网地址，手机连不上。检查电脑是否连了 WiFi/网线。")
     print(f"  手机打开  http://{ip}:{a.port}")
     print(f"  大屏同源  http://127.0.0.1:{a.port}/screen")
     print(f"  本机自测  http://127.0.0.1:{a.port}/api/ping")

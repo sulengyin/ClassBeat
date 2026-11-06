@@ -57,6 +57,8 @@ def main():
     hub.MSG_FILE = os.path.join(tmp, "messages.json")
     hub.PHONE_FILE = os.path.join(ROOT, "server", "phone.html")
     hub.CONF["klass"] = "测试班"
+    # 大屏拿这个地址画二维码；真机上由启动时探测，这里钉一个固定值
+    hub.CONF["lan"] = "http://192.168.1.5:8765"
     hub._messages = []
     hub._seq = 0
 
@@ -71,6 +73,8 @@ def main():
         d = json.loads(raw)
         check(code == 200 and d.get("ok") and d.get("class") == "测试班",
               "① 大屏能探测到服务", f'{code} {d.get("class")}')
+        check(d.get("lan") == "http://192.168.1.5:8765",
+              "①a ping 报出局域网地址（二维码用）", d.get("lan"))
 
         # ①b 校时：给毫秒时间戳，并明确按 UTC+8
         code, _, raw = req(port, "/api/time")

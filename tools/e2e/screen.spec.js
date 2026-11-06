@@ -144,6 +144,35 @@ test("手机发的那条会出现在屏上，撤回后消失", async ({ page, re
   await expect(page.locator(".notice-text")).toHaveCount(0);
 });
 
+test("「手机」面板出二维码，地址就是手机要打开的那个", async ({ page }) => {
+  // 教室电脑的 LAN 地址在 CI 里不可预测，钉一个固定的 ping 响应
+  await page.route("**/api/ping", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      ok: true, class: "测试班", port: 8765, lan: "http://192.168.1.5:8765",
+    }),
+  }));
+
+  await openScreen(page);
+  await openTools(page);
+  await page.locator("#btn-phone").click();
+
+  await expect(page.locator("#qr-panel")).toHaveClass(/open/);
+  await expect(page.locator("#qr-url")).toHaveText("http://192.168.1.5:8765/");
+  await expect(page.locator("#qr-empty")).toBeHidden();
+
+  // 画布上真的落了黑块，不是一张空白
+  const dark = await page.evaluate(() => {
+    const c = document.getElementById("qr-canvas");
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 128) n += 1;
+    return n;
+  });
+  expect(dark, "二维码应该有黑块").toBeGreaterThan(1000);
+});
+
 test("紧急通知走大字区，而不是角落的小提示条", async ({ page, request }) => {
   const now = await hubNow(request);
   await openScreen(page, `2026-11-05T${now}:00+08:00`);

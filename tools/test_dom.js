@@ -120,12 +120,25 @@ const document = {
 /* 主屏骨架：与 index.html 的 id 对齐 */
 ["cls", "date", "clock", "sec", "main", "band", "bandText", "spine", "heroMain", "heroSub", "after", "chips",
  "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner",
- "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme",
+ "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
+ "qr-panel", "qr-url", "qr-empty", "qr-close",
  "demo", "d-play", "d-now", "d-ribbon", "d-range", "d-speed", "d-close"].forEach(id => {
   const e = new El(id.indexOf("btn") === 0 || id === "warn-title" ? "button" : "div");
   e.id = id;
   body.appendChild(e);
 });
+
+/* 「手机」面板里的画布：桩只记录被填了多少个方块，够判断"码画出来了" */
+const qrCanvas = new El("canvas");
+qrCanvas.id = "qr-canvas";
+qrCanvas.width = 512;
+qrCanvas.height = 512;
+let qrRects = 0;
+qrCanvas.getContext = () => ({
+  fillStyle: "",
+  fillRect() { qrRects++; }
+});
+body.appendChild(qrCanvas);
 /* 与真实 DOM 一致：状态词在 .band 里面，倒计时靠 dataset.text 取原文 */
 const bandEl = document.getElementById("band");
 const bandTextEl = document.getElementById("bandText");
@@ -179,7 +192,17 @@ function loadBrowserScript(f) {
   new Function("module", "exports", "require", "self", code)(undefined, undefined, undefined, global);
 }
 
-["app/data.js", "app/engine/schedule.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/edit.js", "app/demo.js"]
+/* 第三方库走 UMD：给它一个 exports 对象，才会把工厂结果交出来 */
+function loadVendor(f, name) {
+  const code = fs.readFileSync(path.join(ROOT, f), "utf8");
+  const m = { exports: {} };
+  new Function("module", "exports", "require", "self", code)(m, m.exports, undefined, global);
+  global[name] = m.exports;
+}
+
+loadVendor("app/vendor/qrcode.min.js", "qrcode");
+
+["app/data.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/demo.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
@@ -449,6 +472,45 @@ check(hubFor({ search: "", protocol: "file:", host: "" }) === "http://127.0.0.1:
   "双击 html 打开时退回本机 8765");
 check(hubFor({ search: "?hub=10.0.0.2:9000", protocol: "http:", host: "1.2.3.4:8765" })
   === "http://10.0.0.2:9000", "URL 上写了 hub 就听 URL 的");
+
+/* ---------- 手机二维码 ---------- */
+check(!!global.qrcode && !!global.QR, "二维码库与封装都注册了");
+
+const q1 = global.QR.make("http://192.168.1.5:8765/");
+check(!!q1 && q1.getModuleCount() === 25, "25 字节地址编成 25×25 的码",
+  q1 && String(q1.getModuleCount()));
+
+/* 固定内容 → 固定图形。换库、改编码模式、动错版本，这条会立刻红。 */
+const qrRows = [];
+for (let r = 0; r < q1.getModuleCount(); r++) {
+  let line = "";
+  for (let c = 0; c < q1.getModuleCount(); c++) line += q1.isDark(r, c) ? "1" : "0";
+  qrRows.push(line);
+}
+const qrHash = require("crypto").createHash("sha256")
+  .update(qrRows.join("\n")).digest("hex").slice(0, 16);
+check(qrHash === "0219b9445ec0ed76", "码的图形固定（换库或改封装会报错）", qrHash);
+
+global.Remote.info.phone = "http://192.168.1.5:8765";
+global.Remote.info.online = true;
+global.PhoneUI.open();
+const qrPanel = document.getElementById("qr-panel");
+check(qrPanel.classList.contains("open"), "点「手机」打开二维码面板");
+check(document.getElementById("qr-url").textContent === "http://192.168.1.5:8765/",
+  "面板上写出手机要打开的地址", document.getElementById("qr-url").textContent);
+check(qrRects > 200, "二维码真的画进了画布", qrRects + " 个方块");
+check(document.getElementById("qr-empty").hidden === true, "有地址时不显示操作提示");
+
+/* 服务只报回环地址：手机连不上，必须改成操作步骤，不能画一个扫不开的码 */
+global.Remote.info.phone = "http://127.0.0.1:8765";
+global.PhoneUI.open();
+check(document.getElementById("qr-empty").hidden === false,
+  "只有本机地址时改成操作提示");
+check(qrCanvas.hidden === true, "这时把画布藏起来");
+
+global.PhoneUI.close();
+check(!qrPanel.classList.contains("open"), "「关闭」能收起面板");
+global.Remote.info.phone = "";
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

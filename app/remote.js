@@ -23,6 +23,8 @@
 
   var es = null;
   var lastSeq = 0;
+  /* 服务的状态：大屏「手机」面板靠它决定画不画二维码 */
+  var info = { online: false, phone: "" };
 
   function nowHM() {
     var m = Screen.nowMinutes();
@@ -118,7 +120,24 @@
     };
   }
 
+  /* 问服务要它自己的局域网地址。二维码要写这个，不能写 127.0.0.1——
+     手机打开 127.0.0.1 打开的是手机自己。 */
+  function probe() {
+    return fetch(HUB + "/api/ping", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        info.online = !!(d && d.ok);
+        info.phone = (d && d.lan) || "";
+        return info;
+      })
+      .catch(function () {
+        info.online = false;
+        return info;
+      });
+  }
+
   function boot() {
+    probe();
     if (root.Clock) syncClock();
     /* 一台屏可能开一整天，隔一段时间再校一次，避免慢慢走偏 */
     if (root.setInterval) root.setInterval(syncClock, 10 * 60 * 1000);
@@ -141,7 +160,10 @@
       });
   }
 
-  root.Remote = { hub: HUB, connect: connect, retract: retract, syncClock: syncClock };
+  root.Remote = {
+    hub: HUB, info: info, probe: probe,
+    connect: connect, retract: retract, syncClock: syncClock
+  };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
   } else {
