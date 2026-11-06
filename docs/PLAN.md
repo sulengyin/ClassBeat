@@ -1243,6 +1243,31 @@ size = Math.min(cap, Math.max(one, area));
 
 **不做**：多班管理、账号体系、云端同步、拼音输入法。
 
+### 2.34 手机消息不再要求装 Python（DONE）
+
+**真机反馈**（2026-11-06，一体机）：双击「启动手机服务.bat」，窗口写「这台电脑没找到 Python 3」。这台机器是学校统一管的，装软件要审批——要求老师先装 Python，等于把这条路堵死。
+
+三个方案摆在桌上：
+
+| 方案 | 老师要做什么 | 包多大 | 代价 |
+|---|---|---|---|
+| 让老师装 Python | 下安装包、管理员授权、勾 Add to PATH | 160 KB | 过不了学校审批，且勾 PATH 这一步经常漏 |
+| PyInstaller 打 exe | 双击 exe | +8 MB | 得在 Windows 上构建，本地是 OpenHarmony 做不了；杀软误报是常事 |
+| **官方 embeddable 运行时** | 双击 bat | **+11 MB** | 包里多一份 Python |
+
+选第三个：`python-3.12.10-embed-amd64.zip` 是 python.org 的官方产物，解压即用，不装、不改 PATH、不要管理员权限。`tools/package.py` 下载后按 SHA256 校验，解到 `server/python/`；bat 先看这个目录在不在，不在才退回系统 Python。
+
+体积从 160 KB 涨到 10.8 MB。这是笔明白账：**11 MB 换掉一次审批**。只要看大屏的老师仍用单文件版（214 KB），不受影响。
+
+想自己控制体积就打 `python3 tools/package.py --no-python`，包回到 160 KB，但一体机得自己装 Python。
+
+**顺带修的两个坑**：
+
+1. 上一版 bat 用 UTF-8 + `chcp 65001` 写中文，cmd 在 65001 下逐行解码会错位，把「安装第一屏…勾上 Add Python to PATH」那行拆开，后半截当成命令执行，屏上直接报 `is not recognized as an internal or external command`。改成 GBK 写盘（中文 Windows 的原生代码页 936），双字节字符都 >127，不会被误判成 `& | >`。
+2. bat 里探测 Python 的顺序改成 `py -3` → `python`：官方安装包的 launcher 最可靠，而 Windows 自带的 `python.exe` 可能只是个跳应用商店的 stub。
+
+**没验证**：Windows 上 embeddable 运行时的实际表现（本机跑不了 exe）。间接验证做了两项——官方包里 `http.server`、`socketserver`、`ssl`、`sqlite3` 等 599 个标准库模块齐全；服务端在 `python3 -I -S`（隔离模式，等价于没有 site-packages）下 ping、发消息、取消息全部正常。
+
 ### 3. 课表结构（CONFIRMED）
 
 五（1）班，班主任张老师。5 天 × 7 节 = 35 格，15 个课程标签，归并后 12 类：
@@ -1448,7 +1473,7 @@ showFrom:  N                              // 只在剩余 N 分钟内出现
 | 能力边界 | **只在校内**。出不了校园网，老师在家发不了。详见 2.22 |
 | 范围 | 常驻服务（静态页 + SSE + 消息文件）、手机 H5 发送页、大屏探测接入、紧急二次确认、时长 10/30/60/自定义/直到我关、手机撤回 + 大屏长按关闭 |
 | 不做 | 学生留言（REJECTED，设计留在 2.22）、公网 / 远程、家长端、群聊、已读回执（老师就在校内，回执没有意义） |
-| 输出 | `server/rhythm_server.py`、`server/phone.html`、`app/remote.js`；验收通过后再打包 `rhythm-server.exe` |
+| 输出 | `server/rhythm_server.py`、`server/phone.html`、`app/remote.js`；`tools/package.py` 把官方免安装运行时（Python 3.12 embeddable）打进 `server/python/`，一体机零安装 |
 | 验收 | 手机发出到上屏 ≤1 秒；服务未启动时大屏行为与现在完全一致；手机连 4G 时明确报"没连上教室"；IP 变化后重输一次即可；消息到期自动消失；**手机撤回后 1 秒内屏上消失**；**大屏长按 0.9 秒可关，单击无效**；**"直到我关"不会留到第二天** |
 | 失败处理 | 服务崩溃不影响大屏（降级为本地）；消息文件损坏时备份并从空开始 |
 

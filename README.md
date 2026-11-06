@@ -235,8 +235,13 @@ python3 server/rhythm_server.py --port 8765
 `v0.1.0-snapshot`：能在一台真实教室的一体机上跑完整一天的版本。
 
 它还不是「下载就能用」的样子：数据要靠 `tools/build_day.py` 预先编译，
-服务端要装 Python，换一个班要改七个 JSON。这些在 `docs/PLAN.md` 的
-「2.33 配置向导」和「P5」里已经排好——做完之后，别的老师不用碰命令行就能配出自己的班。
+换一个班要改七个 JSON。这些在 `docs/PLAN.md` 的「2.33 配置向导」和「P5」里已经排好
+——做完之后，别的老师不用碰命令行就能配出自己的班。
+
+**手机消息已经不需要装 Python 了**：`tools/package.py` 会把官方免安装运行时
+（Python 3.12 embeddable，约 11 MB）打进 `server/python/`，一体机双击就跑，
+不安装、不改 PATH、不需要管理员权限。代价是包从 160 KB 变成 10.8 MB；
+只想看大屏的话用单文件版，214 KB。
 
 ## 许可
 

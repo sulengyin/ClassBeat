@@ -14,8 +14,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import shutil
 import sys
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -66,42 +68,82 @@ BAT_SERVER = (
     "title 手机消息服务 · 这个窗口不要关\r\n"
     "cd /d \"%~dp0server\"\r\n"
     "\r\n"
-    "set \"PY=\"\r\n"
-    "py -3 -c \"import sys\" >nul 2>&1\r\n"
-    "if not errorlevel 1 set \"PY=py -3\"\r\n"
-    "if not defined PY (\r\n"
-    "  python -c \"import sys\" >nul 2>&1\r\n"
-    "  if not errorlevel 1 set \"PY=python\"\r\n"
-    ")\r\n"
-    "if not defined PY (\r\n"
-    "  python3 -c \"import sys\" >nul 2>&1\r\n"
-    "  if not errorlevel 1 set \"PY=python3\"\r\n"
-    ")\r\n"
+    "rem 包里自带一份 Python，不用装、不用配 PATH\r\n"
+    "if exist \"python\\python.exe\" goto bundled\r\n"
     "\r\n"
+    "rem 没带运行时（--no-python 打的包），退回系统 Python\r\n"
+    "set \"PY=\"\r\n"
+    "python -c \"import sys\" >nul 2>&1\r\n"
+    "if not errorlevel 1 set \"PY=python\"\r\n"
+    "if not defined PY (\r\n"
+    "  py -3 -c \"import sys\" >nul 2>&1\r\n"
+    "  if not errorlevel 1 set \"PY=py -3\"\r\n"
+    ")\r\n"
     "if not defined PY goto nopython\r\n"
     "\r\n"
     "echo 正在启动手机消息服务，这个窗口最小化就好，不要关。\r\n"
     "echo.\r\n"
     "%PY% rhythm_server.py\r\n"
+    "goto done\r\n"
+    "\r\n"
+    ":bundled\r\n"
+    "echo 正在启动手机消息服务，这个窗口最小化就好，不要关。\r\n"
     "echo.\r\n"
-    "echo 服务已停止（上面几行是最后的输出）。\r\n"
-    "pause\r\n"
-    "exit /b 0\r\n"
+    "python\\python.exe rhythm_server.py\r\n"
+    "goto done\r\n"
     "\r\n"
     ":nopython\r\n"
     "echo.\r\n"
-    "echo   这台电脑没找到 Python 3。\r\n"
+    "echo   这台电脑没找到 Python 3，包里也没有自带。\r\n"
     "echo.\r\n"
     "echo   大屏不受影响，双击「打开大屏.bat」照样能用。\r\n"
     "echo   只有「手机发消息」这一个功能需要 Python。\r\n"
     "echo.\r\n"
-    "echo   要装的话，到 python.org 下载 Python 3。\r\n"
-    "echo   安装第一屏最下面有个 Add Python to PATH 的勾，一定要勾上，\r\n"
-    "echo   然后一路点下一步。装完再双击一次本文件。\r\n"
-    "echo.\r\n"
     "echo   现在可以直接关掉这个窗口，不影响大屏。\r\n"
     "pause\r\n"
+    "exit /b 1\r\n"
+    "\r\n"
+    ":done\r\n"
+    "echo.\r\n"
+    "echo 服务已停止（上面几行是最后的输出）。\r\n"
+    "pause\r\n"
 )
+
+
+# 官方免安装运行时：解压即用，不需要安装、不需要管理员权限、不碰 PATH。
+# 一体机通常是学校统一管的，装软件要审批——这 11 MB 换掉一次审批。
+PY_EMBED_URL = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip"
+PY_EMBED_SHA256 = "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
+PY_EMBED_CACHE = ROOT / "tools" / "vendor" / "python-embed-amd64.zip"
+
+
+def python_runtime() -> Path | None:
+    """取一份免安装 Python，带校验。拿不到就返回 None，不阻塞打包。"""
+    if PY_EMBED_CACHE.exists():
+        got = hashlib.sha256(PY_EMBED_CACHE.read_bytes()).hexdigest()
+        if got == PY_EMBED_SHA256:
+            return PY_EMBED_CACHE
+        print(f"  缓存的运行时校验不对（{got[:12]}…），重新下载")
+        PY_EMBED_CACHE.unlink()
+
+    PY_EMBED_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    print("  正在下载免安装 Python（约 11 MB，只需一次）…")
+    part = PY_EMBED_CACHE.with_suffix(".part")
+    try:
+        with urllib.request.urlopen(PY_EMBED_URL, timeout=180) as r, part.open("wb") as f:
+            shutil.copyfileobj(r, f)
+    except Exception as e:
+        part.unlink(missing_ok=True)
+        print(f"  下载失败：{e}")
+        return None
+
+    got = hashlib.sha256(part.read_bytes()).hexdigest()
+    if got != PY_EMBED_SHA256:
+        part.unlink(missing_ok=True)
+        print(f"  下载到的文件校验不对（{got}），不用它")
+        return None
+    part.rename(PY_EMBED_CACHE)
+    return PY_EMBED_CACHE
 
 
 def bat_bytes(text):
@@ -162,12 +204,12 @@ Windows 也可以用文件夹里的：
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 五、手机发消息（可选）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-需要一台装了 Python 3 的电脑，和一体机连同一个 WiFi。
+不用装任何东西，包里自带运行环境。手机和电脑连同一个 WiFi 就行。
 
 1. 电脑上双击「启动手机服务.bat」
    ——双击就行，不用"选择用什么程序打开"。会弹出一个黑色窗口，
    里面出现地址之后把它最小化，不要关：关了手机就连不上。
-   窗口里如果写"没找到 Python 3"，说明这台电脑没装，按提示装一下。
+   （第一次启动可能慢几秒，Windows 在检查这个新程序，属于正常）
 2. 大屏上点右下角「⋯」→「手机」，屏幕上会出一个二维码
 3. 手机连同一个 WiFi，扫码（或直接输入屏上那行地址）
 4. 写一句话点发送，大屏立刻就出现，不用刷新
@@ -274,9 +316,18 @@ def main() -> None:
 
     build_single(single_path)
 
+    pyzip = None if "--no-python" in sys.argv else python_runtime()
+
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for src, arc in items:
             z.write(src, f"{PACK_NAME}/{arc}")
+
+        if pyzip:
+            with zipfile.ZipFile(pyzip) as pz:
+                for info in pz.infolist():
+                    if info.is_dir():
+                        continue
+                    z.writestr(f"{PACK_NAME}/server/python/{info.filename}", pz.read(info))
 
         z.write(single_path, f"{PACK_NAME}/{PACK_NAME}-单文件版.html")
         z.writestr(f"{PACK_NAME}/使用说明.txt", readme.encode("utf-8-sig"))
@@ -286,8 +337,13 @@ def main() -> None:
 
     size = zip_path.stat().st_size / 1024
     one = single_path.stat().st_size / 1024
+    with zipfile.ZipFile(zip_path) as z:
+        count = len(z.namelist())
+    pretty = f"{size / 1024:.1f} MB" if size >= 1024 else f"{size:.0f} KB"
     print(f"已生成 {zip_path}")
-    print(f"  {len(items) + 5} 个文件，{size:.0f} KB")
+    print(f"  {count} 个文件，{pretty}"
+          + ("（含免安装 Python，一体机不用装东西）" if pyzip
+             else "（没带 Python，一体机要自己装才能用手机发消息）"))
     print(f"已生成 {single_path}")
     print(f"  单文件 {one:.0f} KB，任何系统双击即开（没有手机发消息）")
 

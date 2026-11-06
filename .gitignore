@@ -36,3 +36,6 @@ motion-effects-collector/
 Thumbs.db
 __pycache__/
 *.pyc
+
+# 打包时下载的免安装 Python 运行时（11 MB，不占仓库）
+tools/vendor/*.zip
