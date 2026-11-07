@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>班级节律屏</title>
 <link rel="stylesheet" href="edit.css">
+<link rel="stylesheet" href="setup.css">
 <style>
 /* ============================================================
    视觉语言：手账 / 贴纸 / 教室公告板
@@ -761,10 +762,13 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
     <button id="btn-cd">倒计时 · 按推荐</button>
     <button id="btn-reduce">减少动效</button>
     <button id="btn-phone">手机</button>
+    <button id="btn-setup">配置班级</button>
     <button id="btn-edit">编辑</button>
   </div>
   <button class="gear" id="btn-gear" aria-label="设置">⋯</button>
 </div>
+
+<div class="setup" id="setup" aria-hidden="true"></div>
 
 <div class="msg-modal" id="msgModal" data-level="normal" aria-hidden="true">
   <section class="msg-card" id="msgCard" data-expanded="false" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
@@ -830,6 +834,8 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 <script src="store.js"></script>
 <script src="runtime.js"></script>
 <script src="screen.js"></script>
+<script src="templates.js"></script>
+<script src="setup.js"></script>
 <script src="remote.js"></script>
 <script src="phoneui.js"></script>
 <script src="edit.js"></script>

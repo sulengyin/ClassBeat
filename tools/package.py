@@ -45,10 +45,10 @@ PACK_NAME = class_name().replace("（", "").replace("）", "") + "节律屏-测�
 
 # 大屏运行需要的文件，逐个列出来——比整目录拷安全，免得把调试残留带进去
 APP_FILES = [
-    "index.html", "preview.html", "edit.css",
+    "index.html", "preview.html", "edit.css", "setup.css",
     "data.js", "engine/schedule.js", "clock.js", "rhythm.js", "store.js",
     "runtime.js", "screen.js", "remote.js", "edit.js", "demo.js", "config.js",
-    "qr.js", "phoneui.js", "vendor/qrcode.min.js",
+    "qr.js", "phoneui.js", "setup.js", "templates.js", "vendor/qrcode.min.js",
 ]
 SERVER_FILES = ["rhythm_server.py", "phone.html"]
 
@@ -288,9 +288,11 @@ def build_single(out: Path) -> Path:
     """
     html = (APP / "index.html").read_text(encoding="utf-8")
 
-    css = (APP / "edit.css").read_text(encoding="utf-8")
-    html = html.replace('<link rel="stylesheet" href="edit.css">',
-                        "<style>\n" + css + "\n</style>")
+    # 样式可能不止一份：主样式写在 index.html 里，编辑面板和向导各有一份
+    for css_name in ["edit.css", "setup.css"]:
+        css = (APP / css_name).read_text(encoding="utf-8")
+        html = html.replace(f'<link rel="stylesheet" href="{css_name}">',
+                            "<style>\n" + css + "\n</style>")
 
     # 按 APP_FILES 走，别再单独维护一份列表——加了 config.js 容易漏
     for name in [f for f in APP_FILES if f.endswith(".js")]:

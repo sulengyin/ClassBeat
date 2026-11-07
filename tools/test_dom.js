@@ -123,6 +123,7 @@ const document = {
  "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
  "qr-panel", "qr-url", "qr-empty", "qr-close",
  "msgModal", "msgCard", "msgContent", "msgBody", "msgTitle", "msgTime", "msgClose",
+ "setup", "btn-setup",
  "demo", "d-play", "d-now", "d-ribbon", "d-range", "d-speed", "d-close"].forEach(id => {
   const e = new El(id.indexOf("btn") === 0 || id === "warn-title" ? "button" : "div");
   e.id = id;
@@ -203,7 +204,7 @@ function loadVendor(f, name) {
 
 loadVendor("app/vendor/qrcode.min.js", "qrcode");
 
-["app/data.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/demo.js"]
+["app/data.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/demo.js", "app/templates.js", "app/setup.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
@@ -550,6 +551,44 @@ check(qrCanvas.hidden === true, "这时把画布藏起来");
 global.PhoneUI.close();
 check(!qrPanel.classList.contains("open"), "「关闭」能收起面板");
 global.Remote.info.phone = "";
+
+/* ---------- 配置向导（P5） ---------- */
+(function () {
+  const box = document.getElementById("setup");
+  const btn = document.getElementById("btn-setup");
+
+  /* 桩的 querySelectorAll 只认 class，不认标签；这里自己按 tagName 走一遍 */
+  const inputsIn = node => {
+    const out = [];
+    (function walk(n) {
+      n.children.forEach(c => { if (c.tagName === "INPUT") out.push(c); walk(c); });
+    })(node);
+    return out;
+  };
+
+  btn._h.click();
+  check(box.classList.contains("open"), "点「配置班级」打开向导");
+  check(box.querySelectorAll(".setup-step").length === 4, "向导是四步",
+    String(box.querySelectorAll(".setup-step").length));
+  check(inputsIn(box).length >= 4, "第一步能填学校/班级/班主任/开学日",
+    String(inputsIn(box).length));
+
+  const next = () => box.querySelectorAll(".setup-btn")
+    .filter(b => b.textContent === "下一步")[0];
+
+  next()._h.click();
+  const tpls = box.querySelectorAll(".setup-tpl");
+  check(tpls.length === 3, "第二步给三套作息模板", String(tpls.length));
+  const rows = box.querySelectorAll(".setup-row");
+  check(rows.length > 20, "第二步列出每一段起止", rows.length + " 行");
+
+  next()._h.click();
+  const cells = inputsIn(box);
+  check(cells.length === 35, "第三步是 5×7 课表", cells.length + " 格");
+
+  box.querySelector(".setup-x")._h.click();
+  check(!box.classList.contains("open"), "「×」能关掉向导");
+})();
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

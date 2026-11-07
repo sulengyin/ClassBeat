@@ -1,0 +1,164 @@
+/* 配置向导（P5）。
+ *
+ * 独立于大屏的视觉层：老师是凑在屏幕前填表，不是 8 米外看字，
+ * 所以字号按"办公表单"给，不跟大屏的 vmin 巨字走。
+ * 配色仍沿用奶油纸 + 深棕描边，避免像另一个软件。
+ */
+.setup{
+  position:fixed;inset:0;z-index:95;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(26,17,10,.62);
+  -webkit-backdrop-filter:blur(3px);
+  backdrop-filter:blur(3px);
+}
+.setup.open{display:flex}
+
+.setup-panel{
+  display:flex;flex-direction:column;
+  width:min(150vmin,94vw);height:min(88vh,104vmin);
+  background:#FFF8E7;color:#31231A;
+  border:.42vmin solid #3A2A1E;
+  border-radius:2.4vmin 2vmin 2.6vmin 2vmin;
+  box-shadow:1vmin 1.2vmin 0 rgba(58,42,30,.18),0 4vmin 12vmin rgba(0,0,0,.3);
+  overflow:hidden;
+}
+
+.setup-head{
+  display:flex;align-items:center;gap:2vmin;
+  padding:2.6vmin 3.4vmin 2vmin;
+  border-bottom:.3vmin dashed rgba(58,42,30,.24);
+  flex:none;
+}
+.setup-title{font-size:3.2vmin;font-weight:900;letter-spacing:.04em}
+.setup-sub{font-size:2.1vmin;color:#8A7563;font-weight:600}
+.setup-x{
+  margin-left:auto;width:4.4vmin;height:4.4vmin;flex:none;
+  border:.28vmin solid #3A2A1E;border-radius:50%;
+  background:#FFF8E7;color:#31231A;
+  font-size:2.6vmin;line-height:1;cursor:pointer;
+}
+
+/* ---------- 步骤条 ---------- */
+.setup-steps{
+  display:flex;align-items:center;gap:1vmin;
+  padding:1.8vmin 3.4vmin;flex:none;
+}
+.setup-step{
+  display:flex;align-items:center;gap:.9vmin;
+  font-size:2vmin;font-weight:700;color:#9B8672;
+  padding:.8vmin 1.4vmin;border-radius:1vmin;
+}
+.setup-step b{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:3.2vmin;height:3.2vmin;border-radius:50%;
+  background:#EFE2CB;color:#8A7563;font-size:1.9vmin;
+}
+.setup-step.on{color:#31231A;background:#FFE9B8}
+.setup-step.on b{background:#3A2A1E;color:#FFD64F}
+.setup-step.done b{background:#4CA34A;color:#fff}
+.setup-step i{width:2.2vmin;height:.24vmin;background:rgba(58,42,30,.2)}
+
+/* ---------- 内容区 ---------- */
+.setup-body{
+  flex:1;min-height:0;overflow:auto;
+  padding:1.4vmin 3.4vmin 2vmin;
+}
+.setup-page{display:none}
+.setup-page.on{display:block}
+
+.setup-h{font-size:2.6vmin;font-weight:900;margin:1.6vmin 0 1.2vmin}
+.setup-p{font-size:2vmin;line-height:1.7;color:#6B5545;margin:0 0 2vmin}
+
+.setup-field{display:flex;align-items:center;gap:1.6vmin;margin:0 0 1.6vmin}
+.setup-field label{
+  width:16vmin;flex:none;font-size:2.1vmin;font-weight:700;color:#6B5545;
+}
+.setup-field input{
+  flex:1;min-width:0;max-width:52vmin;
+  font-family:inherit;font-size:2.3vmin;font-weight:600;
+  color:#31231A;background:#FFFDF6;
+  border:.26vmin solid #C9B79E;border-radius:1vmin;
+  padding:1.2vmin 1.6vmin;outline:none;
+}
+.setup-field input:focus{border-color:#3A2A1E;box-shadow:0 0 0 .3vmin rgba(255,214,79,.7)}
+.setup-field input[type="time"]{max-width:22vmin;font-variant-numeric:tabular-nums}
+.setup-hint{font-size:1.8vmin;color:#9B8672;margin-left:1vmin}
+
+/* ---------- 模板卡 ---------- */
+.setup-tpls{display:flex;gap:1.6vmin;flex-wrap:wrap;margin-bottom:2vmin}
+.setup-tpl{
+  flex:1 1 36vmin;max-width:48vmin;text-align:left;cursor:pointer;
+  background:#FFFDF6;border:.3vmin solid #C9B79E;border-radius:1.6vmin;
+  padding:1.8vmin 2vmin;font-family:inherit;color:#31231A;
+  transition:border-color .18s,background .18s,transform .18s;
+}
+.setup-tpl:hover{transform:translateY(-.3vmin);border-color:#8A7563}
+.setup-tpl.on{border-color:#3A2A1E;background:#FFE9B8;box-shadow:.4vmin .4vmin 0 rgba(58,42,30,.14)}
+.setup-tpl b{display:block;font-size:2.4vmin;font-weight:900;margin-bottom:.6vmin}
+.setup-tpl span{display:block;font-size:1.9vmin;line-height:1.55;color:#6B5545}
+
+/* ---------- 作息表 ---------- */
+.setup-blocks{border:.26vmin solid #D8C8AE;border-radius:1.4vmin;overflow:hidden}
+.setup-row{
+  display:grid;grid-template-columns:7vmin 1fr 9vmin 9vmin;
+  align-items:center;gap:1vmin;
+  padding:.7vmin 1.2vmin;border-bottom:.16vmin solid #E8DCC6;
+  font-size:2vmin;
+}
+.setup-row:last-child{border-bottom:0}
+.setup-row:nth-child(even){background:#FFFCF2}
+.setup-row.head{
+  background:#F1E4CB;font-weight:800;color:#6B5545;font-size:1.9vmin;
+}
+.setup-row .k{font-weight:800;color:#6B5545}
+.setup-row .t{display:flex;align-items:center;gap:.4vmin}
+.setup-row input{
+  width:11vmin;font-family:inherit;font-size:2vmin;font-variant-numeric:tabular-nums;
+  background:#FFFDF6;border:.22vmin solid #C9B79E;border-radius:.8vmin;
+  padding:.6vmin .8vmin;outline:none;
+}
+.setup-row input:focus{border-color:#3A2A1E}
+.setup-row.bad{background:#FFE3DE}
+.setup-row.bad input{border-color:#DE3B34}
+
+/* ---------- 课表网格 ---------- */
+.setup-grid{border:.26vmin solid #D8C8AE;border-radius:1.4vmin;overflow:hidden}
+.setup-grid-row{display:grid;grid-template-columns:6vmin repeat(5,1fr);gap:.2vmin;background:#E8DCC6}
+.setup-grid-row > *{
+  background:#FFFDF6;padding:.5vmin .6vmin;min-width:0;
+}
+.setup-grid-row.head > *{background:#F1E4CB;font-size:1.9vmin;font-weight:800;color:#6B5545;text-align:center}
+.setup-grid-row .no{font-weight:800;color:#6B5545;display:flex;align-items:center;justify-content:center}
+.setup-grid-row input{
+  width:100%;font-family:inherit;font-size:2vmin;text-align:center;
+  border:0;background:transparent;outline:none;color:#31231A;padding:.6vmin 0;
+}
+.setup-grid-row input:focus{background:#FFF3D0;border-radius:.6vmin}
+
+/* ---------- 完成页 ---------- */
+.setup-sum{
+  border:.26vmin dashed rgba(58,42,30,.3);border-radius:1.4vmin;
+  padding:2vmin 2.4vmin;font-size:2.1vmin;line-height:1.9;background:#FFFCF2;
+}
+.setup-sum b{font-weight:900}
+.setup-actions{display:flex;gap:1.2vmin;flex-wrap:wrap;margin-top:2vmin}
+
+/* ---------- 底部按钮 ---------- */
+.setup-foot{
+  display:flex;align-items:center;gap:1.4vmin;
+  padding:1.8vmin 3.4vmin;border-top:.3vmin dashed rgba(58,42,30,.24);flex:none;
+}
+.setup-btn{
+  font-family:inherit;font-size:2.2vmin;font-weight:800;
+  padding:1.3vmin 2.6vmin;border-radius:1.2vmin;cursor:pointer;
+  border:.3vmin solid #3A2A1E;background:#FFF8E7;color:#31231A;
+  box-shadow:.36vmin .36vmin 0 rgba(58,42,30,.14);
+}
+.setup-btn:hover{background:#FFF3D8}
+.setup-btn:disabled{opacity:.4;cursor:default;box-shadow:none}
+.setup-btn.primary{background:#FFD64F}
+.setup-btn.primary:hover{background:#FFE07A}
+.setup-btn.ghost{border-color:transparent;background:transparent;box-shadow:none;color:#6B5545}
+.setup-foot .grow{flex:1}
+.setup-msg{font-size:1.9vmin;color:#B23A32;font-weight:700}
+.setup-msg.ok{color:#3C7F3A}
