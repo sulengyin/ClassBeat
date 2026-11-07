@@ -306,6 +306,7 @@
       p.appendChild(el("h3", "setup-h", "确认一下"));
       p.appendChild(el("p", "setup-p", "点「应用到这台机器」之前，改的都还只是草稿，屏上不会变。"));
     }
+    if (state.flash) p.appendChild(el("p", "setup-msg ok", state.flash));
 
     var sum = el("div", "setup-sum");
     sum.appendChild(el("div", null, "班级：" + (state.klass || "我的班") + (state.school ? "　·　" + state.school : "")));
@@ -327,9 +328,14 @@
     out.type = "button";
     out.addEventListener("click", exportAll);
     acts.appendChild(out);
+
+    var inp = el("button", "setup-btn", "导入设置 JSON");
+    inp.type = "button";
+    inp.addEventListener("click", pickImport);
+    acts.appendChild(inp);
     p.appendChild(acts);
 
-    p.appendChild(el("p", "setup-p", "导出的是整份设置（含文案和本机偏好），换电脑后在编辑面板里导入就能搬过去。"));
+    p.appendChild(el("p", "setup-p", "导出的是整份设置（含文案和本机偏好）。换电脑后点「导入设置 JSON」，选对方给的这份文件，班级、作息、课表一起搬过来。"));
 
     if (root.Runtime && root.Runtime.ready && !root.Runtime.ready()) {
       p.appendChild(el("p", "setup-msg", "提醒：这个包本身缺配置，应用后仍可能算不出全天。"));
@@ -425,6 +431,63 @@
     } catch (e) {
       alertBox("这个浏览器不支持下载文件，可以先在电脑上打开再导出。");
     }
+  }
+
+  /* ---------- 导入 ----------
+     老师之间传的是一个 JSON，不是一个 zip：文件更小，也不会带进
+     别人包里的旧脚本。选完立刻生效，失败一个字都不改。 */
+  function pickImport() {
+    if (!root.Store || !root.Store.importAll) return;
+    var file = document.createElement("input");
+    file.type = "file";
+    file.accept = ".json,application/json";
+    file.style.cssText = "position:fixed;left:-200px;top:0;width:1px;height:1px;opacity:0";
+    document.body.appendChild(file);
+
+    function drop() {
+      if (file.parentNode) file.parentNode.removeChild(file);
+    }
+
+    file.addEventListener("change", function () {
+      var f = file.files && file.files[0];
+      if (!f) { drop(); return; }
+      if (f.size > 2 * 1024 * 1024) {
+        alertBox("这个文件有 " + Math.round(f.size / 1024) + " KB，不像设置文件。");
+        drop();
+        return;
+      }
+      if (typeof root.FileReader === "undefined") {
+        alertBox("这个浏览器不支持选文件，请在电脑上导入。");
+        drop();
+        return;
+      }
+      var fr = new root.FileReader();
+      fr.onerror = function () {
+        alertBox("文件读不出来，换一个再试。原有设置没有改动。");
+        drop();
+      };
+      fr.onload = function () {
+        drop();
+        var obj = null;
+        try { obj = JSON.parse(String(fr.result)); }
+        catch (e) {
+          alertBox("这个文件不是 JSON，可能选错了。原有设置没有改动。");
+          return;
+        }
+        var r = root.Store.importAll(obj);
+        if (!r.ok) {
+          alertBox("导入失败：" + r.why + "。原有设置没有改动。");
+          return;
+        }
+        state = loadCurrent();
+        state.applied = true;
+        state.flash = "已导入" + (r.klass ? "「" + r.klass + "」的" : "") + "整份设置，屏上已经换过来。";
+        clearDraft();
+        render();
+      };
+      fr.readAsText(f, "utf-8");
+    });
+    file.click();
   }
 
   /* ---------- 开关 ---------- */

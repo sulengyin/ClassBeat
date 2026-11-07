@@ -586,6 +586,13 @@ global.Remote.info.phone = "";
   const cells = inputsIn(box);
   check(cells.length === 35, "第三步是 5×7 课表", cells.length + " 格");
 
+  next()._h.click();
+  const doneBtns = box.querySelectorAll(".setup-btn").map(b => b.textContent);
+  check(doneBtns.indexOf("导出设置 JSON") >= 0, "完成页能导出设置",
+    doneBtns.join(" / "));
+  check(doneBtns.indexOf("导入设置 JSON") >= 0, "完成页能导入另一台机器的设置",
+    doneBtns.join(" / "));
+
   box.querySelector(".setup-x")._h.click();
   check(!box.classList.contains("open"), "「×」能关掉向导");
 })();

@@ -386,30 +386,72 @@
   var EXPORT_FORMAT = "rhythm-config/v1";
 
   function exportAll() {
+    /* 导出整份生效配置，不是只导本机改动：对方可能拿的是另一个包，
+       少了这份，班级作息课表就接不上。 */
+    var full = (root.Runtime && root.Runtime.config) ? root.Runtime.config() : null;
     return {
       format: EXPORT_FORMAT,
       savedAt: new Date().toISOString(),
       texts: read(KEY.texts, {}) || {},
       overrides: read(KEY.overrides, {}) || {},
-      config: config(),
+      config: full || config(),
       phrases: allPhrases(),
       prefs: prefs()
     };
   }
 
+  function isPlain(v) {
+    return !!v && typeof v === "object" && !Array.isArray(v);
+  }
+
+  /* 导入要么整份成功，要么一个字都不写。
+     文件从别的电脑拷过来，可能只对了一半；写进去一半，
+     屏上会变成谁都不是的班，比直接拒绝更难收拾。 */
   function importAll(obj) {
-    if (!obj || typeof obj !== "object") return { ok: false, why: "文件不是有效的设置" };
+    if (!isPlain(obj)) return { ok: false, why: "文件不是有效的设置" };
     if (obj.format !== EXPORT_FORMAT) return { ok: false, why: "不是本程序导出的设置文件" };
 
-    var n = 0;
-    if (obj.texts && typeof obj.texts === "object") { write(KEY.texts, obj.texts); n++; }
-    if (obj.overrides && typeof obj.overrides === "object") { write(KEY.overrides, obj.overrides); n++; }
-    if (obj.config && typeof obj.config === "object") { write(KEY.config, obj.config); n++; }
-    if (Array.isArray(obj.phrases)) { write(KEY.phrases, trimPhrases(obj.phrases)); n++; }
-    if (obj.prefs && typeof obj.prefs === "object") { write(KEY.prefs, obj.prefs); n++; }
-    if (!n) return { ok: false, why: "文件里没有可导入的内容" };
+    var plan = [];
+    if ("texts" in obj) {
+      if (!isPlain(obj.texts)) return { ok: false, why: "设置里的「文字」格式不对" };
+      plan.push([KEY.texts, obj.texts]);
+    }
+    if ("overrides" in obj) {
+      if (!isPlain(obj.overrides)) return { ok: false, why: "设置里的「临时调整」格式不对" };
+      plan.push([KEY.overrides, obj.overrides]);
+    }
+    if ("config" in obj) {
+      var c = obj.config;
+      if (!isPlain(c)) return { ok: false, why: "设置里的「班级配置」格式不对" };
+      if ("timetable" in c && (!isPlain(c.timetable) || !Array.isArray(c.timetable.blocks))) {
+        return { ok: false, why: "设置里的「作息表」格式不对" };
+      }
+      if ("schedule" in c && (!isPlain(c.schedule) || !Array.isArray(c.schedule.entries))) {
+        return { ok: false, why: "设置里的「课表」格式不对" };
+      }
+      plan.push([KEY.config, c]);
+    }
+    if ("phrases" in obj) {
+      if (!Array.isArray(obj.phrases)) return { ok: false, why: "设置里的「常用话术」格式不对" };
+      plan.push([KEY.phrases, trimPhrases(obj.phrases)]);
+    }
+    if ("prefs" in obj) {
+      if (!isPlain(obj.prefs)) return { ok: false, why: "设置里的「本机偏好」格式不对" };
+      plan.push([KEY.prefs, obj.prefs]);
+    }
+    if (!plan.length) return { ok: false, why: "文件里没有可导入的内容" };
+
+    /* 校验全过才落盘。写入失败（配额满）时 write 只在内存里兜底，
+       这里不逐项报错，回读一次班级名足以判断是否真的进去了。 */
+    plan.forEach(function (kv) { write(kv[0], kv[1]); });
+    write(KEY.history, {});          // 撤销栈是旧配置下的快照，不能留
+
     if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
-    return { ok: true, n: n };
+    if (root.Screen && root.Screen.render) root.Screen.render();
+
+    var meta = (obj.config && obj.config.meta) || {};
+    var sch = (obj.config && obj.config.schedule) || {};
+    return { ok: true, n: plan.length, klass: meta.klass || sch.class || "" };
   }
 
   var api = {

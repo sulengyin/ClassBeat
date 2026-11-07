@@ -147,6 +147,42 @@ const rOk = S.importAll(JSON.parse(JSON.stringify(dump)));
 check(rOk.ok === true && S.texts().breakTitle === "课间休息",
   "导入后文字回来了", "n=" + rOk.n);
 
+/* ---------- 导入的原子性：坏文件不能写进去一半 ---------- */
+S.patchTexts({ breakTitle: "本机原样" });
+const beforeTitle = S.texts().breakTitle;
+const rHalf = S.importAll({
+  format: "rhythm-config/v1",
+  texts: { breakTitle: "别人的班" },
+  config: { timetable: { blocks: "坏掉的" } }
+});
+check(rHalf.ok === false, "作息结构坏掉时整份拒绝", rHalf.why);
+check(S.texts().breakTitle === beforeTitle, "拒绝后文字没被改", S.texts().breakTitle);
+check(!S.config().timetable || Array.isArray(S.config().timetable.blocks),
+  "拒绝后配置也没被改");
+
+const rArr = S.importAll({ format: "rhythm-config/v1", texts: ["不是对象"] });
+check(rArr.ok === false, "文字不是对象时拒绝", rArr.why);
+const rFmt = S.importAll({ format: "别的程序/v1", texts: {} });
+check(rFmt.ok === false, "格式标记不对时拒绝", rFmt.why);
+
+const rGood = S.importAll({
+  format: "rhythm-config/v1",
+  texts: { breakTitle: "导入的班" },
+  phrases: ["站队", "安静"]
+});
+check(rGood.ok === true && S.texts().breakTitle === "导入的班",
+  "合法文件整份导入", "n=" + rGood.n);
+
+/* ---------- 换电脑：A 导出、B 导入，班级和作息都要对上 ---------- */
+S.patchConfig({ meta: { klass: "搬家测试班" } });
+const move = JSON.parse(JSON.stringify(S.exportAll()));
+S.resetConfig();
+const rMove = S.importAll(move);
+check(rMove.ok === true && (S.config().meta || {}).klass === "搬家测试班",
+  "导入后班级名对上", rMove.klass);
+check(Array.isArray((S.config().timetable || {}).blocks),
+  "导入后作息表还在", String(((S.config().timetable || {}).blocks || []).length) + " 段");
+
 /* ---------- 烤进包里的文字不能被一次小修改抹掉 ---------- */
 D.texts = {
   reading: { "4": { subject: "英语" } },
