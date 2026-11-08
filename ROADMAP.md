@@ -145,7 +145,8 @@ GET  /api/pair    配对信息（IP + 端口 + 一次性码）
 - ✅ **GitHub Actions**：`.github/workflows/ci.yml`，用 `sample/` 构建后跑 139 项测试 + 隐私扫描。
 - ⬜ 分目录 `web/`：暂缓。改名会牵动 20 多处相对路径，而收益只是好看；
   等阶段 1 引擎换掉 `data.js` 时一起做，那时有 CI 兜着。
-- ⬜ 配置加 `schemaVersion` + 迁移函数（老版本 localStorage 能升级）——阶段 2 做，现在还没有旧版本要兼容。
+- ✅ 配置加 `schemaVersion` + 迁移函数（老版本 localStorage 能原地升级）。当前 v1；
+  导出带版本号，导入旧备份自动升级、更高版本整份拒绝；`tools/test_store.js` 已覆盖。
 - ⬜ 设备兼容基线 `docs/compat.md`：等一体机真机跑过再写，现在的数据是空的。
 
 **验收**：`grep -r` 扫不到具体班名 ✅；干净 clone 后 `python3 tools/bundle.py` 能直接用 `sample/` 起来 ✅。
