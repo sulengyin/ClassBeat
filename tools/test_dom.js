@@ -254,6 +254,15 @@ check((seen["08:30"] || "").indexOf("语文") > 0, "第 1 节语文上屏", seen
 check(seen["10:24"] !== seen["10:12"], "焦点随时间真的变了",
   seen["10:12"] + " → " + seen["10:24"]);
 
+/* 周末 / 节假日没有时间线：脊柱留空，但重绘不能抛错。
+   真浏览器在周六验收配置向导时，这里会把「应用」误判成写入失败。 */
+global.__rhythmDate = "2026-11-07";
+global.__rhythmTime = 10 * 60;
+let holidayErr = null;
+try { Screen.render(); } catch (e) { holidayErr = e; }
+check(!holidayErr, "周末重绘不报错", holidayErr ? holidayErr.message : "无异常");
+check(heroText() === "今天不上学", "周末主视觉仍是「今天不上学」", heroText());
+
 /* 早读：7:30–8:10 是真实的一段；提醒事项单独一块，比建议更醒目 */
 global.__rhythmDate = "2026-11-05";
 global.__rhythmTime = 7 * 60 + 30;
@@ -824,6 +833,11 @@ global.Remote.info.phone = "";
     "改的班名写进了本机配置", landed.meta && landed.meta.klass);
   check(landed.timetable && landed.timetable.blocks[0].start === "07:40",
     "改的作息也落盘了", landed.timetable && landed.timetable.blocks[0].start);
+
+  /* 应用后不用刷新，抬头当场就是新班名（B5 真浏览器验收时补上的） */
+  Screen.render();
+  check(document.getElementById("cls").textContent === "测试二班",
+    "应用后不刷新抬头就换班名", document.getElementById("cls").textContent);
 
   /* 用一个完全干净的 window 重放页面脚本，等价于刷新 */
   const fresh = { console, localStorage: global.localStorage };

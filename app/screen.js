@@ -178,14 +178,18 @@
   /* ---------- 一日脊柱：今天走到哪儿 ---------- */
   function buildSpine(day) {
     if (!el.spine) return;
-    var key = day.date + "|" + day.timeline.length;
+    /* 周末 / 节假日没有时间线，脊柱留空；不能拿 undefined 去读 length，
+       否则当天每一次重绘都会抛错，连配置向导的「应用」都会被当成写入失败。 */
+    var t = day.timeline || [];
+    var key = day.date + "|" + t.length;
     if (key === spineKey) return;
     spineKey = key;
 
     el.spine.innerHTML = "";
     spineSegs = [];
+    el.mark = null;
+    if (!t.length) return;
 
-    var t = day.timeline;
     spineFrom = R.t2m(t[0].start);
     var end = R.t2m(t[t.length - 1].end);
     spineSpan = Math.max(1, end - spineFrom);
@@ -390,6 +394,9 @@
   /* ---------- 主渲染 ---------- */
   function render() {
     if (!el.main) return;
+
+    /* 班名也会被配置向导 / 导入当场改掉，不能只在 boot 时写一次 */
+    setText(el.cls, CFG.klass());
 
     var key = todayKey();
     /* 现算，不再从预生成的 days 里查：改作息、跨午夜都不需要重新打包 */
