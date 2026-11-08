@@ -409,10 +409,10 @@
 
     if (!day) {
       el.warn.classList.add("show");
-      setText(el.warnTitle, RT && RT.ready() ? "今天算不出来（" + key + "）" : "配置还没生成");
+      setText(el.warnTitle, RT && RT.ready() ? "今天算不出来（" + key + "）" : "还没有配置班级");
       el.warnText.innerHTML = RT && RT.ready()
         ? "数据里有写不通的地方，先在浏览器控制台看报错。"
-        : "请在电脑上运行：<br><code>python3 tools/bundle.py</code>";
+        : "这个包还没有作息和课表。<br>点右下角「⋯ → 配置班级」，四步填出你自己的班，填完立刻生效。";
       setText(el.bandText, ""); setHeroText("");
       setText(el.heroSub, ""); setText(el.after, ""); el.chips.innerHTML = ""; el.duty.innerHTML = "";
       return;

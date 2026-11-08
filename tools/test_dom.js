@@ -801,6 +801,71 @@ global.Remote.info.phone = "";
   box.querySelector(".setup-x")._h.click();
   check(!box.classList.contains("open"), "「×」能关掉向导");
 
+  /* ---------- B5：改班名 → 课表落盘 → 刷新仍在 ----------
+     向导只写 localStorage；"刷新"在 node 里用一个干净的 window 重放
+     data.js + store.js + runtime.js 来模拟，不依赖真实浏览器。 */
+  localStorage.removeItem("rhythm.setup.draft.v1");
+  btn._h.click();
+  const nameInput = inputsIn(box)[1];
+  nameInput.value = "测试二班";
+  nameInput._h.input();
+  next()._h.click();
+
+  const startInput = inputsIn(box)[0];
+  startInput.value = "07:40";
+  startInput._h.change();
+  next()._h.click();
+  next()._h.click();
+  box.querySelectorAll(".setup-btn").filter(b => b.textContent === "应用到这台机器")[0]._h.click();
+  box.querySelectorAll(".setup-btn").filter(b => b.textContent === "确认保存")[0]._h.click();
+
+  const landed = JSON.parse(localStorage.getItem("rhythm.config.v1") || "{}");
+  check(landed.meta && landed.meta.klass === "测试二班",
+    "改的班名写进了本机配置", landed.meta && landed.meta.klass);
+  check(landed.timetable && landed.timetable.blocks[0].start === "07:40",
+    "改的作息也落盘了", landed.timetable && landed.timetable.blocks[0].start);
+
+  /* 用一个完全干净的 window 重放页面脚本，等价于刷新 */
+  const fresh = { console, localStorage: global.localStorage };
+  fresh.window = fresh; fresh.self = fresh;
+  ["app/data.js", "app/engine/schedule.js", "app/clock.js", "app/config.js", "app/store.js", "app/runtime.js"]
+    .forEach(f => new Function("window", "self", "module", "exports", "localStorage", "console",
+      fs.readFileSync(path.join(ROOT, f), "utf8"))(fresh, fresh, undefined, undefined, global.localStorage, console));
+  check(fresh.Runtime.config().meta.klass === "测试二班", "刷新后班名还在",
+    fresh.Runtime.config().meta.klass);
+  check(fresh.Runtime.config().timetable.blocks[0].start === "07:40",
+    "刷新后作息还在", fresh.Runtime.config().timetable.blocks[0].start);
+  check(fresh.CFG.klass() === "测试二班", "刷新后屏上抬头用的是新班名", fresh.CFG.klass());
+  const freshDay = fresh.Runtime.day("2026-11-09");
+  check(!!freshDay && freshDay.timeline[0].start === "07:40",
+    "刷新后当天时间线按新作息算", freshDay && freshDay.timeline[0].start);
+
+  box.querySelector(".setup-x")._h.click();
+  localStorage.removeItem("rhythm.setup.draft.v1");
+  global.Store.resetConfig();
+
+  /* ---------- B5：空配置自动进向导 ---------- */
+  const baked = window.RHYTHM_DATA;
+  delete window.RHYTHM_DATA;
+  loadBrowserScript("app/setup.js");
+  check(box.classList.contains("open"), "空配置打开页面就直接进向导");
+  check(document.body.dataset.setup === "1", "向导打开时主屏的提示先让位");
+  const blankName = inputsIn(box)[1];
+  blankName.value = "空包测试班";
+  blankName._h.input();
+  next()._h.click();
+  check(box.querySelectorAll(".setup-row").length > 20,
+    "空包第二步已经套上一套模板，不是空表",
+    String(box.querySelectorAll(".setup-row").length));
+  box.querySelector(".setup-x")._h.click();
+  check(document.body.dataset.setup === "", "关掉向导后主屏提示恢复");
+
+  window.RHYTHM_DATA = baked;
+  localStorage.removeItem("rhythm.setup.draft.v1");
+  global.Store.resetConfig();
+  loadBrowserScript("app/setup.js");
+  check(!box.classList.contains("open"), "配置齐全时启动不自动弹向导");
+
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
 })();
