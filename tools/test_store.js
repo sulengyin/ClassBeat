@@ -241,6 +241,47 @@ check(confRoles.map(function (r) { return r.id; }).indexOf("r14")
   "保存后本机配置按新顺序生效", "r14 在 r18 之前");
 S.resetConfig();
 
+/* 人群组：只存老师显式「存成组」的点名组，排班组不落库（PLAN 2.18） */
+var g0 = S.upsertGroup([], {
+  id: "g1", name: "  放学留下  ",
+  memberIds: ["s01", "s02", "s01", ""]
+});
+check(g0.length === 1 && g0[0].name === "放学留下" && g0[0].memberIds.length === 2,
+  "存组会去掉首尾空白、成员去重", JSON.stringify(g0.map(function (g) { return g.memberIds; })));
+check(S.upsertGroup([], { id: "g2", name: "", memberIds: ["s01"] }).length === 0
+      && S.upsertGroup([], { id: "g3", name: "临时", memberIds: [] }).length === 0,
+  "没名字或没成员不存", "空组被丢掉");
+check(S.upsertGroup([], { id: "g4", name: "排班", source: "role", memberIds: ["s01"] }).length === 0,
+  "排班组不落库，按岗位实时取人", "source:role 被拒绝");
+
+var g0b = S.upsertGroup(g0, { id: "g1", name: "放学留下", memberIds: ["s03"] });
+check(g0b.length === 1 && g0b[0].memberIds[0] === "s03",
+  "同 id 再存是改名/换人，不新增一条", JSON.stringify(g0b[0].memberIds));
+check(S.removeGroup(g0b, "g1").length === 0, "删组按 id 只删这一条", "剩 0 条");
+
+var savedGroup = S.saveGroup({
+  id: "g9", name: "值日组", memberIds: ["s01", "s02"], order: 0
+});
+var savedConf = S.config().peopleGroups;
+check(savedGroup.ok && savedConf.length === 1 && savedConf[0].name === "值日组",
+  "saveGroup 写入本机配置", "1 条");
+check(S.exportAll().config.peopleGroups.length === 1,
+  "备份导出带上人群组", "peopleGroups 在 config 里");
+S.resetConfig();
+check(S.peopleGroups().length === 0, "重置配置后组也没了", "0 条");
+
+var badGroups = JSON.parse(JSON.stringify(S.exportAll()));
+badGroups.config.peopleGroups = [{ name: "坏人", memberIds: "s01" }];
+check(S.importAll(badGroups).ok === false,
+  "人群组格式不对时整份拒绝导入", "memberIds 不是数组");
+var goodGroups = JSON.parse(JSON.stringify(S.exportAll()));
+goodGroups.config.peopleGroups = [
+  { id: "g9", name: "值日组", source: "manual", memberIds: ["s01"] }
+];
+check(S.importAll(goodGroups).ok === true && S.peopleGroups().length === 1,
+  "合法人群组能随备份恢复", "1 条");
+S.resetConfig();
+
 /* ---------- 配置版本：老备份原地升级，更高版本整份拒绝 ---------- */
 check(S.schemaVersion() === 1, "本机配置版本是 1", String(S.schemaVersion()));
 check(S.exportAll().schemaVersion === 1, "导出文件带版本号", "schemaVersion");

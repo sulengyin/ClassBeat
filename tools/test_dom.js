@@ -518,6 +518,35 @@ check(idx14 >= 0 && idx14 < idx18,
   "▲ 调完顺序立刻进本机配置，且排到同一时刻更前面",
   "r14=" + idx14 + "，r18=" + idx18);
 
+/* 人群组：换人弹窗里点组一次带出整组；临时勾选不落库，显式存组才落库 */
+const cleanLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+cleanLine.children[0]._h.click();
+const groupChips = document.querySelectorAll(".ep-group-chip");
+const roleGroupChip = groupChips.filter(c => c.textContent === "值日组")[0];
+check(!!roleGroupChip && groupChips.length >= 1,
+  "换人弹窗里有「点组带出」，排班组按当天值日实时出人",
+  groupChips.map(c => c.textContent).join("、"));
+const groupsBefore = global.Store.peopleGroups().length;
+roleGroupChip._h.click();
+const groupPicked = document.querySelectorAll(".ep-person.on");
+check(groupPicked.length === 8 && global.Store.peopleGroups().length === groupsBefore,
+  "点「值日组」把整组 8 人一次选上，且没有自动落库",
+  groupPicked.length + " 人，配置里 " + groupsBefore + " 组");
+document.querySelector(".ep-group-name").value = "放学留下";
+document.querySelector(".ep-group-save-btn")._h.click();
+const savedGroup = global.Store.peopleGroups();
+check(savedGroup.length === 1 && savedGroup[0].name === "放学留下"
+      && savedGroup[0].memberIds.length === 8,
+  "点「存成组」才写入本机配置，成员不重复",
+  savedGroup.length + " 组，" + (savedGroup[0] || {}).memberIds.length + " 人");
+const manualChip = document.querySelectorAll(".ep-group-chip")
+  .filter(c => c.textContent === "放学留下")[0];
+check(!!manualChip, "存好的组立刻出现在「点组带出」里");
+document.querySelectorAll(".ep-group-del")[0]._h.click();
+check(global.Store.peopleGroups().length === 0,
+  "删组只删这一条，不动名单", global.Store.peopleGroups().length + " 组");
+
 global.Store.resetConfig();
 global.Edit.close();
 
