@@ -13,6 +13,7 @@
     lock:      "rhythm.lock.v1",
     texts:     "rhythm.texts.v1",
     config:    "rhythm.config.v1",
+    schema:    "rhythm.schema.v1",
     snapshot:  "rhythm.setup.snapshot.v1"
   };
 
@@ -442,6 +443,7 @@
     if (local && local.students) out.students = local.students;
     return {
       format: EXPORT_FORMAT,
+      schemaVersion: configVersion(),
       savedAt: new Date().toISOString(),
       texts: read(KEY.texts, {}) || {},
       overrides: read(KEY.overrides, {}) || {},
@@ -455,12 +457,56 @@
     return !!v && typeof v === "object" && !Array.isArray(v);
   }
 
+  /* ---------- 配置版本与迁移 ----------
+     老师的配置只活在这台机器上；格式一改，老 localStorage 必须能原地升级。
+     每加一版就往 MIGRATIONS 末尾追加一个函数，输入是上一版的配置对象。 */
+  var SCHEMA_VERSION = 1;
+  var MIGRATIONS = [
+    /* 0 → 1：早期配置没有版本号，但结构兼容，补上标记即可。 */
+    function (c) { return c; }
+  ];
+
+  function configVersion() {
+    var v = read(KEY.schema, 0);
+    return (typeof v === "number" && v >= 0 && v === Math.floor(v)) ? v : 0;
+  }
+
+  function migrateConfig(raw, from) {
+    var out = isPlain(raw) ? clone(raw) : {};
+    for (var v = from; v < SCHEMA_VERSION; v++) {
+      if (typeof MIGRATIONS[v] === "function") out = MIGRATIONS[v](out) || out;
+    }
+    return out;
+  }
+
+  function upgrade() {
+    var from = configVersion();
+    if (from >= SCHEMA_VERSION) return from;
+    var raw = read(KEY.config, null);
+    /* 坏成非对象的配置不覆盖，留着现场；版本号照样补上。 */
+    if (isPlain(raw)) write(KEY.config, migrateConfig(raw, from));
+    write(KEY.schema, SCHEMA_VERSION);
+    return SCHEMA_VERSION;
+  }
+
   /* 导入要么整份成功，要么一个字都不写。
      文件从别的电脑拷过来，可能只对了一半；写进去一半，
      屏上会变成谁都不是的班，比直接拒绝更难收拾。 */
   function importAll(obj) {
     if (!isPlain(obj)) return { ok: false, why: "文件不是有效的设置" };
     if (obj.format !== EXPORT_FORMAT) return { ok: false, why: "不是本程序导出的设置文件" };
+
+    var importedVersion = 0;
+    if ("schemaVersion" in obj) {
+      importedVersion = obj.schemaVersion;
+      if (typeof importedVersion !== "number" || importedVersion < 0
+          || importedVersion !== Math.floor(importedVersion)) {
+        return { ok: false, why: "设置里的「版本号」格式不对" };
+      }
+      if (importedVersion > SCHEMA_VERSION) {
+        return { ok: false, why: "设置来自更新的版本（v" + importedVersion + "），请先升级本机再导入" };
+      }
+    }
 
     var plan = [];
     if ("texts" in obj) {
@@ -472,7 +518,7 @@
       plan.push([KEY.overrides, obj.overrides]);
     }
     if ("config" in obj) {
-      var c = obj.config;
+      var c = migrateConfig(obj.config, importedVersion);
       if (!isPlain(c)) return { ok: false, why: "设置里的「班级配置」格式不对" };
       if ("timetable" in c && (!isPlain(c.timetable) || !Array.isArray(c.timetable.blocks))) {
         return { ok: false, why: "设置里的「作息表」格式不对" };
@@ -481,6 +527,7 @@
         return { ok: false, why: "设置里的「课表」格式不对" };
       }
       plan.push([KEY.config, c]);
+      plan.push([KEY.schema, SCHEMA_VERSION]);
     }
     if ("phrases" in obj) {
       if (!Array.isArray(obj.phrases)) return { ok: false, why: "设置里的「常用话术」格式不对" };
@@ -505,6 +552,8 @@
     return { ok: true, n: plan.length, klass: meta.klass || sch.class || "" };
   }
 
+  upgrade();
+
   var api = {
     KEY: KEY, dayKey: dayKey, clone: clone,
     allOverrides: allOverrides, getDayOverride: getDayOverride,
@@ -517,6 +566,7 @@
     textsLocal: textsLocal, setTextsLocal: setTextsLocal, setupSnapshot: setupSnapshot,
     config: config, patchConfig: patchConfig, resetConfig: resetConfig,
     reorderRoles: reorderRoles,
+    schemaVersion: configVersion,
     exportAll: exportAll, importAll: importAll,
     makeChallenge: makeChallenge, lockState: lockState,
     recordFail: recordFail, resetFail: resetFail,
