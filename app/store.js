@@ -408,12 +408,17 @@
     /* 导出整份生效配置，不是只导本机改动：对方可能拿的是另一个包，
        少了这份，班级作息课表就接不上。 */
     var full = (root.Runtime && root.Runtime.config) ? root.Runtime.config() : null;
+    var out = Object.assign({}, full || config());
+    /* 名册修正只存在本机 config 里，Runtime 不认识 students，
+       不单独并进来，换机器备份时老师的修正就丢了。 */
+    var local = read(KEY.config, {});
+    if (local && local.students) out.students = local.students;
     return {
       format: EXPORT_FORMAT,
       savedAt: new Date().toISOString(),
       texts: read(KEY.texts, {}) || {},
       overrides: read(KEY.overrides, {}) || {},
-      config: full || config(),
+      config: out,
       phrases: allPhrases(),
       prefs: prefs()
     };

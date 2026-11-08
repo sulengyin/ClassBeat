@@ -175,13 +175,19 @@ check(rGood.ok === true && S.texts().breakTitle === "导入的班",
 
 /* ---------- 换电脑：A 导出、B 导入，班级和作息都要对上 ---------- */
 S.patchConfig({ meta: { klass: "搬家测试班" } });
+S.patchConfig({ students: [{ name: "孙星野", active: true }, { name: "新同学", active: true }] });
 const move = JSON.parse(JSON.stringify(S.exportAll()));
+check(Array.isArray(move.config.students) && move.config.students.length === 2
+      && move.config.students[1].name === "新同学",
+  "导出带上名册修正", String((move.config.students || []).length));
 S.resetConfig();
 const rMove = S.importAll(move);
 check(rMove.ok === true && (S.config().meta || {}).klass === "搬家测试班",
   "导入后班级名对上", rMove.klass);
 check(Array.isArray((S.config().timetable || {}).blocks),
   "导入后作息表还在", String(((S.config().timetable || {}).blocks || []).length) + " 段");
+check((((S.config().students || [])[1] || {}).name === "新同学"),
+  "导入后名册修正还在", String(((S.config().students || []).length)));
 
 /* ---------- 烤进包里的文字不能被一次小修改抹掉 ---------- */
 D.texts = {
