@@ -282,5 +282,27 @@ check(S.importAll(goodGroups).ok === true && S.peopleGroups().length === 1,
   "合法人群组能随备份恢复", "1 条");
 S.resetConfig();
 
+/* ---------- 配置版本：老备份原地升级，更高版本整份拒绝 ---------- */
+check(S.schemaVersion() === 1, "本机配置版本是 1", String(S.schemaVersion()));
+check(S.exportAll().schemaVersion === 1, "导出文件带版本号", "schemaVersion");
+
+var legacy = S.exportAll();
+delete legacy.schemaVersion;
+legacy.config = { meta: { klass: "旧版班级" }, students: ["同学甲"] };
+var legacyRes = S.importAll(legacy);
+check(legacyRes.ok === true, "没有版本号的旧备份能导入", legacyRes.why || "");
+check(S.schemaVersion() === 1 && S.config().meta.klass === "旧版班级",
+  "导入旧备份后补上版本号，配置原样保留",
+  "v" + S.schemaVersion() + "/" + S.config().meta.klass);
+
+var future = S.exportAll();
+future.schemaVersion = 99;
+var futureRes = S.importAll(future);
+check(futureRes.ok === false && S.config().meta.klass === "旧版班级",
+  "更高版本的备份整份拒绝，不动现有配置", futureRes.why || "");
+
+S.resetConfig();
+check(S.schemaVersion() === 1, "重置配置不回退版本号", "v" + S.schemaVersion());
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);
