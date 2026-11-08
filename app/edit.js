@@ -902,15 +902,27 @@
   }
 
   /* ---------- Tab：值日 ---------- */
+  /* 岗位与顺序都以「本机生效配置」为准：向导导入过的班，岗位可能和出厂包不同。 */
+  function roleDoc() {
+    var cfg = (RT && RT.config) ? RT.config() : null;
+    if (cfg && cfg.roles && cfg.roles.roles) return cfg.roles;
+    return DATA.roles || { roles: [] };
+  }
+
   function renderDuty(ov, key) {
     var sec = h("section", "ep-sec");
     sec.appendChild(h("h3", null, "换人只改这一条"));
     sec.appendChild(h("p", "ep-note", "点一下岗位，从名单里选。改的是今天，不影响以后的排班。"));
+    sec.appendChild(h("p", "ep-note", "▲▼ 调的是同一时刻谁先做，大屏值日条跟着变。"));
 
-    var roles = (DATA.roles && DATA.roles.roles) || [];
+    var doc = roleDoc();
+    var roles = (doc.roles || []).slice().sort(function (a, b) {
+      return (typeof a.order === "number" ? a.order : 0) - (typeof b.order === "number" ? b.order : 0);
+    });
     var list = h("div", "ep-rows");
-    roles.forEach(function (r) {
+    roles.forEach(function (r, i) {
       var changed = ov.roles && ov.roles[r.id];
+      var line = h("div", "ep-rowline");
       var row = h("button", "ep-row" + (changed ? " changed" : ""));
       row.appendChild(h("span", "p", r.name));
 
@@ -923,10 +935,33 @@
       row.appendChild(h("span", "s", who || "未定"));
       row.appendChild(h("span", "x", changed ? "已换" : "换"));
       row.addEventListener("click", function () { openPicker(r, key); });
-      list.appendChild(row);
+      line.appendChild(row);
+
+      var up = h("button", "ep-move", "▲");
+      up.title = "往前挪";
+      up.disabled = i === 0;
+      up.addEventListener("click", function () { moveRole(doc, r, -1); });
+      var down = h("button", "ep-move", "▼");
+      down.title = "往后挪";
+      down.disabled = i === roles.length - 1;
+      down.addEventListener("click", function () { moveRole(doc, r, 1); });
+      line.appendChild(up);
+      line.appendChild(down);
+      list.appendChild(line);
     });
     sec.appendChild(list);
     bodyEl.appendChild(sec);
+  }
+
+  function moveRole(doc, role, delta) {
+    var res = S.reorderRoles(doc.roles || [], role.id, delta);
+    if (!res.changed) { flash(delta < 0 ? "已经排在最前" : "已经排在最后"); return; }
+    var next = {};
+    Object.keys(doc).forEach(function (k) { next[k] = doc[k]; });
+    next.roles = res.roles;
+    S.patchConfig({ roles: next });
+    flash("「" + role.name + "」" + (delta < 0 ? "往前挪了一位" : "往后挪了一位"));
+    renderBody();
   }
 
   /* 换人时候选的排序依据：这个岗位原本是谁，就先出谁。

@@ -114,10 +114,17 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
           border:.26vmin solid #6B5641;background:transparent;color:#C1B09A;cursor:pointer}
 
 .ep-rows{display:flex;flex-direction:column;gap:.8vmin;max-height:54vmin;overflow:auto}
+.ep-rowline{display:flex;align-items:center;gap:.6vmin}
+.ep-rowline .ep-row{flex:1;min-width:0}
 .ep-row{display:flex;align-items:center;gap:1.5vmin;width:100%;text-align:left;
         font:inherit;font-size:2.5vmin;padding:1.3vmin 1.5vmin;border-radius:1.2vmin;
         border:.22vmin solid transparent;background:#2C2017;color:#E2D4BC;cursor:pointer}
 .ep-row.static{cursor:default}
+.ep-move{font:inherit;font-size:2.1vmin;font-weight:900;width:5.2vmin;flex:none;
+         padding:1.1vmin 0;border-radius:1.1vmin;border:.2vmin solid #6B5641;
+         background:#3D2D20;color:#E2D4BC;cursor:pointer}
+.ep-move:disabled{opacity:.35;cursor:default}
+.ep-move:hover:not(:disabled){border-color:#FFD64F;color:#FBF3DF}
 .ep-row:hover{background:#3A2A1E}
 .ep-row.changed{box-shadow:inset .6vmin 0 0 #FFD64F;border-color:#6B5641}
 .ep-row .p{width:15vmin;flex:none;font-weight:800}

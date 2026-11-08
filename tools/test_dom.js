@@ -498,6 +498,26 @@ endTime._h.change();
 check(global.Runtime.day("2026-11-09").timeline[0].end === "08:10",
   "结束早于开始时不写入", global.Runtime.day("2026-11-09").timeline[0].end);
 
+/* 岗位顺序：在「值日」页把「擦窗户」往前挪一位，本机配置立刻记下 */
+const dutyTab = tabs.filter(b => b.textContent === "值日")[0];
+check(!!dutyTab, "面板里有「值日」这一页");
+dutyTab._h.click();
+const roleLines = document.querySelectorAll(".ep-rowline");
+check(roleLines.length === global.Runtime.config().roles.roles.length
+      && roleLines.length >= 10,
+  "每一条岗位都带上下移按钮", roleLines.length + " 条");
+const windowLine = roleLines.filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+check(!!windowLine && windowLine.children.length === 3,
+  "岗位行 = 换人按钮 + ▲ + ▼", windowLine ? windowLine.children.length + " 个子元素" : "没找到");
+windowLine.children[1]._h.click();
+
+const confRoles = global.Runtime.config().roles.roles;
+const idx14 = confRoles.map(r => r.id).indexOf("r14");
+const idx18 = confRoles.map(r => r.id).indexOf("r18");
+check(idx14 >= 0 && idx14 < idx18,
+  "▲ 调完顺序立刻进本机配置，且排到同一时刻更前面",
+  "r14=" + idx14 + "，r18=" + idx18);
+
 global.Store.resetConfig();
 global.Edit.close();
 
