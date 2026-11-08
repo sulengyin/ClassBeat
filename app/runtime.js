@@ -19,6 +19,17 @@
     return (root.Store && root.Store.config) ? root.Store.config() : {};
   }
 
+  /* 空包（没跑过 bundle.py，或刚配完向导）也要能算一天。
+     岗位、准备清单、午间规则缺了就是「没有」，不编造内容：
+     岗位列表空 → 不排值日；清单空 → 不提示带东西；午间只给最普通的休息。 */
+  var EMPTY_NOON = {
+    defaultPreset: "rest",
+    weekRule: {},
+    presets: {
+      rest: { label: "午间", title: "午间休息", items: [], tip: "闭眼趴一会儿，不说话，不追跑" }
+    }
+  };
+
   /* 出厂配置（data.js）+ 本机改动（localStorage），本机优先。
      meta 逐字段合并：改了班名不该把学校名一起抹掉。 */
   function config() {
@@ -28,17 +39,18 @@
       meta: Object.assign({}, d.meta || {}, o.meta || {}),
       timetable: pick("timetable"),
       schedule: pick("schedule"),
-      content: pick("content"),
-      roles: pick("roles"),
-      noon: pick("noon"),
+      content: pick("content") || [],
+      roles: pick("roles") || { roles: [], dutyCycle: {} },
+      noon: pick("noon") || EMPTY_NOON,
       calendar: pick("calendar") || { days: {} }
     };
   }
 
-  /* 配置齐不齐。缺了不是"今天没数据"，是包本身没生成对。 */
+  /* 能不能算一天：作息和课表是必需的，其余都有安全默认值。
+     这样向导在空包上填完立刻就能出屏，不用先跑 bundle.py。 */
   function ready() {
     var c = config();
-    return !!(Engine && c.timetable && c.schedule && c.roles && c.content && c.noon);
+    return !!(Engine && c.timetable && c.schedule);
   }
 
   function day(key) {

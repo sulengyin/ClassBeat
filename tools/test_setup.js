@@ -94,8 +94,26 @@ check(m(T[1].blocks[T[1].blocks.length - 1].end) < m(T[0].blocks[T[0].blocks.len
   "35 / 40 / 45 分钟课的放学时间依次推后",
   T.map(t => t.blocks[t.blocks.length - 1].end).join(" → "));
 
-/* 校验：空、缝隙、倒置 */
+/* ---------- B5：首次启动 ---------- */
 const S = global.Setup;
+const savedReady = global.Runtime.ready;
+global.Runtime.ready = () => false;
+check(S._needsSetup() === true, "缺作息 / 课表时自动进向导");
+global.Runtime.ready = () => true;
+check(S._needsSetup() === false, "配置齐了不打扰老师");
+global.Runtime.ready = savedReady;
+
+/* 空包：没有 blocks 时先套第一套模板，第二步不是一张空表 */
+const savedCfg = global.Runtime.config;
+global.Runtime.config = () => ({});
+const blank = S._loadCurrent();
+global.Runtime.config = savedCfg;
+check(blank.blocks.length > 20 && blank.tplId === T[0].id,
+  "空配置默认套上第一套模板", blank.tplId + " / " + blank.blocks.length + " 段");
+check(blank.klass === "" && blank.entries.length === 0 && blank.roles === null,
+  "空配置不带别人的班名、课表和岗位");
+
+/* 校验：空、缝隙、倒置 */
 check(Object.keys(S._errors([])).length === 0, "空作息不报错");
 check(Object.keys(S._errors(T[0].blocks)).length === 0, "模板本身通过校验");
 

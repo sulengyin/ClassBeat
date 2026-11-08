@@ -1142,16 +1142,22 @@
     var sc = c.schedule || {};
     var roles = clone(c.roles || null);
     var texts = clone(effectiveTexts());
+
+    /* 空包没有作息可改：先套第一套模板，老师只改不一样的地方。
+       不这么做，第二步是一张空表，第三个「下一步」也照样能点过去，
+       最后得到一张没有段的屏。 */
+    var tpl = (!(tt.blocks && tt.blocks.length) && root.RHYTHM_TEMPLATES && root.RHYTHM_TEMPLATES[0]) || null;
+
     return {
       step: 0,
       school: m.school || tt.school || sc.school || "",
       klass: m.klass || sc.class || "",
       head: m.headTeacher || sc.headTeacher || "",
       term: sc.termStart || "",
-      tplId: "",
-      blocks: clone(tt.blocks || []),
-      noonBand: clone(tt.noonBand || null),
-      marks: clone(tt.marks || []),
+      tplId: tpl ? tpl.id : "",
+      blocks: clone(tpl ? tpl.blocks : (tt.blocks || [])),
+      noonBand: clone(tpl ? tpl.noonBand : (tt.noonBand || null)),
+      marks: clone(tpl ? tpl.marks : (tt.marks || [])),
       entries: clone(sc.entries || []),
       roles: roles,
       rolesBase: clone(roles),
@@ -2578,6 +2584,12 @@
     file.click();
   }
 
+  /* 空配置：没有作息或课表就没法出屏，这时直接把向导打开，
+     而不是让老师对着「配置还没生成」自己找入口。 */
+  function needsSetup() {
+    return !(root.Runtime && root.Runtime.ready && root.Runtime.ready());
+  }
+
   /* ---------- 开关 ---------- */
   function open() {
     if (!box) return;
@@ -2585,11 +2597,14 @@
     if (state.applied) state.applied = false;
     box.classList.add("open");
     box.setAttribute("aria-hidden", "false");
+    /* 空包时主屏的「还没配置」提示也在，别让它盖住向导（CSS 里靠这个属性藏起来） */
+    if (document.body) document.body.dataset.setup = "1";
     render();
   }
 
   function close() {
     saveDraft();
+    if (document.body) document.body.dataset.setup = "";
     if (box) {
       box.classList.remove("open");
       box.setAttribute("aria-hidden", "true");
@@ -2604,10 +2619,13 @@
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && box.classList.contains("open")) close();
     });
+    if (needsSetup()) open();
   }
 
   root.Setup = {
     open: open, close: close,
+    _needsSetup: needsSetup,
+    _loadCurrent: loadCurrent,
     _errors: function (blocks) { return blockErrors(blocks); },
     /* 纯函数给 node 测试用：不碰 DOM，也不读写 localStorage */
     _freqText: freqText,

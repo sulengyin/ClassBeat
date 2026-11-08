@@ -13,6 +13,9 @@
 }
 .setup.open{display:flex}
 
+/* 向导开着时，主屏的「还没配置」提示先让位；关掉向导它再回来 */
+body[data-setup="1"] .warn{display:none}
+
 .setup-panel{
   position:relative;
   display:flex;flex-direction:column;
