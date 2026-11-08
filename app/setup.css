@@ -14,6 +14,7 @@
 .setup.open{display:flex}
 
 .setup-panel{
+  position:relative;
   display:flex;flex-direction:column;
   width:min(150vmin,94vw);height:min(88vh,104vmin);
   background:#FFF8E7;color:#31231A;
@@ -142,6 +143,77 @@
 }
 .setup-sum b{font-weight:900}
 .setup-actions{display:flex;gap:1.2vmin;flex-wrap:wrap;margin-top:2vmin}
+
+/* ---------- 岗位 ---------- */
+.setup-src{
+  display:flex;flex-direction:column;gap:.6vmin;
+  border:.26vmin solid #C9B79E;border-left:.9vmin solid #4CA34A;
+  border-radius:1.2vmin;background:#FFFCF2;padding:1.6vmin 2vmin;
+  margin:0 0 2vmin;
+}
+.setup-src b{font-size:2.1vmin;font-weight:900}
+.setup-src span{font-size:1.9vmin;line-height:1.6;color:#6B5545}
+.setup-src.warn{border-left-color:#D98A1F;background:#FFF4DA}
+.setup-src.warn b{color:#9A5B07}
+
+.setup-roles{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(44vmin,1fr));
+  gap:1.4vmin;margin:0 0 2vmin;
+}
+.setup-role{
+  border:.24vmin solid #D8C8AE;border-radius:1.4vmin;
+  background:#FFFDF6;padding:1.2vmin 1.6vmin 0;
+}
+.setup-role-head{
+  display:flex;align-items:center;gap:1vmin;
+  padding:.4vmin 0 .6vmin;border-bottom:.16vmin solid #E8DCC6;
+}
+.setup-role-id{
+  font-size:1.7vmin;font-weight:900;color:#8A7563;
+  background:#F1E4CB;border-radius:.6vmin;padding:.2vmin .8vmin;
+}
+.setup-role-freq{
+  font-size:1.8vmin;font-weight:700;color:#6B5545;
+}
+.setup-role-freq.unset{color:#B23A32}
+.setup-role .setup-field{margin:.6vmin 0}
+.setup-role .setup-field label{width:9vmin;font-size:1.9vmin}
+.setup-role .setup-field input{padding:.8vmin 1.2vmin;font-size:2vmin}
+
+/* ---------- 文案折叠区 ---------- */
+.setup-text-sec{
+  border:.24vmin solid #D8C8AE;border-radius:1.4vmin;
+  background:#FFFDF6;margin:0 0 1.2vmin;overflow:hidden;
+}
+.setup-text-head{
+  display:flex;align-items:baseline;gap:1.4vmin;
+  padding:1.2vmin 1.8vmin;cursor:pointer;
+  background:#F1E4CB;list-style:none;
+}
+.setup-text-head::-webkit-details-marker{display:none}
+.setup-text-head::before{content:"▸";font-size:1.9vmin;color:#6B5545}
+.setup-text-sec[open] .setup-text-head::before{content:"▾"}
+.setup-text-title{font-size:2.1vmin;font-weight:900}
+.setup-text-hint{font-size:1.8vmin;color:#8A7563}
+.setup-text-sec .setup-field{margin:1vmin 1.8vmin}
+.setup-text-sec .setup-field label{width:20vmin;font-size:1.9vmin}
+.setup-text-sec .setup-field input{font-size:2vmin;padding:.9vmin 1.2vmin}
+
+/* ---------- 保存确认 ---------- */
+.setup-confirm{
+  position:absolute;inset:0;z-index:2;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(26,17,10,.45);
+}
+.setup-confirm-card{
+  width:min(78vmin,90%);background:#FFF8E7;
+  border:.36vmin solid #3A2A1E;border-radius:1.8vmin;
+  box-shadow:.8vmin .8vmin 0 rgba(58,42,30,.2);
+  padding:2.4vmin 2.8vmin;
+}
+.setup-confirm-h{font-size:2.5vmin;font-weight:900;margin:0 0 1.6vmin}
+.setup-confirm-line{font-size:1.95vmin;line-height:1.75;color:#6B5545}
+.setup-confirm-acts{display:flex;gap:1.2vmin;justify-content:flex-end;margin-top:2.2vmin}
 
 /* ---------- 底部按钮 ---------- */
 .setup-foot{

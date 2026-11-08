@@ -12,7 +12,8 @@
     picked:    "rhythm.picked.v1",
     lock:      "rhythm.lock.v1",
     texts:     "rhythm.texts.v1",
-    config:    "rhythm.config.v1"
+    config:    "rhythm.config.v1",
+    snapshot:  "rhythm.setup.snapshot.v1"
   };
 
   var mem = {};
@@ -336,6 +337,24 @@
     return {};
   }
 
+  /* 配置向导要用「本机原文案」而不是 texts()：texts() 会把包内默认并进来，
+     拿它做快照，恢复时会把别人的默认写成自己的改动。 */
+  function textsLocal() {
+    var v = read(KEY.texts, null);
+    return (v && Object.keys(v).length) ? v : null;
+  }
+
+  function setTextsLocal(obj) {
+    return write(KEY.texts, (obj && typeof obj === "object") ? obj : {});
+  }
+
+  /* 向导保存前的快照：只放岗位和文案，够还原这两块就行。
+     不带撤销栈、不带班级作息课表——那些有各自的导入导出。 */
+  function setupSnapshot(v) {
+    if (arguments.length) { write(KEY.snapshot, v || null); return v; }
+    return read(KEY.snapshot, null);
+  }
+
   /* ---------- 本机配置：作息 / 课表 / 班级信息 ---------- */
   /* data.js 里的配置是出厂值，老师在设置里改的存这里，读时盖在出厂值上。
      整块替换而不是逐字段深合并：一张作息表改一条边界，本来就是整表重写，
@@ -463,6 +482,7 @@
     recall: recall, remember: remember, allPhrases: allPhrases, removePhrase: removePhrase,
     findTimeWords: findTimeWords,
     texts: texts, patchTexts: patchTexts, resetTexts: resetTexts,
+    textsLocal: textsLocal, setTextsLocal: setTextsLocal, setupSnapshot: setupSnapshot,
     config: config, patchConfig: patchConfig, resetConfig: resetConfig,
     exportAll: exportAll, importAll: importAll,
     makeChallenge: makeChallenge, lockState: lockState,

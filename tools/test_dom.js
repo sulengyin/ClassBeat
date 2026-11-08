@@ -593,6 +593,19 @@ global.Remote.info.phone = "";
   check(doneBtns.indexOf("导入设置 JSON") >= 0, "完成页能导入另一台机器的设置",
     doneBtns.join(" / "));
 
+  /* B4a：第四步列出岗位卡片和可折叠的文案分组，仍然只有四步 */
+  const roleCards = box.querySelectorAll(".setup-role");
+  const bakedRoles = (window.RHYTHM_DATA.roles || {}).roles || [];
+  check(roleCards.length === bakedRoles.length, "第四步按岗位逐个列卡片",
+    roleCards.length + " / " + bakedRoles.length);
+  check(box.querySelectorAll(".setup-src").length === 1, "第四步标明岗位来源班");
+  check(box.querySelectorAll(".setup-text-sec").length >= 4, "第四步有可折叠的文案分组",
+    String(box.querySelectorAll(".setup-text-sec").length));
+  check(doneBtns.indexOf("恢复至修改前") >= 0, "完成页有恢复快照的入口",
+    doneBtns.join(" / "));
+  check(inputsIn(box).length > 35, "岗位和文案都能直接编辑",
+    String(inputsIn(box).length));
+
   box.querySelector(".setup-x")._h.click();
   check(!box.classList.contains("open"), "「×」能关掉向导");
 })();

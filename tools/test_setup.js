@@ -12,10 +12,18 @@ function check(ok, title, detail) {
 }
 
 global.window = global;
+
+/* 内存版 localStorage：B4a 要验证“写进去、读回来”和失败回滚 */
+const mem = {};
 global.localStorage = {
-  getItem() { return null; },
-  setItem() {},
-  removeItem() {}
+  getItem(k) { return mem[k] === undefined ? null : mem[k]; },
+  setItem(k, v) { mem[k] = String(v); },
+  removeItem(k) { delete mem[k]; }
+};
+
+global.RHYTHM_DATA = {
+  texts: { reminders: { default: "戴好红领巾，打扫好个人卫生" } },
+  meta: { klass: "五（1）班" }
 };
 
 function load(f) {
@@ -23,6 +31,25 @@ function load(f) {
 }
 load("app/templates.js");
 load("app/setup.js");
+load("app/store.js");
+
+/* 和 runtime.js 同样的合并顺序：本机优先，包内兜底 */
+const BAKED = { meta: { klass: "五（1）班" }, roles: null };
+global.Screen = { render() {} };
+global.Runtime = {
+  config() {
+    const o = global.Store.config();
+    const pick = k => o[k] !== undefined ? o[k] : BAKED[k];
+    return {
+      meta: Object.assign({}, BAKED.meta, o.meta || {}),
+      timetable: pick("timetable"), schedule: pick("schedule"),
+      content: pick("content"), roles: pick("roles"), noon: pick("noon")
+    };
+  },
+  patch(p) { global.Store.patchConfig(p); },
+  reload() {},
+  ready() { return true; }
+};
 
 const T = global.RHYTHM_TEMPLATES;
 check(Array.isArray(T) && T.length === 3, "三套作息模板都在", T && T.length);
@@ -79,6 +106,85 @@ const backBlocks = JSON.parse(JSON.stringify(T[0].blocks));
 backBlocks[2].end = backBlocks[2].start;
 const backErrs = S._errors(backBlocks);
 check(!!backErrs[2], "结束等于开始算倒置", JSON.stringify(backErrs));
+
+/* ---------- B4a：岗位 / 文案 ---------- */
+const S2 = global.Setup;
+const STORE = global.Store;
+const roleSet = JSON.parse(fs.readFileSync(path.join(ROOT, "sample/roles.json"), "utf8"));
+const clone = v => JSON.parse(JSON.stringify(v));
+
+check(/不产生提醒/.test(S2._freqText({ kind: "unset" })), "unset 岗位明确说不产生提醒",
+  S2._freqText({ kind: "unset" }));
+check(S2._freqText({ kind: "daily", times: ["07:50"] }).indexOf("07:50") >= 0,
+  "有频率的岗位照实显示时间");
+
+const edited = S2._editRole(roleSet, "r01", "duty", "改成新的职责");
+const r01 = edited.roles.filter(r => r.id === "r01")[0];
+const r01old = roleSet.roles.filter(r => r.id === "r01")[0];
+check(r01.duty === "改成新的职责" && r01.name === "路队长"
+      && r01.people.length === 2 && r01.freq.kind === "event" && r01.order === 90,
+  "岗位只改职责：ID / 名称 / 人员 / 频率 / 顺序都不动", r01.duty);
+check(edited.roles.length === roleSet.roles.length, "岗位数量不变", String(edited.roles.length));
+check(r01old.duty === "提醒静齐排队，清点人数，有序进场", "原岗位对象没有被就地改掉");
+check(S2._roleChangedCount(edited, roleSet) === 1, "改动计数按字段算", String(S2._roleChangedCount(edited, roleSet)));
+
+const baseTexts = {
+  reminders: { default: "戴好红领巾", 1: "周一提醒" },
+  stage: { before: { title: "早上好", note: "交作业" } },
+  reading: { 1: { subject: "语文", task: "读第 5 课" } }
+};
+const curTexts = clone(baseTexts);
+curTexts.reminders.default = "换了提醒";
+delete curTexts.stage;
+const tp = S2._textPatch(curTexts, baseTexts);
+check(tp.reminders && tp.reminders.default === "换了提醒" && tp.reminders[1] === "周一提醒",
+  "文案只提交改过的组，组内没改的键还在");
+check(tp.stage === null, "清空整组时提交 null");
+check(!("reading" in tp), "没动过的组不提交");
+
+const baseBreak = { breakTitle: "课间", prepLabel: "准备好" };
+const curBreak = { breakTitle: "歇一会儿", prepLabel: "准备好", breakActions: ["喝水", "上厕所"] };
+const tpBreak = S2._textPatch(curBreak, baseBreak);
+check(tpBreak.breakTitle === "歇一会儿" && tpBreak.breakActions.length === 2
+      && !("prepLabel" in tpBreak), "课间 3 项按项比较，没改的不提交");
+check(S2._textPatch({ breakTitle: "" }, baseBreak).breakTitle === null, "清空大字提交 null");
+
+check(STORE.textsLocal() === null, "没改过时本机文案是空的");
+STORE.setTextsLocal({ reminders: { default: "本机改过" } });
+check(STORE.textsLocal().reminders.default === "本机改过", "原始文案能原样读回");
+check(STORE.texts().reminders.default === "本机改过", "生效文案优先用本机改动");
+
+STORE.patchTexts({ reminders: { default: "再改一次", 1: "周一提醒" } });
+check(STORE.textsLocal().reminders.default === "再改一次"
+      && STORE.textsLocal().reminders[1] === "周一提醒",
+  "patchTexts 仍是“从当前生效文案起步”的合并语义");
+
+STORE.setupSnapshot({ savedAt: "t", roles: { id: "x" }, texts: { a: 1 } });
+check(STORE.setupSnapshot().roles.id === "x" && STORE.setupSnapshot().texts.a === 1,
+  "快照能存能取");
+STORE.setupSnapshot(null);
+check(STORE.setupSnapshot() === null, "快照能清空");
+
+const okRoles = S2._editRole(roleSet, "r02", "name", "省电小队长");
+check(S2._commit(okRoles, { reminders: { default: "新提醒" } }) === true, "岗位和文案能写入");
+check(global.Runtime.config().roles.roles[1].name === "省电小队长", "写入后读回岗位一致");
+check(STORE.textsLocal().reminders.default === "新提醒", "写入后读回文案一致");
+check(!!STORE.setupSnapshot().savedAt, "写入前留了快照");
+
+const beforeRoles = clone(global.Runtime.config().roles);
+const origPatch = STORE.patchTexts;
+STORE.patchTexts = function () { throw new Error("quota"); };
+const failOk = S2._commit(S2._editRole(okRoles, "r03", "name", "不该生效"), { reminders: { default: "不该写进去" } });
+STORE.patchTexts = origPatch;
+check(failOk === false, "写入失败返回 false");
+check(JSON.stringify(global.Runtime.config().roles) === JSON.stringify(beforeRoles),
+  "失败时岗位回到写入前");
+check(STORE.textsLocal().reminders.default === "新提醒", "失败时文案回到写入前");
+
+STORE.setTextsLocal({ reminders: { default: "独自改的" } });
+STORE.patchTexts({ reminders: null });
+check(STORE.texts().reminders.default === "戴好红领巾，打扫好个人卫生",
+  "清空组后回落到包内默认");
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);
