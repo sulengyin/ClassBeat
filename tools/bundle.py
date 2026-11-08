@@ -37,6 +37,7 @@ def read(data_dir: Path, name: str, default=None):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", help="数据目录，默认 data/，没有就用 sample/")
+    ap.add_argument("--out", help="输出路径，默认 app/data.js")
     args = ap.parse_args()
 
     data_dir = Path(args.data).resolve() if args.data else DATA
@@ -83,7 +84,7 @@ def main() -> None:
             payload["texts"] = texts
             print(f"已并入 {baked.relative_to(ROOT)}：{len(texts)} 组文字")
 
-    out = ROOT / "app" / "data.js"
+    out = Path(args.out).resolve() if args.out else ROOT / "app" / "data.js"
     with out.open("w", encoding="utf-8") as f:
         f.write("/* 由 tools/bundle.py 生成，不要手改 */\n")
         f.write("window.RHYTHM_DATA=")

@@ -204,7 +204,10 @@ function loadVendor(f, name) {
 
 loadVendor("app/vendor/qrcode.min.js", "qrcode");
 
-["app/data.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/demo.js", "app/templates.js", "app/setup.js"]
+/* 固定夹具，不读 app/data.js：本机 app/data.js 是真实班级，CI 是 sample，
+   两种数据跑同一套断言必然一边红。夹具由
+   `python3 tools/bundle.py --data sample --out tools/fixtures/data.sample.js` 生成。 */
+["tools/fixtures/data.sample.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/demo.js", "app/templates.js", "app/setup.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");

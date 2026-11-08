@@ -1,0 +1,73 @@
+name: Release
+
+# 手动跑 = 只验证「这份代码能不能打出完整的包」，产物进 artifact；
+# 打 tag（v*）= 同上，并把 zip 和单文件版挂到 GitHub Release。
+#
+# 仓库里没有 data/，一律用 sample/ 的化名班级构建。包名会带「五1班」，
+# 老师装上后首次打开自动进配置向导，改成自己的班即可。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TZ: Asia/Shanghai          # 包名里的日期用北京时间，不要跟着 runner 走 UTC
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # 免安装运行时约 11 MB，从 python.org 下载。缓存住，
+      # 手动验证时不用每次都等这一下。
+      - name: 缓存免安装 Python
+        uses: actions/cache@v6
+        with:
+          path: tools/vendor
+          key: python-embed-3.12.10
+
+      - name: 用示例班级构建配置
+        run: python3 tools/bundle.py --data sample
+
+      - name: 打包（含免安装 Python）
+        run: python3 tools/package.py
+
+      - name: 检查产物
+        run: |
+          set -e
+          ls -lh dist
+          zip=$(ls dist/*.zip | head -1)
+          unzip -l "$zip" | grep -q "server/python/python.exe"
+          unzip -l "$zip" | grep -q "启动手机服务.bat"
+          unzip -l "$zip" | grep -q "app/setup.js"
+          echo "zip=$zip" >> "$GITHUB_ENV"
+          echo "已确认：$zip 自带运行时、手机服务、配置向导"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v7
+        with:
+          name: classbeat-package
+          path: |
+            dist/*.zip
+            dist/*单文件版.html
+          retention-days: 30
+
+      - name: 发布到 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "$zip" dist/*单文件版.html \
+            --title "ClassBeat $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
