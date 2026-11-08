@@ -147,6 +147,20 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
            border:.24vmin solid #6B5641;background:#3D2D20;color:#E2D4BC;cursor:pointer}
 .ep-person.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10;font-weight:900}
 
+.ep-groups{display:flex;flex-wrap:wrap;gap:.8vmin;align-items:center;margin-bottom:1.3vmin}
+.ep-groups-label{font-size:2vmin;color:#8E7B66;letter-spacing:.12em;margin-right:.4vmin}
+.ep-group{display:inline-flex;align-items:center;gap:.2vmin}
+.ep-group-chip{font:inherit;font-size:2.2vmin;font-weight:800;padding:.9vmin 1.4vmin;
+               border-radius:1vmin;border:.24vmin solid #6B5641;background:#3D2D20;
+               color:#E2D4BC;cursor:pointer}
+.ep-group-chip:hover{background:#4A3728;border-color:#A08A6E}
+.ep-group-del{font:inherit;font-size:2vmin;line-height:1;padding:.7vmin .9vmin;
+              border-radius:1vmin;border:.24vmin solid #6E3A32;background:transparent;
+              color:#F08A7E;cursor:pointer}
+.ep-group-del:hover{background:#402A22}
+.ep-group-save{display:flex;gap:.9vmin;align-items:center;margin-top:1.4vmin}
+.ep-group-save .ep-input{flex:1;min-width:0;font-size:2.3vmin;padding:1.1vmin 1.3vmin;margin-bottom:0}
+
 .ep-flash{position:fixed;left:50%;bottom:6vmin;transform:translate(-50%,2vmin);
           background:#FFD64F;color:#2B1D10;font-size:2.5vmin;font-weight:900;
           padding:1.4vmin 2.8vmin;border-radius:2vmin;

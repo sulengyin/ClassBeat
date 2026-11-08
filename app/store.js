@@ -360,7 +360,7 @@
      整块替换而不是逐字段深合并：一张作息表改一条边界，本来就是整表重写，
      深合并只会留下「删掉的那一段又冒回来」这种怪事。 */
   var CONFIG_BLOCKS = ["meta", "timetable", "schedule", "roles",
-                       "content", "noon", "calendar", "students"];
+                       "content", "noon", "calendar", "students", "peopleGroups"];
 
   function config() {
     var c = read(KEY.config, null);
@@ -420,6 +420,65 @@
     };
   }
 
+  /* ---------- 人群组（PLAN 2.18） ----------
+     只落库老师显式「存成组」的点名组；排班组（source:role）的成员
+     每次都从岗位实时取，不存快照。临时勾选走弹窗内存，不写这里。 */
+  function normGroup(g) {
+    if (!isPlain(g)) return null;
+    if (g.source !== undefined && g.source !== "manual") return null;
+    var name = String(g.name == null ? "" : g.name).trim();
+    if (!name) return null;
+    var ids = [];
+    (Array.isArray(g.memberIds) ? g.memberIds : []).forEach(function (id) {
+      var v = String(id == null ? "" : id).trim();
+      if (v && ids.indexOf(v) < 0) ids.push(v);
+    });
+    if (!ids.length) return null;
+    return {
+      id: String(g.id == null ? "" : g.id).trim(),
+      name: name,
+      source: "manual",
+      memberIds: ids,
+      order: typeof g.order === "number" ? g.order : 0
+    };
+  }
+
+  /* 同一 id 再存就是改名/换成员，不新增一条 */
+  function upsertGroup(list, g) {
+    var out = (Array.isArray(list) ? list : []).slice();
+    var n = normGroup(g);
+    if (!n || !n.id) return out;
+    var hit = -1;
+    out.forEach(function (x, i) { if (x && x.id === n.id) hit = i; });
+    if (hit >= 0) out[hit] = n; else out.push(n);
+    return out;
+  }
+
+  function removeGroup(list, id) {
+    return (Array.isArray(list) ? list : []).filter(function (g) {
+      return g && g.id !== id;
+    });
+  }
+
+  function peopleGroups() {
+    var list = config().peopleGroups;
+    return Array.isArray(list) ? clone(list) : [];
+  }
+
+  function saveGroup(g) {
+    var n = normGroup(g);
+    if (!n || !n.id) return { ok: false, why: "组名和成员都要有。" };
+    var next = upsertGroup(peopleGroups(), n);
+    patchConfig({ peopleGroups: next });
+    return { ok: true, groups: next };
+  }
+
+  function deleteGroup(id) {
+    var next = removeGroup(peopleGroups(), id);
+    patchConfig({ peopleGroups: next });
+    return next;
+  }
+
   /* ---------- 偏好 ---------- */
   function prefs() { return read(KEY.prefs, { cdMode: "auto", reduce: false }); }
   function setPref(k, v) {
@@ -440,6 +499,7 @@
        不单独并进来，换机器备份时老师的修正就丢了。 */
     var local = read(KEY.config, {});
     if (local && local.students) out.students = local.students;
+    if (local && local.peopleGroups) out.peopleGroups = local.peopleGroups;
     return {
       format: EXPORT_FORMAT,
       savedAt: new Date().toISOString(),
@@ -480,6 +540,15 @@
       if ("schedule" in c && (!isPlain(c.schedule) || !Array.isArray(c.schedule.entries))) {
         return { ok: false, why: "设置里的「课表」格式不对" };
       }
+      if ("peopleGroups" in c) {
+        if (!Array.isArray(c.peopleGroups)) {
+          return { ok: false, why: "设置里的「人群组」格式不对" };
+        }
+        var groupsBad = c.peopleGroups.some(function (g) {
+          return !isPlain(g) || typeof g.name !== "string" || !Array.isArray(g.memberIds);
+        });
+        if (groupsBad) return { ok: false, why: "设置里的「人群组」格式不对" };
+      }
       plan.push([KEY.config, c]);
     }
     if ("phrases" in obj) {
@@ -517,6 +586,8 @@
     textsLocal: textsLocal, setTextsLocal: setTextsLocal, setupSnapshot: setupSnapshot,
     config: config, patchConfig: patchConfig, resetConfig: resetConfig,
     reorderRoles: reorderRoles,
+    peopleGroups: peopleGroups, saveGroup: saveGroup, deleteGroup: deleteGroup,
+    upsertGroup: upsertGroup, removeGroup: removeGroup,
     exportAll: exportAll, importAll: importAll,
     makeChallenge: makeChallenge, lockState: lockState,
     recordFail: recordFail, resetFail: resetFail,

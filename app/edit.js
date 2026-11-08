@@ -973,9 +973,80 @@
     return out.concat(role.substitute || []);
   }
 
+  /* ---------- 人群组：点组带出（PLAN 2.18） ---------- */
+  /* 名单以本机配置为准（向导可能补过），没有再回退到包里的。 */
+  function rosterStudents() {
+    var cfg = S.config ? S.config() : null;
+    var d = cfg && cfg.students ? cfg.students : DATA.students;
+    if (d && Array.isArray(d.students)) return d.students;
+    return Array.isArray(d) ? d : [];
+  }
+
+  function rosterNameIndex(roster) {
+    var byId = {};
+    roster.forEach(function (s) {
+      if (!s || !s.name || s.active === false) return;
+      if (s.id) byId[s.id] = s.name;
+      byId["name:" + s.name] = s.name;
+    });
+    return byId;
+  }
+
+  /* 排班组按 role.grp 实时取人：当天值日条已解析的优先，
+     再加上岗位本身的人（含今天的临时换人），不存成员快照；
+     点名组从 memberIds 取。两边都只认名单里还在用的人。 */
+  function groupDefs(role, key) {
+    var out = [];
+    var day = RT && RT.day ? RT.day(key) : null;
+    var roster = rosterStudents();
+    var keep = {};
+    roster.forEach(function (s) {
+      if (s && s.name && s.active !== false) keep[s.name] = 1;
+    });
+
+    if (role && role.grp) {
+      var names = [];
+      function add(n) {
+        if (n && keep[n] && names.indexOf(n) < 0) names.push(n);
+      }
+      if (day) {
+        (S.applyOverrides(day, S.getDayOverride(key)).duties || []).forEach(function (d) {
+          if (d.grp !== role.grp) return;
+          (d.people || []).forEach(add);
+        });
+      }
+      var ov = (S.getDayOverride(key) || {}).roles || {};
+      (roleDoc().roles || []).forEach(function (r) {
+        if (r.grp !== role.grp) return;
+        var people = (ov[r.id] && ov[r.id].people) ? ov[r.id].people : [];
+        if (!people.length && r.people) people = r.people;
+        if (!people.length && r.peopleMap) {
+          people = Object.keys(r.peopleMap).sort().map(function (k) { return r.peopleMap[k]; });
+        }
+        people.forEach(add);
+      });
+      if (names.length) {
+        out.push({ id: "role:" + role.grp, name: role.grp, source: "role", names: names });
+      }
+    }
+    var byId = rosterNameIndex(roster);
+    (S.peopleGroups ? S.peopleGroups() : []).forEach(function (g) {
+      var names = [];
+      (g.memberIds || []).forEach(function (id) {
+        var n = byId[id];
+        if (n && names.indexOf(n) < 0) names.push(n);
+      });
+      if (names.length) out.push({ id: g.id, name: g.name, source: "manual", names: names });
+    });
+    return out;
+  }
+
   function openPicker(role, key) {
     var wrap = h("div", "ep-dialog picker");
     wrap.appendChild(h("div", "ep-dialog-title", "换人 · " + role.name));
+
+    var groupBox = h("div", "ep-groups");
+    wrap.appendChild(groupBox);
 
     var q = document.createElement("input");
     q.className = "ep-input";
@@ -988,9 +1059,38 @@
     var selected = [];
     var related = relatedNames(role);
 
+    function paintGroupChips() {
+      groupBox.innerHTML = "";
+      var defs = groupDefs(role, key);
+      if (!defs.length) return;
+      groupBox.appendChild(h("span", "ep-groups-label", "点组带出"));
+      defs.forEach(function (g) {
+        var box = h("span", "ep-group");
+        var b = h("button", "ep-group-chip", g.name);
+        b.title = "点一下把这组 " + g.names.length + " 人全选上：" + g.names.join("、");
+        b.addEventListener("click", function () {
+          selected = g.names.slice();
+          g.names.forEach(function (n) { S.markPicked(n); });
+          paint();
+        });
+        box.appendChild(b);
+        if (g.source === "manual") {
+          var x = h("button", "ep-group-del", "×");
+          x.title = "删除这个组";
+          x.addEventListener("click", function () {
+            S.deleteGroup(g.id);
+            paintGroupChips();
+            flash("已删除「" + g.name + "」");
+          });
+          box.appendChild(x);
+        }
+        groupBox.appendChild(box);
+      });
+    }
+
     function paint() {
       grid.innerHTML = "";
-      var res = S.rankStudents(DATA.students || [], q.value, related, 24);
+      var res = S.rankStudents(rosterStudents(), q.value, related, 24);
       if (!res.length) {
         grid.appendChild(h("p", "ep-note", "名单里没有这个人"));
         return;
@@ -1008,7 +1108,44 @@
     }
 
     q.addEventListener("input", paint);
+    paintGroupChips();
     paint();
+
+    /* 只有点了「存成组」才写入配置；临时勾选留在弹窗里，关掉就没。 */
+    var saveRow = h("div", "ep-group-save");
+    var nameInput = document.createElement("input");
+    nameInput.className = "ep-input ep-group-name";
+    nameInput.placeholder = "给这组起个名字，下次一点就带出";
+    saveRow.appendChild(nameInput);
+    var saveGroupBtn = h("button", "ep-mini ep-group-save-btn", "存成组");
+    saveGroupBtn.addEventListener("click", function () {
+      if (!selected.length) { flash("先选人"); return; }
+      var name = (nameInput.value || "").trim();
+      if (!name) { flash("先给这组起个名字"); return; }
+      var roster = rosterStudents();
+      var ids = [];
+      selected.forEach(function (n) {
+        var hit = roster.filter(function (s) {
+          return s && s.name === n && s.active !== false;
+        })[0];
+        if (!hit) return;
+        var id = hit.id ? String(hit.id) : "name:" + hit.name;
+        if (ids.indexOf(id) < 0) ids.push(id);
+      });
+      if (!ids.length) { flash("名单里找不到这些人"); return; }
+      var r = S.saveGroup({
+        id: "g" + Date.now(),
+        name: name,
+        memberIds: ids,
+        order: S.peopleGroups().length
+      });
+      if (!r.ok) { flash(r.why); return; }
+      nameInput.value = "";
+      paintGroupChips();
+      flash("已存成组「" + name + "」");
+    });
+    saveRow.appendChild(saveGroupBtn);
+    wrap.appendChild(saveRow);
 
     var row = h("div", "ep-actrow");
     var save = h("button", "ep-primary", "就是 TA");
