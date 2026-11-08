@@ -211,5 +211,35 @@ for (var j = 0; j < 30; j++) {
 }
 check(okShape, "验证码是三位数 × 一位数", "30 次抽样");
 
+/* ---------- 岗位顺序：班主任定的先后，值日条照它排 ---------- */
+var roleDoc0 = JSON.parse(JSON.stringify(D.roles));
+var orders0 = roleDoc0.roles.map(function (r) { return r.order; }).join(",");
+var movedUp = S.reorderRoles(roleDoc0.roles, "r14", -1);
+check(movedUp.changed === true && movedUp.roles.length === roleDoc0.roles.length,
+  "上移返回整份新岗位表", String(movedUp.roles.length) + " 条");
+check(movedUp.roles.every(function (r, i, a) { return i === 0 || a[i - 1].order < r.order; }),
+  "重排后 order 严格递增（不再并列）",
+  movedUp.roles.map(function (r) { return r.order; }).join(","));
+check(roleDoc0.roles.map(function (r) { return r.order; }).join(",") === orders0,
+  "不改动传入的旧数组", orders0);
+check(movedUp.roles.map(function (r) { return r.id; }).indexOf("r14")
+      < movedUp.roles.map(function (r) { return r.id; }).indexOf("r18"),
+  "擦窗户挪到同一时刻更前面", "r14 在 r18 之前");
+check(S.reorderRoles(roleDoc0.roles, "r07", -1).changed === false
+      && S.reorderRoles(roleDoc0.roles, "r01", 1).changed === false,
+  "排到两头就不再动", "首条上移 / 末条下移都不改");
+check(S.reorderRoles(roleDoc0.roles, "no-such", 1).changed === false,
+  "找不到岗位就原样返回", "no-such");
+
+/* 存进本机配置后，Runtime 立刻按新顺序给屏用 */
+var nextDoc = JSON.parse(JSON.stringify(D.roles));
+nextDoc.roles = movedUp.roles;
+S.patchConfig({ roles: nextDoc });
+var confRoles = RT.config().roles.roles;
+check(confRoles.map(function (r) { return r.id; }).indexOf("r14")
+      < confRoles.map(function (r) { return r.id; }).indexOf("r18"),
+  "保存后本机配置按新顺序生效", "r14 在 r18 之前");
+S.resetConfig();
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

@@ -393,6 +393,33 @@
     return {};
   }
 
+  /* ---------- 岗位顺序 ---------- */
+  /* 值日条按 order 从小到大排（PLAN 2.14），这个先后由班主任定（2.4）。
+     老数据里多条岗位并列同一个 order（比如三个 0），只交换两个数字看不出变化；
+     所以按当前位置换完人，再统一重排成 5、10、15…，相对顺序唯一且可预期。 */
+  function reorderRoles(roles, roleId, delta) {
+    var list = (roles || []).map(function (r, i) {
+      return { role: r, at: i, order: (typeof r.order === "number" ? r.order : i) };
+    }).sort(function (a, b) { return a.order - b.order || a.at - b.at; });
+
+    var from = -1;
+    list.forEach(function (x, i) { if (x.role.id === roleId) from = i; });
+    if (from < 0) return { changed: false, roles: (roles || []).slice() };
+
+    var to = from + (delta < 0 ? -1 : 1);
+    if (to < 0 || to >= list.length) return { changed: false, roles: (roles || []).slice() };
+
+    var tmp = list[from]; list[from] = list[to]; list[to] = tmp;
+    return {
+      changed: true,
+      roles: list.map(function (x, i) {
+        var c = clone(x.role);
+        c.order = (i + 1) * 5;
+        return c;
+      })
+    };
+  }
+
   /* ---------- 偏好 ---------- */
   function prefs() { return read(KEY.prefs, { cdMode: "auto", reduce: false }); }
   function setPref(k, v) {
@@ -489,6 +516,7 @@
     texts: texts, patchTexts: patchTexts, resetTexts: resetTexts,
     textsLocal: textsLocal, setTextsLocal: setTextsLocal, setupSnapshot: setupSnapshot,
     config: config, patchConfig: patchConfig, resetConfig: resetConfig,
+    reorderRoles: reorderRoles,
     exportAll: exportAll, importAll: importAll,
     makeChallenge: makeChallenge, lockState: lockState,
     recordFail: recordFail, resetFail: resetFail,
