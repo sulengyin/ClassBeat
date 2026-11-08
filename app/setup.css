@@ -199,6 +199,101 @@
 .setup-text-sec .setup-field label{width:20vmin;font-size:1.9vmin}
 .setup-text-sec .setup-field input{font-size:2vmin;padding:.9vmin 1.2vmin}
 
+/* ---------- 岗位表导入 ---------- */
+.setup-import-bar{display:flex;align-items:center;gap:1.4vmin;flex-wrap:wrap;margin:0 0 1.6vmin}
+.setup-import-count{font-size:1.85vmin;color:#8A7563;font-weight:600}
+.setup-import{
+  border:.26vmin solid #C9B79E;border-radius:1.4vmin;
+  background:#FFFCF2;padding:1.8vmin 2vmin;margin:0 0 2.4vmin;
+}
+.setup-import p{margin:0 0 1.4vmin}
+/* 分步板块：① 学生名单 → ② 岗位表，一次只处理一个文件 */
+.setup-import-block{
+  border:.2vmin solid #D8C8AE;border-radius:1.2vmin;
+  background:#FFFDF6;padding:1.4vmin 1.6vmin;margin:0 0 1.6vmin;
+}
+.setup-import-block-head{display:flex;align-items:center;gap:1vmin;flex-wrap:wrap;margin:0 0 1vmin}
+.setup-import-step{
+  flex:none;width:3.6vmin;height:3.6vmin;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.9vmin;font-weight:800;color:#FFFDF6;background:#3A2A1E;
+}
+.setup-import-block-title{font-size:2.1vmin;font-weight:800;color:#31231A}
+.setup-import-req{
+  font-size:1.8vmin;line-height:1.6;color:#6B5545;
+  padding-left:1.2vmin;border-left:.3vmin solid #C9B79E;margin:0 0 .9vmin;
+}
+.setup-import-roster-names{
+  max-height:12vmin;overflow:auto;font-size:1.8vmin;line-height:1.7;color:#31231A;
+  background:#F7EDD9;border-radius:.9vmin;padding:1vmin 1.2vmin;margin:0 0 1.2vmin;
+}
+.setup-import-gate{color:#8A6A3E}
+.setup-roster-tools{margin:.4vmin 0 1.2vmin}
+.setup-import-text.setup-roster-text{min-height:12vmin;margin:0 0 1vmin}
+.setup-import-text{
+  width:100%;min-height:14vmin;resize:vertical;
+  font-family:inherit;font-size:1.95vmin;line-height:1.55;color:#31231A;
+  background:#FFFDF6;border:.26vmin solid #C9B79E;border-radius:1vmin;
+  padding:1.2vmin 1.4vmin;outline:none;white-space:pre;overflow:auto;
+}
+.setup-import-text:focus{border-color:#3A2A1E;box-shadow:0 0 0 .3vmin rgba(255,214,79,.7)}
+.setup-import-field{display:flex;align-items:center;gap:1.4vmin;margin:0 0 .8vmin}
+.setup-import-field label{width:8vmin;flex:none;font-size:1.9vmin;font-weight:700;color:#6B5545}
+.setup-import-file-row{display:flex;align-items:center;gap:1.2vmin;flex-wrap:wrap;margin:0 0 1.4vmin}
+.setup-import-file-tip{font-size:1.9vmin;font-weight:700;color:#6B5545}
+.setup-import-file{font-family:inherit;font-size:1.8vmin;color:#31231A;max-width:100%}
+.setup-import-field input{
+  flex:1;min-width:0;font-family:inherit;font-size:2vmin;font-weight:600;color:#31231A;
+  background:#FFFDF6;border:.22vmin solid #C9B79E;border-radius:.8vmin;
+  padding:.8vmin 1.2vmin;outline:none;
+}
+.setup-import-field input:focus{border-color:#3A2A1E}
+.setup-import-preview{margin:1.4vmin 0 2vmin}
+.setup-import-sum{
+  font-size:1.95vmin;font-weight:800;color:#6B5545;
+  background:#F1E4CB;border-radius:1vmin;padding:1vmin 1.4vmin;margin:0 0 1.2vmin;
+}
+.setup-import-row{
+  border:.22vmin solid #D8C8AE;border-radius:1.2vmin;
+  background:#FFFDF6;padding:1.2vmin 1.4vmin;margin:0 0 1.2vmin;
+}
+.setup-import-row-head{display:flex;align-items:center;gap:1vmin;flex-wrap:wrap;margin-bottom:.8vmin}
+.setup-import-pick{width:2.4vmin;height:2.4vmin;flex:none;accent-color:#3A2A1E}
+.setup-import-name{
+  flex:1 1 20vmin;min-width:0;font-family:inherit;font-size:2.1vmin;font-weight:800;color:#31231A;
+  background:#FFFDF6;border:.22vmin solid #C9B79E;border-radius:.8vmin;
+  padding:.7vmin 1vmin;outline:none;
+}
+.setup-import-name:focus{border-color:#3A2A1E}
+.setup-import-tag{
+  font-size:1.75vmin;font-weight:800;border-radius:.7vmin;padding:.3vmin .9vmin;
+  background:#E6F1E4;color:#3C7F3A;
+}
+.setup-import-tag.add{background:#FFF0CE;color:#9A5B07}
+.setup-import-conf{font-size:1.75vmin;color:#8A7563;font-weight:700}
+.setup-import-people{display:flex;gap:.8vmin;flex-wrap:wrap;margin:.2vmin 0 .8vmin}
+.setup-import-person{
+  display:inline-flex;align-items:center;gap:.6vmin;
+  font-size:1.85vmin;font-weight:700;border-radius:.9vmin;padding:.4vmin 1vmin;
+  border:.16vmin solid transparent;
+}
+.setup-import-person.exact{background:#E6F1E4;color:#3C7F3A;border-color:#B7D8B2}
+.setup-import-person.typo{background:#FFF4DA;color:#9A5B07;border-color:#E9C98A}
+.setup-import-person.bad,.setup-import-person.missing,.setup-import-person.same{
+  background:#FFE3DE;color:#B23A32;border-color:#E9B3AC;
+}
+.setup-import-use{
+  font-family:inherit;font-size:1.7vmin;font-weight:800;cursor:pointer;
+  border:.18vmin solid #9A5B07;border-radius:.7vmin;
+  background:#FFD64F;color:#31231A;padding:.2vmin .8vmin;
+}
+.setup-import-pending{display:flex;gap:.8vmin;flex-wrap:wrap;margin:.2vmin 0}
+.setup-import-pending span{
+  font-size:1.7vmin;font-weight:700;color:#8A7563;
+  background:#F1E4CB;border-radius:.7vmin;padding:.2vmin .8vmin;
+}
+.setup-import-raw{font-size:1.7vmin;color:#9B8672;line-height:1.5;margin-top:.6vmin;word-break:break-all}
+
 /* ---------- 保存确认 ---------- */
 .setup-confirm{
   position:absolute;inset:0;z-index:2;

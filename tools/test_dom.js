@@ -553,7 +553,7 @@ check(!qrPanel.classList.contains("open"), "「关闭」能收起面板");
 global.Remote.info.phone = "";
 
 /* ---------- 配置向导（P5） ---------- */
-(function () {
+(async function () {
   const box = document.getElementById("setup");
   const btn = document.getElementById("btn-setup");
 
@@ -581,10 +581,31 @@ global.Remote.info.phone = "";
   check(tpls.length === 3, "第二步给三套作息模板", String(tpls.length));
   const rows = box.querySelectorAll(".setup-row");
   check(rows.length > 20, "第二步列出每一段起止", rows.length + " 行");
+  check(box.querySelectorAll(".setup-time-file").length === 1
+        && box.querySelector(".setup-time-file").accept === ".xlsx,.docx",
+    "第二步能直接选作息表文件");
+  check(box.querySelector(".setup-time-apply").disabled === true,
+    "没识别前「套用到作息」不可点");
+  const timeTa = box.querySelector(".setup-import-text");
+  timeTa.value = "8:10—8:50\t第 一 节\n8:50—9:20\t大课间（升旗仪式）";
+  timeTa._h.input();
+  box.querySelector(".setup-time-run")._h.click();
+  check(box.querySelector(".setup-time-apply").disabled === false, "识别作息后可以套用");
+  check(/读到 2 行/.test(box.querySelector(".setup-msg").textContent),
+    "识别作息给出读数", box.querySelector(".setup-msg").textContent);
 
   next()._h.click();
-  const cells = inputsIn(box);
+  const cells = inputsIn(box).filter(i => i.type !== "file");
   check(cells.length === 35, "第三步是 5×7 课表", cells.length + " 格");
+  check(box.querySelectorAll(".setup-grid-file").length === 1
+        && box.querySelector(".setup-grid-file").accept === ".xlsx,.docx",
+    "第三步能直接选班级课表文件");
+  const gridTa = box.querySelector(".setup-import-text");
+  gridTa.value = "周一\t周二\t周三\t周四\t周五\n第 1 节\t英语\t语文\t语文\t语文\t数学";
+  gridTa._h.input();
+  box.querySelector(".setup-grid-run")._h.click();
+  check(/识别到 5 格/.test(box.querySelector(".setup-msg").textContent),
+    "识别课表给出格数", box.querySelector(".setup-msg").textContent);
 
   next()._h.click();
   const doneBtns = box.querySelectorAll(".setup-btn").map(b => b.textContent);
@@ -606,9 +627,180 @@ global.Remote.info.phone = "";
   check(inputsIn(box).length > 35, "岗位和文案都能直接编辑",
     String(inputsIn(box).length));
 
+  /* B4b：从岗位表导入。粘贴 → 识别 → 核对四态 → 并入草稿 */
+  const studentsBefore = JSON.stringify(window.RHYTHM_DATA.students);
+  check(box.querySelectorAll(".setup-import-open").length === 1,
+    "第四步有「从岗位表导入」入口");
+  box.querySelector(".setup-import-open")._h.click();
+  check(box.querySelectorAll(".setup-import-block").length === 1
+        && box.querySelectorAll(".setup-import-roster-names").length === 1,
+    "打开后先出现①学生名单板块", String(box.querySelectorAll(".setup-import-block").length));
+  check(box.querySelector(".setup-import-roster-names").textContent.indexOf("孙星野") >= 0,
+    "①里列出名册姓名");
+  check(box.querySelectorAll(".setup-import-text").length === 0
+        && box.querySelectorAll(".setup-import-gate").length === 1,
+    "名单没确认前，岗位表上传入口不出现");
+
+  /* 名册修正：只改本机核对用的名单，② 仍要先重新确认 */
+  check(box.querySelectorAll(".setup-roster-fix").length === 1, "①有「修正名单」入口");
+  box.querySelector(".setup-roster-fix")._h.click();
+  check(box.querySelectorAll(".setup-roster-text").length === 1, "点修正后出现名单编辑框");
+  box.querySelector(".setup-roster-text").value = "孙星野\n孔子墨\n新同学测试";
+  box.querySelector(".setup-roster-save")._h.click();
+  check(box.querySelectorAll(".setup-roster-text").length === 0, "保存后收起编辑框");
+  check(box.querySelectorAll(".setup-import-text").length === 0,
+    "名单变了，岗位表要重新确认");
+  const fixedNames = box.querySelector(".setup-import-roster-names").textContent;
+  check(fixedNames.indexOf("新同学测试") >= 0 && fixedNames.indexOf("赵子墨") < 0,
+    "①显示修正后的名单", fixedNames);
+  box.querySelector(".setup-roster-reset")._h.click();
+  const backNames = box.querySelector(".setup-import-roster-names").textContent;
+  check(backNames.indexOf("新同学测试") < 0 && backNames.indexOf("赵子墨") >= 0,
+    "「恢复班级名单」回到原名单", backNames.slice(0, 20));
+
+  box.querySelector(".setup-roster-ok")._h.click();
+  check(box.querySelectorAll(".setup-import-block").length === 2,
+    "确认名单后出现②岗位表板块", String(box.querySelectorAll(".setup-import-block").length));
+  check(box.querySelectorAll(".setup-import-text").length === 1,
+    "打开后有粘贴框");
+
+  const ta = box.querySelector(".setup-import-text");
+  ta.value = "岗位,职责,负责人\n路队长,提醒静齐排队,孙星野、孔子墨\n图书角管理员,整理图书角,周予宁";
+  ta._h.input();
+  box.querySelector(".setup-import-run")._h.click();
+  check(box.querySelectorAll(".setup-import-row").length === 2,
+    "CSV 识别出两行岗位", String(box.querySelectorAll(".setup-import-row").length));
+  check(box.querySelectorAll(".setup-import-person.exact").length === 3,
+    "三名人员精确命中名册", String(box.querySelectorAll(".setup-import-person.exact").length));
+  const tags = box.querySelectorAll(".setup-import-tag").map(t => t.textContent);
+  check(tags.indexOf("更新「路队长」") >= 0 && tags.indexOf("新增岗位") >= 0,
+    "预览分清「更新现有」和「新增」", tags.join(" / "));
+
+  box.querySelector(".setup-import-apply")._h.click();
+  check(box.querySelectorAll(".setup-role").length === bakedRoles.length + 1,
+    "并入草稿后岗位卡片多一个", box.querySelectorAll(".setup-role").length + " / " + bakedRoles.length);
+  check(inputsIn(box).some(i => i.value === "图书角管理员"),
+    "新增岗位出现在草稿里");
+  check(!(JSON.parse(localStorage.getItem("rhythm.config.v1") || "{}").roles),
+    "只进草稿，没写大屏配置");
+  check(box.querySelectorAll(".setup-import").length === 0
+        && box.querySelectorAll(".setup-import-count").length === 1,
+    "并入后收起面板，留下待确认计数");
+
+  /* 疑似错字 / 未找到：先列差异，老师点「采用」才写 */
+  box.querySelector(".setup-import-open")._h.click();
+  const ta2 = box.querySelector(".setup-import-text");
+  ta2.value = "窗户小管家：孙星野、孔子默、王小明";
+  ta2._h.input();
+  box.querySelector(".setup-import-run")._h.click();
+  check(box.querySelectorAll(".setup-import-person.typo").length === 1
+        && box.querySelectorAll(".setup-import-person.missing").length === 1,
+    "疑似错字和未找到都列出来，不静默写入");
+  const useBtn = box.querySelector(".setup-import-use");
+  check(!!useBtn, "疑似错字旁边有「采用」按钮");
+  useBtn._h.click();
+  check(box.querySelector(".setup-import-person.typo").textContent.indexOf("已采用") >= 0,
+    "点「采用」后确认候选姓名");
+  box.querySelector(".setup-import-cancel")._h.click();
+  check(box.querySelectorAll(".setup-import").length === 0, "「取消」收起导入面板");
+
+  /* Word 表格粘贴：textarea 只会插入纯文本，HTML 结构要从剪贴板另外接住 */
+  const wordHtml = '<html><head><style>p{margin:0}</style></head><body><table>'
+    + '<tr><td><p><span>岗位</span></p></td><td><p><span>职责</span></p></td>'
+    + '<td><p><span>负责人</span></p></td></tr>'
+    + '<tr><td><p><span>路队长</span></p></td><td><p><span>提醒&nbsp;静齐排队</span></p></td>'
+    + '<td><p><span>孙星野、孔子墨</span></p></td></tr></table></body></html>';
+  box.querySelector(".setup-import-open")._h.click();
+  const ta3 = box.querySelector(".setup-import-text");
+  ta3.value = "";
+  ta3._h.paste({
+    clipboardData: { getData: t => t === "text/html" ? wordHtml : "" },
+    preventDefault() {}
+  });
+  ta3._h.input();
+  box.querySelector(".setup-import-run")._h.click();
+  check(box.querySelectorAll(".setup-import-row").length === 1,
+    "Word 表格粘贴：接住剪贴板里的 HTML，而不是只读纯文本",
+    String(box.querySelectorAll(".setup-import-row").length));
+  check(box.querySelector(".setup-import-name").value === "路队长",
+    "Word 表格：岗位名识别正确", box.querySelector(".setup-import-name").value);
+  check(box.querySelectorAll(".setup-import-person.exact").length === 2,
+    "Word 表格：姓名仍然拿名册核对");
+  box.querySelector(".setup-import-cancel")._h.click();
+
+  /* 直接选 .xlsx 文件：文件直读是异步的，change 之后要等它 render */
+  const zipOf = entries => {
+    const locals = [], centrals = [];
+    let off = 0;
+    entries.forEach(e => {
+      const name = Buffer.from(e.name, "utf8");
+      const body = Buffer.from(e.body);
+      const lh = Buffer.alloc(30);
+      lh.writeUInt32LE(0x04034b50, 0);
+      lh.writeUInt16LE(20, 4);
+      lh.writeUInt32LE(body.length, 18);
+      lh.writeUInt32LE(body.length, 22);
+      lh.writeUInt16LE(name.length, 26);
+      const ch = Buffer.alloc(46);
+      ch.writeUInt32LE(0x02014b50, 0);
+      ch.writeUInt16LE(20, 4);
+      ch.writeUInt16LE(20, 6);
+      ch.writeUInt32LE(body.length, 20);
+      ch.writeUInt32LE(body.length, 24);
+      ch.writeUInt16LE(name.length, 28);
+      ch.writeUInt32LE(off, 42);
+      locals.push(lh, name, body);
+      centrals.push(ch, name);
+      off += 30 + name.length + body.length;
+    });
+    const cd = Buffer.concat(centrals);
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(entries.length, 8);
+    eocd.writeUInt16LE(entries.length, 10);
+    eocd.writeUInt32LE(cd.length, 12);
+    eocd.writeUInt32LE(off, 16);
+    return Buffer.concat([Buffer.concat(locals), cd, eocd]);
+  };
+  const xlsxBytes = zipOf([
+    { name: "xl/workbook.xml", body:
+      '<workbook><sheets><sheet name="岗位表" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+    { name: "xl/_rels/workbook.xml.rels", body:
+      '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>' },
+    { name: "xl/sharedStrings.xml", body:
+      '<sst><si><t>岗位</t></si><si><t>职责</t></si><si><t>负责人</t></si>'
+      + '<si><t>窗户小管家</t></si><si><t>擦窗台</t></si><si><t>周予安</t></si></sst>' },
+    { name: "xl/worksheets/sheet1.xml", body:
+      '<worksheet><sheetData>'
+      + '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row>'
+      + '<row r="2"><c r="A2" t="s"><v>3</v></c><c r="B2" t="s"><v>4</v></c><c r="C2" t="s"><v>5</v></c></row>'
+      + '</sheetData></worksheet>' }
+  ]);
+
+  box.querySelector(".setup-import-open")._h.click();
+  const fileInput = box.querySelector(".setup-import-file");
+  check(!!fileInput && fileInput.type === "file" && fileInput.accept === ".xlsx,.docx",
+    "导入面板能直接选 .xlsx / .docx 文件",
+    fileInput && (fileInput.type + " / " + fileInput.accept));
+  fileInput.files = [{ name: "岗位表.xlsx", arrayBuffer: () => Promise.resolve(xlsxBytes) }];
+  fileInput._h.change();
+  /* 桩把 setTimeout 换成了空实现，这里用 setImmediate 等微任务链跑完 */
+  await new Promise(r => setImmediate(r));
+  check(box.querySelectorAll(".setup-import-row").length === 1,
+    "选 .xlsx 文件后直接出预览", String(box.querySelectorAll(".setup-import-row").length));
+  check(box.querySelector(".setup-import-name").value === "窗户小管家",
+    "xlsx 文件里的岗位名读对了", box.querySelector(".setup-import-name").value);
+  const flash = box.querySelectorAll(".setup-msg").map(m => m.textContent);
+  check(flash.some(t => t.indexOf("岗位表.xlsx") >= 0),
+    "提示里说明读的是哪个文件", flash.join(" | "));
+  box.querySelector(".setup-import-cancel")._h.click();
+
+  check(JSON.stringify(window.RHYTHM_DATA.students) === studentsBefore,
+    "导入全程没有新增学生");
+
   box.querySelector(".setup-x")._h.click();
   check(!box.classList.contains("open"), "「×」能关掉向导");
-})();
 
-console.log("\n" + pass + "/" + (pass + fail) + " 通过");
-process.exit(fail ? 1 : 0);
+  console.log("\n" + pass + "/" + (pass + fail) + " 通过");
+  process.exit(fail ? 1 : 0);
+})();
