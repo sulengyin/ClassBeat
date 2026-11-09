@@ -648,16 +648,21 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
 .enter{animation:hero-in .46s var(--e-spring) both}
 
 /* ---------- 角落控制 ---------- */
+/* 外框不接事件：否则展开后这一大块会盖住底部提示条的「知道了」。
+   真正可点的只有齿轮，以及展开后的工具按钮。 */
 .corner{position:fixed;right:1vmin;bottom:1vmin;display:flex;flex-direction:column;
-        align-items:flex-end;gap:.7vmin;z-index:60}
+        align-items:flex-end;gap:.7vmin;z-index:60;pointer-events:none}
 .corner .tools{display:flex;gap:.6vmin;opacity:0;pointer-events:none;
                transform:translateY(.6vmin);transition:all var(--d-in) var(--e-out)}
 .corner.open .tools{opacity:1;pointer-events:auto;transform:none}
 .corner button{
+  pointer-events:auto;
   font:700 1.9vmin/1 inherit;padding:.9vmin 1.4vmin;border-radius:1vmin;
   border:.24vmin solid var(--line);background:var(--cream);color:var(--ink-2);cursor:pointer;
   transition:transform var(--d-in) var(--e-out),color var(--d-fast) var(--e-soft);
 }
+.corner .tools button{pointer-events:none}
+.corner.open .tools button{pointer-events:auto}
 .corner button:hover{color:var(--ink);transform:translateY(-.2vmin)}
 .corner button.on{background:var(--accent);color:var(--band-ink)}
 .corner .gear{
@@ -667,6 +672,28 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
   transition:opacity var(--d-in) var(--e-soft);
 }
 .corner:hover .gear,.corner.open .gear{opacity:.95}
+/* 版本号：只在展开设置时露出来，不占主信息区 */
+.corner .ver{
+  align-self:center;padding:0 .6vmin;
+  font:500 1.4vmin/1 var(--mono);color:var(--ink-2);opacity:.6;
+  white-space:nowrap;
+}
+
+/* ---------- 底部提示条：更新 / 迁移，可关闭、不挡内容 ---------- */
+.tip{
+  position:fixed;left:50%;bottom:2.2vmin;transform:translateX(-50%);
+  z-index:59;display:flex;align-items:center;gap:1.4vmin;max-width:86vw;
+  padding:.9vmin 1.6vmin;border-radius:1.2vmin;
+  background:rgba(251,243,223,.92);border:.2vmin solid rgba(107,86,65,.35);
+  font:500 1.7vmin/1.35 inherit;color:var(--ink-2);
+  box-shadow:0 .6vmin 2vmin rgba(0,0,0,.14);
+}
+.tip[hidden]{display:none}
+.tip button{
+  flex:none;font:700 1.7vmin/1 inherit;padding:.6vmin 1vmin;
+  border:.2vmin solid rgba(107,86,65,.45);border-radius:.9vmin;
+  background:transparent;color:var(--ink-2);cursor:pointer;
+}
 
 /* ---------- 手机发消息：二维码面板 ---------- */
 .qr-panel{
@@ -862,11 +889,17 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
     <button id="btn-phone">手机</button>
     <button id="btn-setup">配置班级</button>
     <button id="btn-edit">编辑</button>
+    <span class="ver" id="ver"></span>
   </div>
   <button class="gear" id="btn-gear" aria-label="设置">⋯</button>
 </div>
 
 <div class="setup" id="setup" aria-hidden="true"></div>
+
+<div class="tip" id="tip" hidden>
+  <span id="tipText"></span>
+  <button id="tipClose" type="button">知道了</button>
+</div>
 
 <div class="msg-modal" id="msgModal" data-level="normal" aria-hidden="true">
   <section class="msg-card" id="msgCard" data-expanded="false" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
@@ -927,6 +960,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
   <p id="warn-text">请在电脑上运行：<br><code>python3 tools/bundle.py</code></p>
 </div>
 
+<script src="version.js"></script>
 <script src="data.js"></script>
 <script src="engine/schedule.js"></script>
 <script src="vendor/qrcode.min.js"></script>
@@ -942,6 +976,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 <script src="remote.js"></script>
 <script src="phoneui.js"></script>
 <script src="edit.js"></script>
+<script src="update.js"></script>
 <script src="demo.js"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@
 import importlib.util
 import json
 import os
+import re
 import shutil
 import socket
 import sys
@@ -208,6 +209,94 @@ def main():
         _, _, raw = req(port, "/api/messages?n=8")
         msgs = json.loads(raw)["messages"]
         check(bool(msgs[-1].get("retractedAt")), "⑯ 已撤回的消息有标记")
+
+        # ⑳ 版本号只有一个来源：/version 报的就是 app/version.js 里的值
+        src_version, src_build = hub.read_app_version()
+        code, _, raw = req(port, "/version")
+        v = json.loads(raw)
+        check(code == 200 and v.get("version") == src_version and v.get("build") == src_build,
+              "⑳ /version 与 app/version.js 同一来源", f'{v.get("version")} · {v.get("build")}')
+        check(bool(re.match(r"\d+\.\d+\.\d+$", v.get("version") or "")) and bool(v.get("startedAt")),
+              "⑳a /version 给出语义版本与启动时间", v.get("startedAt"))
+        body = raw.decode("utf-8")
+        check("url" not in v and hub.APP_DIR not in body
+              and not (os.environ.get("USERNAME") and os.environ["USERNAME"] in body),
+              "⑳b /version 不带更新源、路径、用户名")
+
+        # ⑳c 改一份临时 version.js，服务端应当跟着变（证明没有在 Python 里另写版本号）
+        old_version_file = hub.VERSION_FILE
+        tmp_version = os.path.join(tmp, "version.js")
+        with open(tmp_version, "w", encoding="utf-8") as f:
+            f.write('var VERSION = "1.2.3";\nvar BUILD = "abc123";\n')
+        hub.VERSION_FILE = tmp_version
+        try:
+            swapped = hub.read_app_version()
+        finally:
+            hub.VERSION_FILE = old_version_file
+        check(swapped == ("1.2.3", "abc123"),
+              "⑳c 服务端直接读 app/version.js，没有第二份版本号", str(swapped))
+
+        # ㉑ ping 顺带回报版本，大屏不用再单独问一次
+        _, _, raw = req(port, "/api/ping")
+        p = json.loads(raw)
+        check(p.get("version") == src_version and p.get("build") == src_build,
+              "㉑ /api/ping 带上版本与构建号", f'{p.get("version")} · {p.get("build")}')
+
+        # ㉒ 版本比较：逐段比数字，认 v 前缀，解析不了的当 0
+        check(hub.version_key("0.2.1") > hub.version_key("v0.2.0")
+              and hub.version_key("1.0") == (1, 0, 0)
+              and hub.version_key("") == (0, 0, 0)
+              and hub.version_key("随便写") == (0, 0, 0),
+              "㉒ 版本比较规则稳定")
+
+        # ㉓ 更新源报更高版本：/api/update 说「有新版」，但不回传更新源地址
+        online = {"text": json.dumps({"version": "9.9.9"})}
+
+        class UpdateSource(hub.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                body = online["text"].encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        usrv = hub.ThreadingHTTPServer(("127.0.0.1", 0), UpdateSource)
+        usrv.daemon_threads = True
+        threading.Thread(target=usrv.serve_forever, daemon=True).start()
+        try:
+            hub.UPDATE["url"] = f"http://127.0.0.1:{usrv.server_address[1]}/latest.json"
+            hub.check_update_once()
+            _, _, raw = req(port, "/api/update")
+            u = json.loads(raw)
+            check(u.get("available") is True and u.get("latest") == "9.9.9",
+                  "㉓ 更新源有更高版本时提示新版", f'{u.get("checked")} {u.get("latest")}')
+            check(u.get("version") == src_version and bool(u.get("startedAt"))
+                  and "url" not in raw.decode("utf-8"),
+                  "㉓a /api/update 只说本机版本，不泄露更新源")
+            online["text"] = "这不是 JSON"
+            hub.check_update_once()
+            bad_ok = hub.UPDATE["available"]
+        finally:
+            usrv.shutdown()
+            usrv.server_close()
+
+        # ㉔ 更新源坏掉、连不上都只算「没查到」，绝不能影响服务
+        hub.UPDATE["url"] = "http://127.0.0.1:1/latest.json"
+        threw = False
+        try:
+            hub.check_update_once()
+        except Exception:
+            threw = True
+        _, _, raw = req(port, "/api/update")
+        u = json.loads(raw)
+        check(not threw and bad_ok is False and u.get("available") is False and u.get("latest") == "",
+              "㉔ 更新源返回非 JSON / 连不上时静默降级",
+              f'bad_json={bad_ok} threw={threw}')
+        hub.UPDATE["url"] = ""
 
         # ⑪ 落盘与重载
         hub.save_messages()

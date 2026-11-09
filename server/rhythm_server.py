@@ -22,11 +22,13 @@ import errno
 import json
 import os
 import mimetypes
+import re
 import socket
 import sys
 import time
 import threading
 import traceback
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -44,6 +46,74 @@ CONF = {"port": DEFAULT_PORT, "klass": ""}
 
 # 消息的 at / until 是给教室看的，一律按北京时间算，不跟服务器的本地时区走。
 BEIJING = dt.timezone(dt.timedelta(hours=8))
+
+# 版本号的唯一来源是 app/version.js（打包时由 tools/package.py 重写），
+# 服务只是读它，不在 Python 里再写一份，免得两处对不上。
+VERSION_FILE = os.path.join(APP_DIR, "version.js")
+APP_VERSION = {"version": "", "build": "", "startedAt": ""}
+
+# 更新自检：只在配置了更新源时跑，失败一律安静（断网不能影响大屏）。
+UPDATE = {"url": "", "interval": 1800, "checkedAt": "", "latest": "", "available": False}
+UPDATE_LOCK = threading.Lock()
+
+
+def read_app_version():
+    """从 app/version.js 里抠出 VERSION / BUILD；读不到就当空，不抛错。"""
+    try:
+        with open(VERSION_FILE, encoding="utf-8") as f:
+            src = f.read()
+    except OSError:
+        return "", ""
+    def grab(name):
+        m = re.search(name + r'\s*=\s*"([^"]{1,40})"', src)
+        return m.group(1) if m else ""
+    return grab("VERSION"), grab("BUILD")
+
+
+def app_version():
+    """惰性读一次并缓存；启动时间也在第一次拿到版本时记下。"""
+    if not APP_VERSION["version"]:
+        APP_VERSION["version"], APP_VERSION["build"] = read_app_version()
+        APP_VERSION["startedAt"] = dt.datetime.now(BEIJING).isoformat(timespec="seconds")
+    return APP_VERSION
+
+
+def version_key(v):
+    """0.2.1 / v0.2.1 这类写法变成可比较的三元组；解析不了的段按 0 算。"""
+    v = (v or "").strip().lstrip("vV")
+    out = []
+    for part in v.split(".")[:3]:
+        m = re.match(r"\d+", part)
+        out.append(int(m.group(0)) if m else 0)
+    while len(out) < 3:
+        out.append(0)
+    return tuple(out)
+
+
+def check_update_once():
+    """问一次更新源（校内共享盘/静态站的 JSON）。任何异常都只表示「没查到」。"""
+    url = UPDATE.get("url")
+    if not url:
+        return
+    latest = ""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "classbeat-update-check"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            raw = r.read(65536).decode("utf-8", "replace")
+        data = json.loads(raw)
+        latest = str((data or {}).get("version") or "").strip()
+    except Exception:
+        latest = ""
+    with UPDATE_LOCK:
+        UPDATE["checkedAt"] = dt.datetime.now(BEIJING).isoformat(timespec="seconds")
+        UPDATE["latest"] = latest
+        UPDATE["available"] = bool(latest) and version_key(latest) > version_key(app_version()["version"])
+
+
+def update_loop():
+    while True:
+        check_update_once()
+        time.sleep(max(60, int(UPDATE.get("interval") or 1800)))
 
 
 def detect_class() -> str:
@@ -265,10 +335,20 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ("/", "/index.html", "/phone"):
             return self._phone()
+        if path in ("/version", "/api/version"):
+            # 轻量自检：只报版本、构建号、启动时间，不暴露路径和用户名
+            ver = app_version()
+            return self._json({
+                "ok": True,
+                "version": ver["version"],
+                "build": ver["build"],
+                "startedAt": ver["startedAt"],
+            })
         if path == "/api/ping":
             # 大屏拿它画二维码：手机要打开的是这个地址，不是 127.0.0.1
             lan = CONF.get("lan") or f"http://127.0.0.1:{CONF['port']}"
             addr = note_address(lan)
+            ver = app_version()
             return self._json({
                 "ok": True,
                 # 大屏扫端口时靠它确认「这是节律屏的服务」，不是别的程序
@@ -276,11 +356,29 @@ class Handler(BaseHTTPRequestHandler):
                 "class": CONF["klass"],
                 "port": CONF["port"],
                 "lan": lan,
+                # 顺手把版本带上：大屏/老师不用再单独问一次
+                "version": ver["version"],
+                "build": ver["build"],
                 # 这次启动的地址和上次不一样：大屏提示一句，让老师重新复制
                 "addrChanged": bool(addr["changed"]),
                 "lastLan": addr["last"],
                 "now": hhmm(0),
                 "time": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
+            })
+        if path == "/api/update":
+            # 只回答「有没有新版」。更新源地址是校内路径，不发给浏览器。
+            ver = app_version()
+            with UPDATE_LOCK:
+                st = dict(UPDATE)
+            return self._json({
+                "ok": True,
+                "version": ver["version"],
+                "build": ver["build"],
+                "startedAt": ver["startedAt"],
+                "checked": bool(st["checkedAt"]),
+                "checkedAt": st["checkedAt"],
+                "available": bool(st["available"]),
+                "latest": st["latest"] if st["available"] else "",
             })
         # 大屏用它校准设备时钟。给毫秒时间戳，客户端自己换算北京时间。
         if path == "/api/time":
@@ -478,7 +576,17 @@ def main():
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--class", dest="klass", default=None, help="不传就从 data/ 或 sample/ 读")
     ap.add_argument("--host", default="0.0.0.0")
+    ap.add_argument("--update-url", dest="update_url", default=None,
+                    help="更新自检的 JSON 地址（校内共享盘/内网静态站）；不填就不查")
+    ap.add_argument("--update-interval", dest="update_interval", type=int, default=1800,
+                    help="多久查一次更新，秒；默认 30 分钟")
     a = ap.parse_args()
+
+    UPDATE["url"] = a.update_url or os.environ.get("CLASSBEAT_UPDATE_URL", "")
+    UPDATE["interval"] = a.update_interval
+    if UPDATE["url"]:
+        app_version()
+        threading.Thread(target=update_loop, daemon=True).start()
 
     CONF["klass"] = a.klass or detect_class()
     load_messages()
