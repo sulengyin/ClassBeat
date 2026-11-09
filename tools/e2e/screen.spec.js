@@ -115,8 +115,9 @@ test("早读 8:10 结束，屏上立刻换成第一节课的准备清单", async
   // 「下一节 语文」走的是主视觉下面那行（#after），不是 #heroSub：
   // #heroSub 只在倒计时接管时写「后上课」。
   await expect(page.locator("#after")).toContainText("下一节");
-  await expect(page.locator("#chips")).toContainText("语文书");
-  await expect(page.locator("#chips")).toContainText("准备好");
+  // 「准备好」并到主视觉下面那一行，和「课间」同字号，不再沉到底部色块里
+  await expect(page.locator("#heroTask")).toContainText("准备好");
+  await expect(page.locator("#heroTask")).toContainText("语文书");
 });
 
 test("放学前值日条有内容", async ({ page }) => {
