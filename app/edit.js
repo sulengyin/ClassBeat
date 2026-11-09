@@ -202,7 +202,15 @@
     flash.t = setTimeout(function () { n.classList.remove("show"); }, 1800);
   }
 
-  function renderBody() {
+  /* 重绘是整块 innerHTML 替换，滚动条会回到顶部。
+     所以重绘前先记住两处滚动位置（整页 .ep-body 和岗位列表 .ep-rows），
+     重绘后原样放回去；给了 anchor 岗位再把它滚进可视区。
+     岗位被删掉时找不到行，就只还原滚动位置，不会跳到列表外。 */
+  function renderBody(anchorRoleId) {
+    var prevBody = bodyEl.scrollTop;
+    var oldRows = bodyEl.querySelector(".ep-rows");
+    var prevRows = oldRows ? oldRows.scrollTop : 0;
+
     bodyEl.innerHTML = "";
     var key = S.dayKey();
     var ov = S.getDayOverride(key) || {};
@@ -212,6 +220,18 @@
     if (tab === "hours") renderHours();
     if (tab === "text") renderText();
     if (tab === "phrase") renderPhrase();
+
+    var rows = bodyEl.querySelector(".ep-rows");
+    if (rows) rows.scrollTop = prevRows;
+    bodyEl.scrollTop = prevBody;
+
+    if (anchorRoleId) {
+      var target = null;
+      Array.prototype.forEach.call(bodyEl.querySelectorAll(".ep-rowline"), function (l) {
+        if (l.dataset && l.dataset.roleId === anchorRoleId) target = l;
+      });
+      if (target && target.scrollIntoView) target.scrollIntoView({ block: "nearest" });
+    }
   }
 
   /* ---------- Tab：今天 ---------- */
@@ -928,6 +948,7 @@
     roles.forEach(function (r, i) {
       var changed = ov.roles && ov.roles[r.id];
       var line = h("div", "ep-rowline");
+      line.dataset.roleId = r.id;
       var row = h("button", "ep-row" + (changed ? " changed" : ""));
       row.appendChild(h("span", "p", r.name));
 
@@ -966,7 +987,7 @@
     next.roles = res.roles;
     S.patchConfig({ roles: next });
     flash("「" + role.name + "」" + (delta < 0 ? "往前挪了一位" : "往后挪了一位"));
-    renderBody();
+    renderBody(role.id);
   }
 
   /* 换人时候选的排序依据：这个岗位原本是谁，就先出谁。
@@ -1079,6 +1100,10 @@
     var selected = [];
     var saveBtn = null;
     var related = relatedNames(role);
+    var activeGroup = null;   /* 从已存组带出时记住它，「保存修改」写回原组 */
+    var nameInput = null;
+    var groupHint = null;
+    var modifyBtn = null;
 
     /* 选定即写入：同一天同一岗位只写这一处，关掉弹窗就是确认。 */
     function commit(names) {
@@ -1087,7 +1112,31 @@
       S.patchDayOverride(key, { roles: roles });
       wrap.remove();
       flash(role.name + " 今天换给 " + names.join("、"));
-      renderBody();
+      renderBody(role.id);
+    }
+
+    /* 勾选的人名 → 名单 id；没有 id 的名单用 name: 兜底，组仍然存得住。 */
+    function pickedIds() {
+      var roster = rosterStudents();
+      var ids = [];
+      selected.forEach(function (n) {
+        var hit = roster.filter(function (s) {
+          return s && s.name === n && s.active !== false;
+        })[0];
+        if (!hit) return;
+        var id = hit.id ? String(hit.id) : "name:" + hit.name;
+        if (ids.indexOf(id) < 0) ids.push(id);
+      });
+      return ids;
+    }
+
+    /* 说清楚这次是「改已有的组」还是「另存一个新组」 */
+    function paintGroupHint() {
+      if (!groupHint) return;
+      groupHint.textContent = activeGroup
+        ? "正在改「" + activeGroup.name + "」：增减人员后点「保存修改」写回这一组；想保留原组就改名点「另存为新组」。"
+        : "临时勾选不会写进配置。起个名字点「另存为新组」，或先点上面的组带出再改。";
+      if (modifyBtn) modifyBtn.style.display = activeGroup ? "" : "none";
     }
 
     function paintGroupChips() {
@@ -1103,6 +1152,9 @@
         b.addEventListener("click", function () {
           selected = g.names.slice();
           g.names.forEach(function (n) { S.markPicked(n); });
+          activeGroup = (g.source === "manual") ? g : null;
+          if (activeGroup && nameInput) nameInput.value = activeGroup.name;
+          paintGroupHint();
           paint();
         });
         box.appendChild(b);
@@ -1111,7 +1163,9 @@
           x.title = "删除这个组";
           x.addEventListener("click", function () {
             S.deleteGroup(g.id);
+            if (activeGroup && activeGroup.id === g.id) activeGroup = null;
             paintGroupChips();
+            paintGroupHint();
             flash("已删除「" + g.name + "」");
           });
           box.appendChild(x);
@@ -1148,28 +1202,49 @@
     paintGroupChips();
     paint();
 
-    /* 只有点了「存成组」才写入配置；临时勾选留在弹窗里，关掉就没。 */
+    /* 临时勾选只留在弹窗里；只有点「保存修改 / 另存为新组」才写配置。 */
     if (multi) {
+      groupHint = h("p", "ep-note", "");
+      wrap.appendChild(groupHint);
+
       var saveRow = h("div", "ep-group-save");
-      var nameInput = document.createElement("input");
+      nameInput = document.createElement("input");
       nameInput.className = "ep-input ep-group-name";
       nameInput.placeholder = "给这组起个名字，下次一点就带出";
       saveRow.appendChild(nameInput);
-      var saveGroupBtn = h("button", "ep-mini ep-group-save-btn", "存成组");
+
+      /* 已存组：在原 id 上更新成员和名字，不新增一条。 */
+      modifyBtn = h("button", "ep-mini ep-group-modify", "保存修改");
+      modifyBtn.addEventListener("click", function () {
+        if (!activeGroup) { flash("先点一个已存的组"); return; }
+        var ids = pickedIds();
+        if (!ids.length) { flash("先选人"); return; }
+        var name = (nameInput.value || "").trim() || activeGroup.name;
+        var r = S.saveGroup({
+          id: activeGroup.id,
+          name: name,
+          memberIds: ids,
+          order: activeGroup.order
+        });
+        if (!r.ok) { flash(r.why); return; }
+        activeGroup = null;
+        paintGroupChips();
+        paintGroupHint();
+        flash("已更新「" + name + "」，共 " + ids.length + " 人");
+      });
+      saveRow.appendChild(modifyBtn);
+
+      /* 永远从空白名字框新建，避免误以为在改旧组。 */
+      var saveGroupBtn = h("button", "ep-mini ep-group-save-btn", "另存为新组");
       saveGroupBtn.addEventListener("click", function () {
         if (!selected.length) { flash("先选人"); return; }
         var name = (nameInput.value || "").trim();
         if (!name) { flash("先给这组起个名字"); return; }
-        var roster = rosterStudents();
-        var ids = [];
-        selected.forEach(function (n) {
-          var hit = roster.filter(function (s) {
-            return s && s.name === n && s.active !== false;
-          })[0];
-          if (!hit) return;
-          var id = hit.id ? String(hit.id) : "name:" + hit.name;
-          if (ids.indexOf(id) < 0) ids.push(id);
-        });
+        if (S.peopleGroups().some(function (g) { return g.name === name; })) {
+          flash("已有同名组「" + name + "」，要改它请用「保存修改」");
+          return;
+        }
+        var ids = pickedIds();
         if (!ids.length) { flash("名单里找不到这些人"); return; }
         var r = S.saveGroup({
           id: "g" + Date.now(),
@@ -1179,11 +1254,14 @@
         });
         if (!r.ok) { flash(r.why); return; }
         nameInput.value = "";
+        activeGroup = null;
         paintGroupChips();
-        flash("已存成组「" + name + "」");
+        paintGroupHint();
+        flash("已存成新组「" + name + "」");
       });
       saveRow.appendChild(saveGroupBtn);
       wrap.appendChild(saveRow);
+      paintGroupHint();
     }
 
     var row = h("div", "ep-actrow");
@@ -1201,7 +1279,7 @@
       delete roles[role.id];
       S.patchDayOverride(key, { roles: roles });
       wrap.remove();
-      renderBody();
+      renderBody(role.id);
     });
     row.appendChild(clear);
     wrap.appendChild(row);

@@ -576,16 +576,36 @@ const confirmBtn = document.querySelector(".ep-primary");
 check(!!confirmBtn && confirmBtn.textContent.indexOf("已选 8 人") >= 0,
   "多选岗位才保留「确定」，并显示已选人数",
   confirmBtn ? confirmBtn.textContent : "没有确定按钮");
+check(document.querySelector(".ep-group-modify").style.display === "none",
+  "还没点已存组时「保存修改」不出现，避免误改旧组");
 document.querySelector(".ep-group-name").value = "放学留下";
 document.querySelector(".ep-group-save-btn")._h.click();
 const savedGroup = global.Store.peopleGroups();
 check(savedGroup.length === 1 && savedGroup[0].name === "放学留下"
       && savedGroup[0].memberIds.length === 8,
-  "点「存成组」才写入本机配置，成员不重复",
+  "点「另存为新组」才写入本机配置，成员不重复",
   savedGroup.length + " 组，" + (savedGroup[0] || {}).memberIds.length + " 人");
 const manualChip = document.querySelectorAll(".ep-group-chip")
   .filter(c => c.textContent === "放学留下")[0];
 check(!!manualChip, "存好的组立刻出现在「点组带出」里");
+
+/* 回归：已存的组要能就地改成员，不新增重复组 */
+manualChip._h.click();
+const modifyBtn = document.querySelector(".ep-group-modify");
+check(!!modifyBtn && modifyBtn.textContent === "保存修改" && modifyBtn.style.display === "",
+  "点已存组后出现「保存修改」，写回原组");
+document.querySelectorAll(".ep-person.on")[0]._h.click();
+check(document.querySelectorAll(".ep-person.on").length === 7,
+  "再点一下能减掉一个人", document.querySelectorAll(".ep-person.on").length + " 人");
+check(global.Store.peopleGroups()[0].memberIds.length === 8,
+  "没点保存前改动不落库", global.Store.peopleGroups()[0].memberIds.length + " 人");
+modifyBtn._h.click();
+const updatedGroup = global.Store.peopleGroups();
+check(updatedGroup.length === 1 && updatedGroup[0].name === "放学留下"
+      && updatedGroup[0].memberIds.length === 7,
+  "「保存修改」更新原组成员，不新增重复组",
+  updatedGroup.length + " 组，" + (updatedGroup[0] || {}).memberIds.length + " 人");
+
 document.querySelectorAll(".ep-group-del")[0]._h.click();
 check(global.Store.peopleGroups().length === 0,
   "删组只删这一条，不动名单", global.Store.peopleGroups().length + " 组");
@@ -596,6 +616,9 @@ const energyLine = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
 check(!!energyLine, "值日页找得到单选岗位「节能小队长」");
 energyLine.children[0]._h.click();
+/* 回归：点确定后不能跳回顶部，要停在用户刚才那个岗位 */
+document.querySelector(".ep-rows").scrollTop = 120;
+document.querySelector(".ep-body").scrollTop = 40;
 const firstMate = document.querySelectorAll(".ep-person")[0];
 const pickName = firstMate.textContent;
 firstMate._h.click();
@@ -604,6 +627,14 @@ const pickedPeople = (pickOv.roles && pickOv.roles.r02) ? pickOv.roles.r02.peopl
 check(pickedPeople.length === 1 && pickedPeople[0] === pickName,
   "单选岗位点候选人就直接写入，不用再点一次确认",
   pickName + " → " + pickedPeople.join("、"));
+check(document.querySelector(".ep-rows").scrollTop === 120
+      && document.querySelector(".ep-body").scrollTop === 40,
+  "确定后岗位列表与整页滚动位置都保留，不跳回顶部",
+  "rows=" + document.querySelector(".ep-rows").scrollTop
+  + " body=" + document.querySelector(".ep-body").scrollTop);
+check(document.querySelectorAll(".ep-rowline")
+  .filter(l => l.dataset.roleId === "r02").length === 1,
+  "重绘后的行仍然带着岗位 id，锚点找得到");
 check(document.querySelectorAll(".ep-dialog.picker").length === 0,
   "点完自动关窗回到岗位列表");
 check(document.querySelectorAll(".ep-primary")
