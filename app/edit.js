@@ -563,13 +563,14 @@
       "早读在「作息」里是一段真实时间"
       + (rc ? "（现在 " + rc.start + "–" + rc.end + "）" : "") + "。"
       + "按星期填科目和读什么，科目空着这天就只显示「早读」，不猜。"
+      + "科目填了，屏上标题就是「英语学习建议」，建议本身接在下一行、同字号。"
       + "早读一下课就自动切到第一节课的准备清单。"));
     var rd = T.reading || {};
 
     var head = h("div", "ep-read head");
     head.appendChild(h("span", "ep-read-day", ""));
     head.appendChild(h("span", "ep-read-tag", "科目"));
-    head.appendChild(h("span", "ep-read-tag", "早读建议（会显示在屏上）"));
+    head.appendChild(h("span", "ep-read-tag", "学习建议（会显示在屏上）"));
     secR.appendChild(head);
 
     WEEKDAYS.forEach(function (w) {

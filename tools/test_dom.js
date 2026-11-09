@@ -118,7 +118,7 @@ const document = {
 };
 
 /* 主屏骨架：与 index.html 的 id 对齐 */
-["cls", "date", "clock", "sec", "main", "band", "bandText", "spine", "heroMain", "heroSub", "after", "chips",
+["cls", "date", "clock", "sec", "main", "band", "bandText", "spine", "heroMain", "heroSub", "heroTask", "after", "chips",
  "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner",
  "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
  "qr-panel", "qr-url", "qr-empty", "qr-close",
@@ -266,7 +266,7 @@ try { Screen.render(); } catch (e) { holidayErr = e; }
 check(!holidayErr, "周末重绘不报错", holidayErr ? holidayErr.message : "无异常");
 check(heroText() === "今天不上学", "周末主视觉仍是「今天不上学」", heroText());
 
-/* 早读：7:30–8:10 是真实的一段；提醒事项单独一块，比建议更醒目 */
+/* 早读：7:30–8:10 是真实的一段；标题写「英语学习建议」，建议本身另起一行大字 */
 global.__rhythmDate = "2026-11-05";
 global.__rhythmTime = 7 * 60 + 30;
 global.Store.patchTexts({
@@ -274,10 +274,17 @@ global.Store.patchTexts({
   reminders: { "default": "带齐回执" }
 });
 Screen.render();
-check(heroText() === "英语早读", "周四 7:30 上早读", heroText());
+check(heroText() === "英语学习建议", "周四 7:30 标题是「英语学习建议」", heroText());
+const taskEl = document.getElementById("heroTask");
+check(taskEl.textContent === "读 Unit 4 单词。",
+  "老师填的建议在标题下一行，自带句号", taskEl.textContent);
+check(taskEl.style.fontSize && taskEl.style.fontSize === document.getElementById("heroMain").style.fontSize,
+  "建议和标题同字号", taskEl.style.fontSize + " / " + document.getElementById("heroMain").style.fontSize);
 const remRow = document.querySelector(".reminder-line");
 check(!!remRow && remRow.textContent.indexOf("带齐回执") >= 0,
   "提醒事项单独一块上屏", remRow ? remRow.textContent : "缺失");
+check(document.querySelectorAll(".prep-line").length === 0,
+  "建议不再以小字清单的形式出现");
 global.Store.resetTexts();
 
 /* 紧急通知：红色只由老师手动发，文字要能占住主区 */

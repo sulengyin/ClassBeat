@@ -2188,7 +2188,7 @@
       var key = String(w.n);
       readRows.push(field(w.label + " · 科目", textAt(["reading", key, "subject"]),
         function (v) { setText(["reading", key, "subject"], v); }, "text", "语文"));
-      readRows.push(field(w.label + " · 早读建议", textAt(["reading", key, "task"]),
+      readRows.push(field(w.label + " · 学习建议", textAt(["reading", key, "task"]),
         function (v) { setText(["reading", key, "task"], v); },
         "text", "今天读第 5 课，背《古诗三首》"));
     });

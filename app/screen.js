@@ -136,6 +136,21 @@
     return Math.max(4.6, Math.min(cap || 16, Math.max(one, area)));
   }
 
+  /* 标题 + 建议两行同字号。字号上限由标题自己定，再往下收，
+     直到两行加起来塞得进主区——建议写得长时先是折行，还不够就整块缩，
+     绝不让提醒贴纸被顶出卡片。 */
+  var ADVICE_H = 41;   /* 标题 + 建议可用的高度，vmin */
+  function adviceSize(title, advice, cap) {
+    var wt = Math.max(weight(title), 1), wa = Math.max(weight(advice), 1);
+    var s = cap;
+    for (; s > 4.6; s -= 0.12) {
+      var lt = Math.max(1, Math.ceil((wt * s - .5) / CARD_W));
+      var la = Math.max(1, Math.ceil((wa * s - .5) / CARD_W));
+      if ((lt + la) * s * 1.13 <= ADVICE_H) break;
+    }
+    return Math.max(4.6, s);
+  }
+
   var BAND = {
     class: "上课", break: "课间", meal: "午餐", noon: "午间",
     action: "大扫除", after: "课后服务", before: "还没到校",
@@ -422,6 +437,7 @@
         : "这个包还没有作息和课表。<br>点右下角「⋯ → 配置班级」，四步填出你自己的班，填完立刻生效。";
       setText(el.bandText, ""); setHeroText("");
       setText(el.heroSub, ""); setText(el.after, ""); el.chips.innerHTML = ""; el.duty.innerHTML = "";
+      if (el.heroTask) el.heroTask.textContent = "";
       return;
     }
     el.warn.classList.remove("show");
@@ -446,7 +462,7 @@
     var isTicker = !urgent && s.focus === "countdown" && !!s.timer;
     /* 倒计时用滚轮，数字自己动；sig 里不放秒数，否则每秒重播一次入场动画 */
     var sig = [s.kind, s.title, s.focus, isTicker ? "cd" : "", urgent ? 1 : 0,
-               urgent ? notice.text : "", s.items.length, s.hints.length,
+               urgent ? notice.text : "", s.advice || "", s.items.length, s.hints.length,
                s.note, s.range].join("|");
 
     /* 顶栏状态词 */
@@ -455,7 +471,7 @@
     el.band.style.letterSpacing = urgent ? ".3em" : ".2em";
 
     /* 主视觉 */
-    var main, sub, after, size;
+    var main, sub, after, size, task = "";
     if (urgent) {
       main = notice.text;
       sub = "";
@@ -472,6 +488,14 @@
       after = afterText(s);
       /* 便签占了一条，主视觉就让一点位置，别把卡片撑破 */
       size = notice ? textSize(main, 13, 17) : textSize(main, 16, 22);
+      /* 早读这块要和下一行同字号，标题先压到一行：六字标题折成两行不好看 */
+      if (s.reading) {
+        size = Math.min(size, CARD_W / Math.max(weight(main), 1));
+        if (s.advice) {
+          task = dot(s.advice);
+          size = notice ? Math.min(size, 13) : adviceSize(main, task, size);
+        }
+      }
     }
 
     if (isTicker) buildTicker(main);
@@ -479,6 +503,10 @@
 
     setText(el.heroSub, sub);
     el.heroMain.style.fontSize = size + "vmin";
+    if (el.heroTask) {
+      el.heroTask.textContent = task;
+      el.heroTask.style.fontSize = size + "vmin";
+    }
     setText(el.after, after);
 
     /* 普通通知：贴在主区上方一条，不改主视觉 */
@@ -758,7 +786,7 @@
       cls: $("cls"), date: $("date"), clock: $("clock"), sec: $("sec"),
       main: $("main"), band: $("band"), bandText: $("bandText"),
       spine: $("spine"), mark: null,
-      heroMain: $("heroMain"), heroSub: $("heroSub"),
+      heroMain: $("heroMain"), heroSub: $("heroSub"), heroTask: $("heroTask"),
       after: $("after"), chips: $("chips"), duty: $("duty"),
       dutyDetail: $("dutyDetail"),
       warn: $("warn"), warnTitle: $("warn-title"), warnText: $("warn-text"),

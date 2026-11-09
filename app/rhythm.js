@@ -176,14 +176,15 @@
           var advice = (rd.task || "").trim();
           return {
             kind: "before",
-            title: rd.subject + "早读",
+            title: rd.subject + "学习建议",
             sub: c0 ? "第 1 节 " + c0.subject : "",
             note: "",
             arrived: true,
             reading: true,
             meta: [],
             items: [],
-            lines: advice ? [{ kind: "prep", label: "早读建议", items: [advice] }] : [],
+            advice: advice,
+            lines: [],
             countdown: countdownFor("before", first - minutes, mode),
             clock: m2t(minutes),
             _ctx: { type: "before", remain: first - minutes, dur: 40 }
@@ -226,18 +227,19 @@
       var firstClass = t.filter(function (x) { return x.type === "class"; })[0];
       var rdToday = readingFor(opts, day, true);
       var rem = reminderFor(opts, day);
-      card.title = (rdToday && rdToday.subject ? rdToday.subject + "早读" : (b.name || "早读"));
+      var tip = rdToday && (rdToday.task || "").trim();
+      card.title = (rdToday && rdToday.subject ? rdToday.subject + "学习建议" : (b.name || "早读"));
       card.sub = firstClass && firstClass.subject ? "第 1 节 " + firstClass.subject : "";
       card.note = "";
       card.items = [];
       card.reading = true;
       card.lines = [];
-      /* 提醒事项排在早读建议前面：它是今天必须记住的那一件，
+      /* 老师填的那条建议不再挤成小字清单，改成标题下面的一整行大字，
+         和标题同字号——早读就一件事，学生从最后一排也要看得清。 */
+      card.advice = tip || "";
+      /* 提醒事项排在建议前面：它是今天必须记住的那一件，
          不能埋在"读第几课"下面。 */
       if (rem) card.lines.push({ kind: "reminder", label: "提醒事项", items: [rem] });
-      if (rdToday && (rdToday.task || "").trim()) {
-        card.lines.push({ kind: "prep", label: "早读建议", items: [rdToday.task.trim()] });
-      }
     }
 
     if (b.type === "class") {

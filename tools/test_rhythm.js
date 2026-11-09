@@ -169,11 +169,10 @@ check(s.countdown.visible, "全部显示时上课也倒计时", s.countdown.text
 const rd = { texts: { reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } } } };
 
 s = at("2026-11-05", "07:30", rd);
-check(s.kind === "reading" && s.title === "英语早读", "周四 7:30 开始早读", s.title);
+check(s.kind === "reading" && s.title === "英语学习建议", "周四 7:30 标题写「英语学习建议」", s.title);
 check(s.reading === true, "标了 reading，顶栏写「早读」");
-check(s.lines.length === 1 && s.lines[0].label === "早读建议"
-  && s.lines[0].items[0] === "读 Unit 4 单词", "早读建议单独一行上屏",
-  JSON.stringify(s.lines));
+check(s.advice === "读 Unit 4 单词" && s.lines.length === 0,
+  "老师填的建议单独成行，不再挤成小字清单", s.advice + " / " + JSON.stringify(s.lines));
 check(s.items.length === 0, "早读不出准备清单", s.items.join("、") || "空");
 
 s = at("2026-11-05", "08:09", rd);
@@ -183,13 +182,13 @@ s = at("2026-11-05", "07:29", rd);
 check(s.kind === "before" && s.title === "早上好", "7:29 还没到早读，不提前催", s.title);
 
 s = at("2026-11-06", "07:30", rd);
-check(s.kind === "reading" && s.title === "早读" && s.lines.length === 0,
+check(s.kind === "reading" && s.title === "早读" && s.lines.length === 0 && !s.advice,
   "周五没配科目：只显示「早读」，不猜科目", s.title);
 
 s = at("2026-11-05", "07:30", { texts: { reading: { "4": { subject: "英语" } } } });
-check(s.title === "英语早读" && s.lines.length === 0, "没写建议就只上一个大字", s.title);
+check(s.title === "英语学习建议" && !s.advice, "没写建议就只上标题", s.title);
 
-/* 提醒事项：单独一块，排在早读建议前面；按天覆盖「每天」 */
+/* 提醒事项：单独一块；建议改成大字正文，不占清单 */
 s = at("2026-11-05", "07:30", {
   texts: {
     reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } },
@@ -197,10 +196,10 @@ s = at("2026-11-05", "07:30", {
   }
 });
 check(s.lines[0].kind === "reminder" && s.lines[0].label === "提醒事项"
-  && s.lines[0].items[0] === "今天穿校服", "提醒事项排在早读建议前面",
+  && s.lines[0].items[0] === "今天穿校服", "提醒事项仍在清单里",
   JSON.stringify(s.lines));
-check(s.lines[1].label === "早读建议", "提醒事项之外的早读建议仍在",
-  JSON.stringify(s.lines[1]));
+check(s.lines.length === 1 && s.advice === "读 Unit 4 单词", "建议不重复进清单",
+  JSON.stringify(s.lines) + " / " + s.advice);
 
 s = at("2026-11-06", "07:30", {
   texts: { reminders: { "default": "带齐回执" } }

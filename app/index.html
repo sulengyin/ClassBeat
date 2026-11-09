@@ -264,6 +264,18 @@ body[data-kind="noon"] .band .dot{animation:dot-live 2.6s var(--e-soft) infinite
 @keyframes hero-in{from{opacity:0;transform:translateY(1.8vmin) rotate(-.6deg)}to{opacity:1;transform:none}}
 .hero-sub{font-size:3.4vmin;font-weight:700;color:var(--ink-2);letter-spacing:.04em}
 
+/* 早读建议：标题下面再压一行同样大的字。
+   不在 h1 里，是因为它自己会折行，和标题共用 baseline 会把标题挤歪。 */
+.hero-task{
+  position:relative;z-index:1;margin-top:.8vmin;
+  font-size:16vmin;font-weight:900;line-height:1.12;
+  letter-spacing:-.01em;color:var(--card-ink);
+  max-width:100%;word-break:break-word;
+  animation:hero-in .5s var(--e-spring) .05s backwards;
+  transition:font-size var(--d-in) var(--e-out);
+}
+.hero-task:empty{display:none}
+
 /* 倒计时：每位一条滚轮，像老式里程表 */
 .hero-main.ticker{
   font-family:var(--mono);font-variant-numeric:tabular-nums;
@@ -565,7 +577,7 @@ body[data-alert="1"][data-settled="1"] .alert-frame::before{animation:none;opaci
 
 /* 减少动态：系统偏好 + 手动开关 */
 @media (prefers-reduced-motion: reduce){
-  .aura,.spine .seg.now,.band .dot,.alert-frame::before,.hero-main,.chips .chip,.reminder-line{animation:none!important}
+  .aura,.spine .seg.now,.band .dot,.alert-frame::before,.hero-main,.hero-task,.chips .chip,.reminder-line{animation:none!important}
   .tk-strip{transition:none!important}
 }
 body[data-reduce="1"] .aura,
@@ -573,6 +585,7 @@ body[data-reduce="1"] .spine .seg.now,
 body[data-reduce="1"] .band .dot,
 body[data-reduce="1"] .alert-frame::before,
 body[data-reduce="1"] .hero-main,
+body[data-reduce="1"] .hero-task,
 body[data-reduce="1"] .chip,
 body[data-reduce="1"] .notice-bar{animation:none!important}
 body[data-reduce="1"] .reminder-line{animation:none!important}
@@ -742,6 +755,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
   <div class="spine" id="spine"></div>
   <div class="band" id="band"><span class="dot"></span><span id="bandText"></span></div>
   <h1 class="hero"><span class="hero-main" id="heroMain"></span><span class="hero-sub" id="heroSub"></span></h1>
+  <p class="hero-task" id="heroTask"></p>
   <div class="after" id="after"></div>
   <div class="chips" id="chips"></div>
 </main>
