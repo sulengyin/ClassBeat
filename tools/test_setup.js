@@ -148,6 +148,20 @@ check(edited.roles.length === roleSet.roles.length, "岗位数量不变", String
 check(r01old.duty === "提醒静齐排队，清点人数，有序进场", "原岗位对象没有被就地改掉");
 check(S2._roleChangedCount(edited, roleSet) === 1, "改动计数按字段算", String(S2._roleChangedCount(edited, roleSet)));
 
+/* 回归：执行频率里的时间也要能改（r03 这类 daily 岗位） */
+const freqEdited = S2._editRoleFreqTimes(roleSet, "r03", ["11:50"]);
+const r03e = freqEdited.roles.filter(r => r.id === "r03")[0];
+const r03o = roleSet.roles.filter(r => r.id === "r03")[0];
+check(r03e.freq.times[0] === "11:50" && r03e.freq.kind === "daily",
+  "岗位执行频率里的时间可以改，kind 保留", r03e.freq.times.join("、"));
+check(r03o.freq.times[0] === "11:45", "原岗位对象没有被就地改掉",
+  r03o.freq.times.join("、"));
+check(JSON.stringify(r03e.people) === JSON.stringify(r03o.people),
+  "改时间不动人员");
+check(S2._roleChangedCount(freqEdited, roleSet) === 1,
+  "只改时间也计入改动，确认页会说要写入",
+  String(S2._roleChangedCount(freqEdited, roleSet)));
+
 const baseTexts = {
   reminders: { default: "戴好红领巾", 1: "周一提醒" },
   stage: { before: { title: "早上好", note: "交作业" } },

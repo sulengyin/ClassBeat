@@ -497,7 +497,12 @@ const answer = qm
   ? (Number(qm[1]) / Number(qm[2])).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
   : "";
 const gks = document.querySelectorAll(".gk");
-answer.split("").forEach(d => {
+/* 回归：输入框以前把数字替换成「•」，老师看不清自己敲了什么 */
+gks.filter(k => k.textContent === answer[0])[0]._h.click();
+check(document.getElementById("gateVal").textContent === answer[0],
+  "验证码输入框显示数字，不用圆点掩码",
+  "显示「" + document.getElementById("gateVal").textContent + "」");
+answer.slice(1).split("").forEach(d => {
   const b = gks.filter(k => k.textContent === d)[0];
   if (b) b._h.click();
 });
@@ -567,6 +572,10 @@ const groupPicked = document.querySelectorAll(".ep-person.on");
 check(groupPicked.length === 8 && global.Store.peopleGroups().length === groupsBefore,
   "点「值日组」把整组 8 人一次选上，且没有自动落库",
   groupPicked.length + " 人，配置里 " + groupsBefore + " 组");
+const confirmBtn = document.querySelector(".ep-primary");
+check(!!confirmBtn && confirmBtn.textContent.indexOf("已选 8 人") >= 0,
+  "多选岗位才保留「确定」，并显示已选人数",
+  confirmBtn ? confirmBtn.textContent : "没有确定按钮");
 document.querySelector(".ep-group-name").value = "放学留下";
 document.querySelector(".ep-group-save-btn")._h.click();
 const savedGroup = global.Store.peopleGroups();
@@ -580,6 +589,26 @@ check(!!manualChip, "存好的组立刻出现在「点组带出」里");
 document.querySelectorAll(".ep-group-del")[0]._h.click();
 check(global.Store.peopleGroups().length === 0,
   "删组只删这一条，不动名单", global.Store.peopleGroups().length + " 组");
+
+/* 回归：单选岗位点一下就该选定，不该再要求点「就是 TA」二次确认 */
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+const energyLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
+check(!!energyLine, "值日页找得到单选岗位「节能小队长」");
+energyLine.children[0]._h.click();
+const firstMate = document.querySelectorAll(".ep-person")[0];
+const pickName = firstMate.textContent;
+firstMate._h.click();
+const pickOv = global.Store.getDayOverride("2026-11-09") || {};
+const pickedPeople = (pickOv.roles && pickOv.roles.r02) ? pickOv.roles.r02.people : [];
+check(pickedPeople.length === 1 && pickedPeople[0] === pickName,
+  "单选岗位点候选人就直接写入，不用再点一次确认",
+  pickName + " → " + pickedPeople.join("、"));
+check(document.querySelectorAll(".ep-dialog.picker").length === 0,
+  "点完自动关窗回到岗位列表");
+check(document.querySelectorAll(".ep-primary")
+  .filter(b => b.textContent.indexOf("就是") >= 0).length === 0,
+  "单选岗位的换人弹窗不再出现「就是 TA」");
 
 global.Store.resetConfig();
 global.Edit.close();

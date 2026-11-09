@@ -130,8 +130,8 @@
     var q = document.getElementById("gateQ");
     var v = document.getElementById("gateVal");
     if (q) q.textContent = challenge.text + " = ?";
-    /* 小数点留着看得见，老师能确认自己点对了；数字仍然打点 */
-    if (v) v.textContent = gateInput ? gateInput.replace(/[0-9]/g, "•") : "　";
+    /* 输入什么就显示什么：老师要能看清自己点了几位、点的是哪个数字 */
+    if (v) v.textContent = gateInput || "　";
     var lock = S.lockState();
     var tip = gateEl.querySelector(".gate-tip");
     if (lock.until && Date.now() < lock.until) {
@@ -1046,12 +1046,27 @@
     return out;
   }
 
+  /* 一个岗位通常就一个人：点谁就是谁，点完直接落库、关窗。
+     只有「一班多人」的岗位（路队长、补给站、按组轮换的值日组等）才需要多选，
+     这时才保留「确定」按钮。 */
+  function roleIsMulti(role) {
+    if (!role) return false;
+    if (role.grp || role.groups) return true;
+    if ((role.people || []).length > 1) return true;
+    if (role.peopleMap && Object.keys(role.peopleMap).length > 1) return true;
+    return false;
+  }
+
   function openPicker(role, key) {
     var wrap = h("div", "ep-dialog picker");
     wrap.appendChild(h("div", "ep-dialog-title", "换人 · " + role.name));
 
-    var groupBox = h("div", "ep-groups");
-    wrap.appendChild(groupBox);
+    var multi = roleIsMulti(role);
+    var groupBox = null;
+    if (multi) {
+      groupBox = h("div", "ep-groups");
+      wrap.appendChild(groupBox);
+    }
 
     var q = document.createElement("input");
     q.className = "ep-input";
@@ -1062,9 +1077,21 @@
     wrap.appendChild(grid);
 
     var selected = [];
+    var saveBtn = null;
     var related = relatedNames(role);
 
+    /* 选定即写入：同一天同一岗位只写这一处，关掉弹窗就是确认。 */
+    function commit(names) {
+      var roles = (S.getDayOverride(key) || {}).roles || {};
+      roles[role.id] = { people: names.slice() };
+      S.patchDayOverride(key, { roles: roles });
+      wrap.remove();
+      flash(role.name + " 今天换给 " + names.join("、"));
+      renderBody();
+    }
+
     function paintGroupChips() {
+      if (!groupBox) return;
       groupBox.innerHTML = "";
       var defs = groupDefs(role, key);
       if (!defs.length) return;
@@ -1103,13 +1130,18 @@
       res.forEach(function (s) {
         var b = h("button", "ep-person" + (selected.indexOf(s.name) >= 0 ? " on" : ""), s.name);
         b.addEventListener("click", function () {
+          S.markPicked(s.name);
+          if (!multi) { commit([s.name]); return; }
           var i = selected.indexOf(s.name);
           if (i >= 0) selected.splice(i, 1);
-          else { selected.push(s.name); S.markPicked(s.name); }
+          else selected.push(s.name);
           paint();
         });
         grid.appendChild(b);
       });
+      if (saveBtn) {
+        saveBtn.textContent = selected.length ? "确定 · 已选 " + selected.length + " 人" : "确定";
+      }
     }
 
     q.addEventListener("input", paint);
@@ -1117,52 +1149,52 @@
     paint();
 
     /* 只有点了「存成组」才写入配置；临时勾选留在弹窗里，关掉就没。 */
-    var saveRow = h("div", "ep-group-save");
-    var nameInput = document.createElement("input");
-    nameInput.className = "ep-input ep-group-name";
-    nameInput.placeholder = "给这组起个名字，下次一点就带出";
-    saveRow.appendChild(nameInput);
-    var saveGroupBtn = h("button", "ep-mini ep-group-save-btn", "存成组");
-    saveGroupBtn.addEventListener("click", function () {
-      if (!selected.length) { flash("先选人"); return; }
-      var name = (nameInput.value || "").trim();
-      if (!name) { flash("先给这组起个名字"); return; }
-      var roster = rosterStudents();
-      var ids = [];
-      selected.forEach(function (n) {
-        var hit = roster.filter(function (s) {
-          return s && s.name === n && s.active !== false;
-        })[0];
-        if (!hit) return;
-        var id = hit.id ? String(hit.id) : "name:" + hit.name;
-        if (ids.indexOf(id) < 0) ids.push(id);
+    if (multi) {
+      var saveRow = h("div", "ep-group-save");
+      var nameInput = document.createElement("input");
+      nameInput.className = "ep-input ep-group-name";
+      nameInput.placeholder = "给这组起个名字，下次一点就带出";
+      saveRow.appendChild(nameInput);
+      var saveGroupBtn = h("button", "ep-mini ep-group-save-btn", "存成组");
+      saveGroupBtn.addEventListener("click", function () {
+        if (!selected.length) { flash("先选人"); return; }
+        var name = (nameInput.value || "").trim();
+        if (!name) { flash("先给这组起个名字"); return; }
+        var roster = rosterStudents();
+        var ids = [];
+        selected.forEach(function (n) {
+          var hit = roster.filter(function (s) {
+            return s && s.name === n && s.active !== false;
+          })[0];
+          if (!hit) return;
+          var id = hit.id ? String(hit.id) : "name:" + hit.name;
+          if (ids.indexOf(id) < 0) ids.push(id);
+        });
+        if (!ids.length) { flash("名单里找不到这些人"); return; }
+        var r = S.saveGroup({
+          id: "g" + Date.now(),
+          name: name,
+          memberIds: ids,
+          order: S.peopleGroups().length
+        });
+        if (!r.ok) { flash(r.why); return; }
+        nameInput.value = "";
+        paintGroupChips();
+        flash("已存成组「" + name + "」");
       });
-      if (!ids.length) { flash("名单里找不到这些人"); return; }
-      var r = S.saveGroup({
-        id: "g" + Date.now(),
-        name: name,
-        memberIds: ids,
-        order: S.peopleGroups().length
-      });
-      if (!r.ok) { flash(r.why); return; }
-      nameInput.value = "";
-      paintGroupChips();
-      flash("已存成组「" + name + "」");
-    });
-    saveRow.appendChild(saveGroupBtn);
-    wrap.appendChild(saveRow);
+      saveRow.appendChild(saveGroupBtn);
+      wrap.appendChild(saveRow);
+    }
 
     var row = h("div", "ep-actrow");
-    var save = h("button", "ep-primary", "就是 TA");
-    save.addEventListener("click", function () {
-      if (!selected.length) { flash("先选人"); return; }
-      var roles = (S.getDayOverride(key) || {}).roles || {};
-      roles[role.id] = { people: selected.slice() };
-      S.patchDayOverride(key, { roles: roles });
-      wrap.remove();
-      flash(role.name + " 今天换给 " + selected.join("、"));
-      renderBody();
-    });
+    if (multi) {
+      saveBtn = h("button", "ep-primary", "确定");
+      saveBtn.addEventListener("click", function () {
+        if (!selected.length) { flash("先选人"); return; }
+        commit(selected);
+      });
+      row.appendChild(saveBtn);
+    }
     var clear = h("button", "ep-ghost", "恢复原样");
     clear.addEventListener("click", function () {
       var roles = (S.getDayOverride(key) || {}).roles || {};
@@ -1171,7 +1203,6 @@
       wrap.remove();
       renderBody();
     });
-    row.appendChild(save);
     row.appendChild(clear);
     wrap.appendChild(row);
 
