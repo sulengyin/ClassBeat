@@ -108,6 +108,17 @@ function boot(hubPorts, search, opts) {
   check(/^http:\/\/127\.0\.0\.1:8766$/.test(d.root.Remote.hub),
         "④ 老服务没 app 字段也认（升级不停机）", d.root.Remote.hub);
 
+  /* ⑤ 老师先开大屏、后启动服务：下一次探测要能重新找到，不用刷新 */
+  const live = new Set();
+  const e = boot(live);
+  await wait(150);
+  check(/^http:\/\/127\.0\.0\.1:8765$/.test(e.root.Remote.hub),
+        "⑤ 服务还没起时停在默认端口", e.root.Remote.hub);
+  live.add(8766);
+  const late = await e.root.Remote.probe();
+  check(late.online === true && /^http:\/\/127\.0\.0\.1:8766$/.test(e.root.Remote.hub),
+        "⑤a 服务后起，下次探测自动接上", e.root.Remote.hub);
+
   console.log();
   console.log(`${pass}/${pass + fail} 通过`);
   process.exit(fail ? 1 : 0);

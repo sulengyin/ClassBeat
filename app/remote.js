@@ -193,6 +193,9 @@
         });
     }).catch(function () {
       info.online = false;
+      /* 服务可能比大屏晚开，也可能因为端口被占换了地方：
+         把发现结果作废，下次再问时重新从 8765 扫一遍。 */
+      if (!fixedHub) hubReady = null;
       return info;
     });
   }
@@ -203,6 +206,17 @@
       if (root.Clock) syncClock();
       /* 一台屏可能开一整天，隔一段时间再校一次，避免慢慢走偏 */
       if (root.setInterval) root.setInterval(syncClock, 10 * 60 * 1000);
+
+      /* 老师常常先开大屏、后双击启动服务。没连上就每分钟重找一次，
+         一旦连上就补一次 connect，屏不用刷新。 */
+      if (root.setInterval) {
+        root.setInterval(function () {
+          if (info.online || fixedHub) return;
+          probe().then(function (i) {
+            if (i && i.online) connect(lastSeq);
+          });
+        }, 60 * 1000);
+      }
 
       /* 先取最新一条：大屏重启时，如果那条还没过期，应该还在屏上 */
       return fetch(HUB + "/api/messages?n=8", { cache: "no-store" })
