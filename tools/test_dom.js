@@ -95,6 +95,8 @@ class El {
 }
 
 const body = new El("body");
+/* 记下挂到 document 上的监听：Esc 关卡片这类全局快捷键要靠它复现 */
+const docHandlers = {};
 const document = {
   body: body,
   documentElement: new El("html"),
@@ -111,7 +113,7 @@ const document = {
     walk(body);
     return found;
   },
-  addEventListener() {},
+  addEventListener(type, fn) { (docHandlers[type] || (docHandlers[type] = [])).push(fn); },
   querySelector(sel) { return body.querySelectorAll(sel)[0] || null; },
   querySelectorAll(sel) { return body.querySelectorAll(sel); },
   fullscreenElement: null
@@ -497,7 +499,12 @@ const answer = qm
   ? (Number(qm[1]) / Number(qm[2])).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
   : "";
 const gks = document.querySelectorAll(".gk");
-answer.split("").forEach(d => {
+/* 回归：输入框以前把数字替换成「•」，老师看不清自己敲了什么 */
+gks.filter(k => k.textContent === answer[0])[0]._h.click();
+check(document.getElementById("gateVal").textContent === answer[0],
+  "验证码输入框显示数字，不用圆点掩码",
+  "显示「" + document.getElementById("gateVal").textContent + "」");
+answer.slice(1).split("").forEach(d => {
   const b = gks.filter(k => k.textContent === d)[0];
   if (b) b._h.click();
 });
@@ -567,19 +574,131 @@ const groupPicked = document.querySelectorAll(".ep-person.on");
 check(groupPicked.length === 8 && global.Store.peopleGroups().length === groupsBefore,
   "点「值日组」把整组 8 人一次选上，且没有自动落库",
   groupPicked.length + " 人，配置里 " + groupsBefore + " 组");
+const confirmBtn = document.querySelector(".ep-primary");
+check(!!confirmBtn && confirmBtn.textContent.indexOf("已选 8 人") >= 0,
+  "多选岗位才保留「确定」，并显示已选人数",
+  confirmBtn ? confirmBtn.textContent : "没有确定按钮");
+check(document.querySelector(".ep-group-modify").style.display === "none",
+  "还没点已存组时「保存修改」不出现，避免误改旧组");
 document.querySelector(".ep-group-name").value = "放学留下";
 document.querySelector(".ep-group-save-btn")._h.click();
 const savedGroup = global.Store.peopleGroups();
 check(savedGroup.length === 1 && savedGroup[0].name === "放学留下"
       && savedGroup[0].memberIds.length === 8,
-  "点「存成组」才写入本机配置，成员不重复",
+  "点「另存为新组」才写入本机配置，成员不重复",
   savedGroup.length + " 组，" + (savedGroup[0] || {}).memberIds.length + " 人");
 const manualChip = document.querySelectorAll(".ep-group-chip")
   .filter(c => c.textContent === "放学留下")[0];
 check(!!manualChip, "存好的组立刻出现在「点组带出」里");
+
+/* 回归：已存的组要能就地改成员，不新增重复组 */
+manualChip._h.click();
+const modifyBtn = document.querySelector(".ep-group-modify");
+check(!!modifyBtn && modifyBtn.textContent === "保存修改" && modifyBtn.style.display === "",
+  "点已存组后出现「保存修改」，写回原组");
+document.querySelectorAll(".ep-person.on")[0]._h.click();
+check(document.querySelectorAll(".ep-person.on").length === 7,
+  "再点一下能减掉一个人", document.querySelectorAll(".ep-person.on").length + " 人");
+check(global.Store.peopleGroups()[0].memberIds.length === 8,
+  "没点保存前改动不落库", global.Store.peopleGroups()[0].memberIds.length + " 人");
+modifyBtn._h.click();
+const updatedGroup = global.Store.peopleGroups();
+check(updatedGroup.length === 1 && updatedGroup[0].name === "放学留下"
+      && updatedGroup[0].memberIds.length === 7,
+  "「保存修改」更新原组成员，不新增重复组",
+  updatedGroup.length + " 组，" + (updatedGroup[0] || {}).memberIds.length + " 人");
+
 document.querySelectorAll(".ep-group-del")[0]._h.click();
 check(global.Store.peopleGroups().length === 0,
   "删组只删这一条，不动名单", global.Store.peopleGroups().length + " 组");
+
+/* 回归：单选岗位点一下就该选定，不该再要求点「就是 TA」二次确认 */
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+const energyLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
+check(!!energyLine, "值日页找得到单选岗位「节能小队长」");
+energyLine.children[0]._h.click();
+/* 回归：点确定后不能跳回顶部，要停在用户刚才那个岗位 */
+document.querySelector(".ep-rows").scrollTop = 120;
+document.querySelector(".ep-body").scrollTop = 40;
+const firstMate = document.querySelectorAll(".ep-person")[0];
+const pickName = firstMate.textContent;
+firstMate._h.click();
+const pickOv = global.Store.getDayOverride("2026-11-09") || {};
+const pickedPeople = (pickOv.roles && pickOv.roles.r02) ? pickOv.roles.r02.people : [];
+check(pickedPeople.length === 1 && pickedPeople[0] === pickName,
+  "单选岗位点候选人就直接写入，不用再点一次确认",
+  pickName + " → " + pickedPeople.join("、"));
+check(document.querySelector(".ep-rows").scrollTop === 120
+      && document.querySelector(".ep-body").scrollTop === 40,
+  "确定后岗位列表与整页滚动位置都保留，不跳回顶部",
+  "rows=" + document.querySelector(".ep-rows").scrollTop
+  + " body=" + document.querySelector(".ep-body").scrollTop);
+check(document.querySelectorAll(".ep-rowline")
+  .filter(l => l.dataset.roleId === "r02").length === 1,
+  "重绘后的行仍然带着岗位 id，锚点找得到");
+check(document.querySelectorAll(".ep-dialog.picker").length === 0,
+  "点完自动关窗回到岗位列表");
+check(document.querySelectorAll(".ep-primary")
+  .filter(b => b.textContent.indexOf("就是") >= 0).length === 0,
+  "单选岗位的换人弹窗不再出现「就是 TA」");
+
+/* 回归：换人卡片要有明确的关闭入口，且同一时刻只能存在一张
+   一体机上没有鼠标，旧卡叠在新卡下面时用户只能再操作一次。 */
+const shutRow = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+const shutRoleId = shutRow.dataset.roleId;
+shutRow.children[0]._h.click();
+const shutBtn = document.querySelector(".ep-dialog-close");
+check(!!shutBtn && shutBtn.textContent === "关闭",
+  "换人卡片右上角有显式「关闭」按钮", shutBtn ? shutBtn.textContent : "没有关闭按钮");
+const closeRule = (fs.readFileSync(path.join(ROOT, "app/edit.css"), "utf8")
+  .match(/\.ep-dialog-close\{[^}]*\}/) || [""])[0];
+check(/min-width:\s*44px/.test(closeRule) && /min-height:\s*44px/.test(closeRule),
+  "关闭按钮触摸区域不小于 44px", closeRule.replace(/\s+/g, " "));
+check(!!document.querySelector(".ep-picker-mask"), "卡片下面有遮罩，挡住后面的岗位");
+shutBtn._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 0
+      && document.querySelectorAll(".ep-picker-mask").length === 0,
+  "点「关闭」后卡片和遮罩都消失");
+
+/* 叠加根因：openPicker 只 append 不清理旧卡，且没有遮罩拦背后点击 */
+shutRow.children[0]._h.click();
+shutRow.children[0]._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 1,
+  "连点两次也只留一张换人卡片",
+  document.querySelectorAll(".ep-dialog.picker").length + " 张");
+const otherRow = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
+otherRow.children[0]._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 1,
+  "开着一张卡时再点别的岗位，也只留一张",
+  document.querySelectorAll(".ep-dialog.picker").length + " 张");
+document.querySelector(".ep-picker-mask")._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 0,
+  "点遮罩能关掉卡片");
+
+otherRow.children[0]._h.click();
+(docHandlers.keydown || []).forEach(fn => fn({ key: "Escape" }));
+check(document.querySelectorAll(".ep-dialog.picker").length === 0,
+  "按 Esc 能关掉卡片");
+
+/* 取消不写配置；关掉卡片后岗位列表和滚动位置都还在 */
+document.querySelector(".ep-rows").scrollTop = 77;
+document.querySelector(".ep-body").scrollTop = 21;
+const ovBeforeClose = JSON.stringify(global.Store.getDayOverride("2026-11-09") || {});
+shutRow.children[0]._h.click();
+document.querySelectorAll(".ep-person")[0]._h.click();
+check(JSON.stringify(global.Store.getDayOverride("2026-11-09") || {}) === ovBeforeClose,
+  "只勾选还没确定，配置不变");
+document.querySelector(".ep-dialog-close")._h.click();
+check(JSON.stringify(global.Store.getDayOverride("2026-11-09") || {}) === ovBeforeClose,
+  "点关闭后这次选择没写进配置", "role=" + shutRoleId);
+check(document.querySelector(".ep-rows").scrollTop === 77
+      && document.querySelector(".ep-body").scrollTop === 21,
+  "关掉卡片后滚动位置和列表状态都还在",
+  "rows=" + document.querySelector(".ep-rows").scrollTop
+  + " body=" + document.querySelector(".ep-body").scrollTop);
 
 global.Store.resetConfig();
 global.Edit.close();

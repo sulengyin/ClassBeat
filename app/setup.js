@@ -91,6 +91,18 @@
     return out;
   }
 
+  /* 执行频率里的时间也能改：只换 freq.times，kind / event / 人员原样保留。 */
+  function editRoleFreqTimes(set, id, times) {
+    var out = clone(set);
+    (out && out.roles || []).forEach(function (r) {
+      if (r.id !== id) return;
+      var f = clone(r.freq || {});
+      f.times = times.slice();
+      r.freq = f;
+    });
+    return out;
+  }
+
   function freqText(freq) {
     if (!freq || freq.kind === "unset") return "尚未设置执行频率，不产生提醒。";
     if (freq.kind === "daily") {
@@ -114,6 +126,9 @@
       if (!b) return;
       if (b.name !== r.name) n++;
       if (b.duty !== r.duty) n++;
+      var bt = (b.freq && b.freq.times) || [];
+      var rt = (r.freq && r.freq.times) || [];
+      if (bt.join("|") !== rt.join("|")) n++;
     });
     return n;
   }
@@ -2138,12 +2153,12 @@
       src.classList.add("warn");
       src.appendChild(el("b", null, "这些岗位来自打包来源班「" + rs.class + "」"));
       src.appendChild(el("span", null, "现在配的是「" + (state.klass || "未填") + "」。"
-        + "可以只改名称和职责；人员、执行频率、轮换规则都原样保留。"
+        + "可以只改名称、职责和执行频率里的时间；人员、轮换规则都原样保留。"
         + "不想用就跳过这一步——屏上不会写入任何岗位。"));
     } else {
       src.appendChild(el("b", null, "岗位清单：共 " + rs.roles.length + " 个"
         + (rs.class ? "（来源班「" + rs.class + "」）" : "")));
-      src.appendChild(el("span", null, "只改名称和职责，人员、执行频率、轮换规则原样保留。"));
+      src.appendChild(el("span", null, "只改名称、职责和执行频率里的时间；人员、轮换规则原样保留。"));
     }
     p.appendChild(src);
     importStart(p);
@@ -2155,7 +2170,8 @@
       var head = el("div", "setup-role-head");
       var f = r.freq || {};
       head.appendChild(el("span", "setup-role-id", r.id));
-      head.appendChild(el("span", "setup-role-freq" + (f.kind === "unset" ? " unset" : ""), freqText(f)));
+      var freqEl = el("span", "setup-role-freq" + (f.kind === "unset" ? " unset" : ""), freqText(f));
+      head.appendChild(freqEl);
       card.appendChild(head);
 
       card.appendChild(field("名称", r.name, function (v) {
@@ -2164,6 +2180,21 @@
       card.appendChild(field("职责", r.duty || "", function (v) {
         state.roles = editRole(state.roles, r.id, "duty", v);
       }, "text", "一句话写清要做什么"));
+
+      /* 执行频率里的时间：有时间的岗位逐条给输入框，改一处只动这一处。
+         kind 为 unset / each / task 的没有时间可填，保持只读说明。 */
+      if (Array.isArray(f.times) && f.times.length) {
+        f.times.forEach(function (t, i) {
+          card.appendChild(field("时间", t, function (v) {
+            var now = (state.roles.roles.filter(function (x) { return x.id === r.id; })[0] || {}).freq || {};
+            var times = (now.times || []).slice();
+            times[i] = v;
+            state.roles = editRoleFreqTimes(state.roles, r.id, times);
+            freqEl.textContent = freqText(now.kind ? { kind: now.kind, event: now.event,
+              task: now.task, times: times } : { kind: "unset" });
+          }, "time"));
+        });
+      }
 
       list.appendChild(card);
     });
@@ -2571,7 +2602,7 @@
     var ac = addedRoleCount(state.roles, state.rolesBase);
     var tk = Object.keys(textPatch).length;
     var roleBits = [];
-    if (rc) roleBits.push("改了 " + rc + " 处名称或职责");
+    if (rc) roleBits.push("改了 " + rc + " 处名称、职责或时间");
     if (ac) roleBits.push("新增 " + ac + " 个岗位（执行频率未设置，不上屏）");
 
     var lines = [
@@ -2786,6 +2817,7 @@
     /* 纯函数给 node 测试用：不碰 DOM，也不读写 localStorage */
     _freqText: freqText,
     _editRole: editRole,
+    _editRoleFreqTimes: editRoleFreqTimes,
     _textPatch: buildTextPatch,
     _roleChangedCount: roleChangedCount,
     _addedRoleCount: addedRoleCount,
