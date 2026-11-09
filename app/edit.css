@@ -36,6 +36,8 @@
 .gk:active{background:#4A3828;transform:scale(.97)}
 .gk.wide{font-size:2.7vmin}
 .gk.primary{background:#FFD64F;color:#2B1D10;border-color:#F1E3C6}
+/* 键位多了一个小数点，进入单独占一行，别挤成半格 */
+.gate-keys .gk.primary{grid-column:1 / -1}
 .gate-cancel{margin:2.6vmin auto 0;display:block;background:none;border:none;
              font:inherit;font-size:2.3vmin;color:#8E7B66;cursor:pointer;padding:1.4vmin}
 

@@ -65,8 +65,8 @@
     val.id = "gateVal";
     box.appendChild(val);
     var keys = h("div", "gate-keys");
-    "123456789 0".split("").forEach(function (c) {
-      if (c === " ") return;
+    /* 商是小数，键盘要能输入小数点；. 只有老师用得上，学生乱按也进不来 */
+    "1234567890.".split("").forEach(function (c) {
       var b = h("button", "gk", c);
       b.addEventListener("click", function () { gateTap(c); });
       keys.appendChild(b);
@@ -130,7 +130,8 @@
     var q = document.getElementById("gateQ");
     var v = document.getElementById("gateVal");
     if (q) q.textContent = challenge.text + " = ?";
-    if (v) v.textContent = gateInput.replace(/./g, "•") || "　";
+    /* 小数点留着看得见，老师能确认自己点对了；数字仍然打点 */
+    if (v) v.textContent = gateInput ? gateInput.replace(/[0-9]/g, "•") : "　";
     var lock = S.lockState();
     var tip = gateEl.querySelector(".gate-tip");
     if (lock.until && Date.now() < lock.until) {
@@ -144,6 +145,8 @@
 
   function gateTap(c) {
     if (gateInput.length >= 5) return;
+    /* 小数点只能有一个，不然「0..3」这种永远答不对 */
+    if (c === "." && gateInput.indexOf(".") >= 0) return;
     gateInput += c;
     paintGate();
   }
@@ -151,7 +154,8 @@
   function submitGate() {
     var lock = S.lockState();
     if (lock.until && Date.now() < lock.until) { paintGate(); return; }
-    if (parseInt(gateInput, 10) === challenge.answer) {
+    var got = parseFloat(gateInput);
+    if (isFinite(got) && Math.abs(got - challenge.answer) < 1e-9) {
       S.resetFail();
       unlockedTill = Date.now() + 5 * 60 * 1000;
       showPanel();

@@ -77,20 +77,27 @@ test("验证码挡住乱输，答对才进设置", async ({ page, request }) => 
   await expect(page.locator(".gate")).toBeVisible();
 
   const q = await page.locator("#gateQ").innerText();
-  const m = q.match(/(\d+)\s*[×x*]\s*(\d+)/);
-  expect(m, `验证码应该是一道算式，实际是「${q}」`).not.toBeNull();
-  const answer = Number(m[1]) * Number(m[2]);
+  // 小数 ÷ 整数。按两位小数四舍五入再抹尾零，别让浮点尾巴变成 0.37000000000000005
+  const m = q.match(/([0-9]+\.[0-9]+)\s*÷\s*([0-9]+)/);
+  expect(m, `验证码应该是一道小数除法，实际是「${q}」`).not.toBeNull();
+  const answer = (Number(m[1]) / Number(m[2])).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  expect(answer, `验证码答案要能算出来，题目是「${q}」`).toMatch(/^[0-9]+(\.[0-9]{1,2})?$/);
+
+  // 键盘逐字输入；小数点也得点得到
+  const tap = async (text) => {
+    for (const ch of text) {
+      const re = new RegExp(`^${ch === "." ? "\\." : ch}$`);
+      await page.locator(".gk", { hasText: re }).click();
+    }
+  };
 
   // 先故意答错：面板不能开
-  const wrong = String(answer + 1);
-  for (const ch of wrong) await page.locator(".gk", { hasText: new RegExp(`^${ch}$`) }).click();
+  await tap(String(Number(answer) + 1));
   await page.locator(".gk.primary").click();
   await expect(page.locator(".ep")).toBeHidden();
 
   // 再答对
-  for (const ch of String(answer)) {
-    await page.locator(".gk", { hasText: new RegExp(`^${ch}$`) }).click();
-  }
+  await tap(answer);
   await page.locator(".gk.primary").click();
   await expect(page.locator("#epTitle")).toBeVisible();
   await expect(page.locator("#epTitle")).toContainText(ping.class);

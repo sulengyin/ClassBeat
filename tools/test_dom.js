@@ -490,7 +490,12 @@ check(!!document.getElementById("gateQ"), "先出验证码，不直接进面板"
 
 /* ---------- 验证码答对后进面板，切到「作息」 ---------- */
 const qText = document.getElementById("gateQ").textContent.replace(" = ?", "");
-const answer = String(qText.split("×").map(x => parseInt(x, 10)).reduce((a, b) => a * b, 1));
+/* 小数 ÷ 整数：按两位小数四舍五入再抹掉尾零，避免浮点尾巴 */
+const qm = qText.match(/^([0-9]+\.[0-9]+) ÷ ([0-9]+)$/);
+check(!!qm, "验证码是一道小数除法", qText);
+const answer = qm
+  ? (Number(qm[1]) / Number(qm[2])).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
+  : "";
 const gks = document.querySelectorAll(".gk");
 answer.split("").forEach(d => {
   const b = gks.filter(k => k.textContent === d)[0];

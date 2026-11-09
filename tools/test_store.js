@@ -216,13 +216,23 @@ check(baked.breakTitle === "课间十分钟" && baked.reading && baked.reading["
 S.resetTexts();
 delete D.texts;
 
-/* ---------- 验证码 ---------- */
-var okShape = true;
-for (var j = 0; j < 30; j++) {
+/* ---------- 验证码：小数 ÷ 整数，除得尽，五年级口算 ---------- */
+var okShape = true, okExact = true, okDigits = true, okSmall = true, badShape = "";
+for (var j = 0; j < 300; j++) {
   var c = S.makeChallenge();
-  if (!(c.a >= 102 && c.a <= 989 && c.b >= 2 && c.b <= 9 && c.answer === c.a * c.b)) okShape = false;
+  /* 只要一位或两位小数的被除数、一位整数除数 */
+  if (!/^[0-9]\.[0-9]([0-9])? ÷ [2-9]$/.test(c.text)) { okShape = false; badShape = c.text; }
+  /* 没有余数：商 × 除数要正好回到被除数 */
+  if (Math.abs(c.a - c.answer * c.b) > 1e-9) okExact = false;
+  if (Math.abs(c.a / c.b - c.answer) > 1e-9) okExact = false;
+  /* 商最多两位小数，学生口算能落笔 */
+  if (Math.abs(Math.round(c.answer * 100) - c.answer * 100) > 1e-9) okDigits = false;
+  if (c.a >= 10) okSmall = false;
 }
-check(okShape, "验证码是三位数 × 一位数", "30 次抽样");
+check(okShape, "验证码是「一位/两位小数 ÷ 一位整数」", badShape || "300 次抽样");
+check(okExact, "除得尽，没有余数");
+check(okDigits, "商最多两位小数，口算能出");
+check(okSmall, "被除数小于 10，不用算大数");
 
 /* ---------- 岗位顺序：班主任定的先后，值日条照它排 ---------- */
 var roleDoc0 = JSON.parse(JSON.stringify(D.roles));

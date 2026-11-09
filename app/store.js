@@ -281,10 +281,34 @@
   }
 
   /* ---------- 验证码 ---------- */
+  /* 小数 ÷ 整数，除得尽，五年级口算能出：
+       · 一位小数：9.6 ÷ 8 = 1.2
+       · 两位小数：1.48 ÷ 4 = 0.37
+     先取「以 0.1 / 0.01 为单位的整数」n，再取除数 b，只从 b 的倍数里挑 n——
+     这样天然没有余数，也不用碰浮点除法。 */
   function makeChallenge() {
-    var a = 102 + Math.floor(Math.random() * 888);  /* 三位数 */
-    var b = 2 + Math.floor(Math.random() * 8);      /* 一位数 2-9 */
-    return { a: a, b: b, answer: a * b, text: a + " × " + b };
+    for (var i = 0; i < 60; i++) {
+      var b = 2 + Math.floor(Math.random() * 8);      /* 除数 2-9 */
+      var two = Math.random() < 0.5;                   /* 被除数是两位小数 */
+      var scale = two ? 100 : 10;
+      var lo = two ? 11 : 5, hi = two ? 499 : 99;      /* 0.11-4.99 / 0.5-9.9 */
+      var first = Math.ceil(lo / b) * b;
+      var last = Math.floor(hi / b) * b;
+      if (last < first) continue;
+      var n = first + b * Math.floor(Math.random() * ((last - first) / b + 1));
+      /* 末位是 0 的话，实际只有一位小数（或干脆是整数），题目就名不副实了 */
+      if (n % 10 === 0) continue;
+      var answer = n / b / scale;
+      if (answer < 0.05) continue;                     /* 0.02 这种不像口算题 */
+      return {
+        a: n / scale,
+        b: b,
+        answer: answer,
+        text: (n / scale).toFixed(two ? 2 : 1) + " ÷ " + b
+      };
+    }
+    /* 理论上到不了；真到了也给一道成立的题，不能把老师锁在门外 */
+    return { a: 9.6, b: 8, answer: 1.2, text: "9.6 ÷ 8" };
   }
 
   /* 连错 3 次锁 60 秒。学生乱试的成本要提高，但不至于把老师也锁死。 */
