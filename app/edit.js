@@ -42,6 +42,7 @@
   }
 
   function close() {
+    closePicker();
     rootEl.classList.remove("show");
     document.body.classList.remove("editing");
     gateEl.style.display = "none";
@@ -115,6 +116,11 @@
     rootEl.appendChild(gateEl);
     rootEl.appendChild(panelEl);
     document.body.appendChild(rootEl);
+
+    /* Esc 关掉换人卡片：卡片是浮层，键盘和触摸都要有退路 */
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" || e.key === "Esc") closePicker();
+    });
   }
 
   /* ---------- 验证码 ---------- */
@@ -202,11 +208,19 @@
     flash.t = setTimeout(function () { n.classList.remove("show"); }, 1800);
   }
 
+  /* 换人卡片是浮层：同一时刻只留一张。开新卡、重绘、退出面板前都先收掉旧的，
+     连点或点卡片后面的岗位时不会叠出第二张。 */
+  function closePicker() {
+    Array.prototype.forEach.call(document.querySelectorAll(".ep-dialog.picker"), function (n) { n.remove(); });
+    Array.prototype.forEach.call(document.querySelectorAll(".ep-picker-mask"), function (n) { n.remove(); });
+  }
+
   /* 重绘是整块 innerHTML 替换，滚动条会回到顶部。
      所以重绘前先记住两处滚动位置（整页 .ep-body 和岗位列表 .ep-rows），
      重绘后原样放回去；给了 anchor 岗位再把它滚进可视区。
      岗位被删掉时找不到行，就只还原滚动位置，不会跳到列表外。 */
   function renderBody(anchorRoleId) {
+    closePicker();
     var prevBody = bodyEl.scrollTop;
     var oldRows = bodyEl.querySelector(".ep-rows");
     var prevRows = oldRows ? oldRows.scrollTop : 0;
@@ -1079,8 +1093,21 @@
   }
 
   function openPicker(role, key) {
+    /* 先收掉可能残留的旧卡：同一时刻只留一张 */
+    closePicker();
+
     var wrap = h("div", "ep-dialog picker");
-    wrap.appendChild(h("div", "ep-dialog-title", "换人 · " + role.name));
+    var head = h("div", "ep-dialog-head");
+    head.appendChild(h("div", "ep-dialog-title", "换人 · " + role.name));
+    var shut = h("button", "ep-dialog-close", "关闭");
+    shut.title = "关闭，这次的选择不保存";
+    shut.addEventListener("click", function () { closePicker(); });
+    head.appendChild(shut);
+    wrap.appendChild(head);
+
+    /* 遮罩挡住卡片后面的岗位：触摸时误点不会又开一张卡 */
+    var mask = h("div", "ep-picker-mask");
+    mask.addEventListener("click", function () { closePicker(); });
 
     var multi = roleIsMulti(role);
     var groupBox = null;
@@ -1284,6 +1311,7 @@
     row.appendChild(clear);
     wrap.appendChild(row);
 
+    panelEl.appendChild(mask);
     panelEl.appendChild(wrap);
     q.focus();
   }

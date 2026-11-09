@@ -95,6 +95,8 @@ class El {
 }
 
 const body = new El("body");
+/* 记下挂到 document 上的监听：Esc 关卡片这类全局快捷键要靠它复现 */
+const docHandlers = {};
 const document = {
   body: body,
   documentElement: new El("html"),
@@ -111,7 +113,7 @@ const document = {
     walk(body);
     return found;
   },
-  addEventListener() {},
+  addEventListener(type, fn) { (docHandlers[type] || (docHandlers[type] = [])).push(fn); },
   querySelector(sel) { return body.querySelectorAll(sel)[0] || null; },
   querySelectorAll(sel) { return body.querySelectorAll(sel); },
   fullscreenElement: null
@@ -640,6 +642,63 @@ check(document.querySelectorAll(".ep-dialog.picker").length === 0,
 check(document.querySelectorAll(".ep-primary")
   .filter(b => b.textContent.indexOf("就是") >= 0).length === 0,
   "单选岗位的换人弹窗不再出现「就是 TA」");
+
+/* 回归：换人卡片要有明确的关闭入口，且同一时刻只能存在一张
+   一体机上没有鼠标，旧卡叠在新卡下面时用户只能再操作一次。 */
+const shutRow = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+const shutRoleId = shutRow.dataset.roleId;
+shutRow.children[0]._h.click();
+const shutBtn = document.querySelector(".ep-dialog-close");
+check(!!shutBtn && shutBtn.textContent === "关闭",
+  "换人卡片右上角有显式「关闭」按钮", shutBtn ? shutBtn.textContent : "没有关闭按钮");
+const closeRule = (fs.readFileSync(path.join(ROOT, "app/edit.css"), "utf8")
+  .match(/\.ep-dialog-close\{[^}]*\}/) || [""])[0];
+check(/min-width:\s*44px/.test(closeRule) && /min-height:\s*44px/.test(closeRule),
+  "关闭按钮触摸区域不小于 44px", closeRule.replace(/\s+/g, " "));
+check(!!document.querySelector(".ep-picker-mask"), "卡片下面有遮罩，挡住后面的岗位");
+shutBtn._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 0
+      && document.querySelectorAll(".ep-picker-mask").length === 0,
+  "点「关闭」后卡片和遮罩都消失");
+
+/* 叠加根因：openPicker 只 append 不清理旧卡，且没有遮罩拦背后点击 */
+shutRow.children[0]._h.click();
+shutRow.children[0]._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 1,
+  "连点两次也只留一张换人卡片",
+  document.querySelectorAll(".ep-dialog.picker").length + " 张");
+const otherRow = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
+otherRow.children[0]._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 1,
+  "开着一张卡时再点别的岗位，也只留一张",
+  document.querySelectorAll(".ep-dialog.picker").length + " 张");
+document.querySelector(".ep-picker-mask")._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 0,
+  "点遮罩能关掉卡片");
+
+otherRow.children[0]._h.click();
+(docHandlers.keydown || []).forEach(fn => fn({ key: "Escape" }));
+check(document.querySelectorAll(".ep-dialog.picker").length === 0,
+  "按 Esc 能关掉卡片");
+
+/* 取消不写配置；关掉卡片后岗位列表和滚动位置都还在 */
+document.querySelector(".ep-rows").scrollTop = 77;
+document.querySelector(".ep-body").scrollTop = 21;
+const ovBeforeClose = JSON.stringify(global.Store.getDayOverride("2026-11-09") || {});
+shutRow.children[0]._h.click();
+document.querySelectorAll(".ep-person")[0]._h.click();
+check(JSON.stringify(global.Store.getDayOverride("2026-11-09") || {}) === ovBeforeClose,
+  "只勾选还没确定，配置不变");
+document.querySelector(".ep-dialog-close")._h.click();
+check(JSON.stringify(global.Store.getDayOverride("2026-11-09") || {}) === ovBeforeClose,
+  "点关闭后这次选择没写进配置", "role=" + shutRoleId);
+check(document.querySelector(".ep-rows").scrollTop === 77
+      && document.querySelector(".ep-body").scrollTop === 21,
+  "关掉卡片后滚动位置和列表状态都还在",
+  "rows=" + document.querySelector(".ep-rows").scrollTop
+  + " body=" + document.querySelector(".ep-body").scrollTop);
 
 global.Store.resetConfig();
 global.Edit.close();

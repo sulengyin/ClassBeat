@@ -143,6 +143,18 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-dialog-title{font-size:2.9vmin;font-weight:900;margin-bottom:1.8vmin}
 .ep-dialog .ep-input{margin-bottom:1.3vmin}
 
+/* 换人卡片：遮罩挡住后面的岗位，右上角留一个 44px 的明确关闭按钮，
+   一体机上不靠「点空白处」猜着退出 */
+.ep-picker-mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:119}
+.ep-dialog-head{display:flex;align-items:center;justify-content:space-between;
+                gap:1.5vmin;margin-bottom:1.8vmin}
+.ep-dialog-head .ep-dialog-title{margin-bottom:0}
+.ep-dialog-close{font:inherit;font-size:2.2vmin;font-weight:800;
+                 min-width:44px;min-height:44px;padding:.8vmin 1.6vmin;
+                 border-radius:1.2vmin;border:.24vmin solid #6B5641;
+                 background:#3D2D20;color:#E2D4BC;cursor:pointer}
+.ep-dialog-close:hover{background:#4A3728;border-color:#A08A6E}
+
 .ep-people{display:grid;grid-template-columns:repeat(4,1fr);gap:.9vmin;margin-top:1.3vmin;
            max-height:42vmin;overflow:auto}
 .ep-person{font:inherit;font-size:2.6vmin;padding:1.4vmin .8vmin;border-radius:1.2vmin;
