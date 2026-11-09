@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import re
 import shutil
+import subprocess
 import sys
 import urllib.request
 import zipfile
@@ -42,19 +44,78 @@ def class_name() -> str:
     return "班级"
 
 
+def cli_value(flag: str) -> str:
+    args = sys.argv[1:]
+    if flag in args:
+        i = args.index(flag)
+        if i + 1 < len(args):
+            return args[i + 1]
+    return ""
+
+
+def version_stamp() -> tuple[str, str]:
+    """版本号只在 app/version.js 里定义；打包时 --version 可覆盖，构建号取 git 短 SHA。"""
+    src = (APP / "version.js").read_text(encoding="utf-8")
+    m = re.search(r'var VERSION = "([^"]*)"', src)
+    ver = cli_value("--version") or (m.group(1) if m else "0.0.0")
+    build = "dev"
+    try:
+        build = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+            stderr=subprocess.DEVNULL).decode().strip() or "dev"
+    except Exception:
+        pass
+    return ver, build
+
+
+def stamped_version_js(ver: str, build: str) -> str:
+    """生成带真实版本/构建号的 version.js；仓库里的源文件保持不动。"""
+    src = (APP / "version.js").read_text(encoding="utf-8")
+    src = re.sub(r'(var VERSION = ")[^"]*(")', lambda m: m.group(1) + ver + m.group(2), src, count=1)
+    src = re.sub(r'(var BUILD = ")[^"]*(")', lambda m: m.group(1) + build + m.group(2), src, count=1)
+    return src
+
+
 PACK_NAME = class_name().replace("（", "").replace("）", "") + "节律屏-测试包"
 
 # 大屏运行需要的文件，逐个列出来——比整目录拷安全，免得把调试残留带进去
 APP_FILES = [
-    "index.html", "preview.html", "edit.css", "setup.css",
+    "version.js", "index.html", "preview.html", "edit.css", "setup.css",
     "data.js", "engine/schedule.js", "clock.js", "rhythm.js", "store.js",
-    "runtime.js", "screen.js", "remote.js", "edit.js", "demo.js", "config.js",
-    "qr.js", "phoneui.js", "setup.js", "templates.js", "vendor/qrcode.min.js",
+    "runtime.js", "screen.js", "remote.js", "edit.js", "update.js", "demo.js",
+    "config.js", "qr.js", "phoneui.js", "setup.js", "templates.js",
+    "vendor/qrcode.min.js",
 ]
 SERVER_FILES = ["rhythm_server.py", "run.py", "phone.html"]
 
 # .bat 内容保持纯 ASCII：cmd 默认 GBK，中文容易花
-BAT_SCREEN = "@echo off\r\nstart \"\" \"%~dp0app\\index.html\"\r\n"
+# 大屏优先走本机服务：同一个来源，端口顺延也能跟上；没有 Python 才退回 file://。
+BAT_SCREEN = (
+    "@echo off\r\n"
+    "cd /d \"%~dp0server\"\r\n"
+    "\r\n"
+    "if exist \"python\\pythonw.exe\" goto bundled\r\n"
+    "\r\n"
+    "set \"PYW=\"\r\n"
+    "pythonw -c \"import sys\" >nul 2>&1\r\n"
+    "if not errorlevel 1 set \"PYW=pythonw\"\r\n"
+    "if not defined PYW (\r\n"
+    "  pyw -3 -c \"import sys\" >nul 2>&1\r\n"
+    "  if not errorlevel 1 set \"PYW=pyw -3\"\r\n"
+    ")\r\n"
+    "if not defined PYW goto nofile\r\n"
+    "start \"\" %PYW% run.py --open\r\n"
+    "exit /b 0\r\n"
+    "\r\n"
+    ":bundled\r\n"
+    "start \"\" \"python\\pythonw.exe\" run.py --open\r\n"
+    "exit /b 0\r\n"
+    "\r\n"
+    ":nofile\r\n"
+    "rem 没有 Python：退回本地文件方式，大屏照样能看，手机消息用不了\r\n"
+    "start \"\" \"%~dp0app\\index.html\"\r\n"
+    "exit /b 0\r\n"
+)
 BAT_DEMO = "@echo off\r\nstart \"\" \"%~dp0app\\preview.html\"\r\n"
 # 编码用 GBK，不用 UTF-8 + chcp 65001。
 # 实测（2026-11-06，一体机）：UTF-8 + chcp 65001 下 cmd 逐行解码会在长中文行上错位，
@@ -196,11 +257,29 @@ README = """{klass} · 班级节律屏
 整个屏只有这一个文件，不用解压，Windows / 安卓 / 鸿蒙都能用浏览器打开。
 
 Windows 也可以用文件夹里的：
-  双击「打开大屏.bat」，或者直接双击 app\\index.html
+  双击「打开大屏.bat」——它会顺带启动本机服务，并打开
+  http://127.0.0.1:8765/screen（端口被占会自动顺延，脚本跟着实际端口走）
+  电脑上没有 Python 时，它会退回直接双击 app\\index.html。
+
+┌─ 以前是「双击 html」用的，现在第一次这样打开 ─┐
+浏览器会把「双击文件」和「从本机地址打开」当成两个不同的地方，
+原来的修改不会自动带过来，看起来像全空。搬一次就好：
+
+  1. 先用旧方式打开一次：双击 app\\index.html
+  2. ⋯ →「编辑」→「文字」→ 页面最下面的「带走这些修改」→ 导出设置
+  3. 关掉，双击「打开大屏.bat」按新地址打开
+  4. ⋯ →「编辑」→「导入设置」，选刚导出的那个文件
+
+以后一直用「打开大屏.bat」，就不会再变。屏幕底部出现提示条时，
+点「知道了」当天不再弹。
 
 打开后按 F11 全屏（安卓点浏览器菜单里的「全屏」）。
 
-大屏不需要联网，也不需要装任何东西。
+版本号在右下角「⋯」展开后能看到（如 v0.1.0 · a1b2c3d），
+报问题时把这串发给管理员，能直接对上是哪一版。
+
+大屏日常不需要联网，也不需要装任何东西；只有「有没有新版本」的检查
+需要网络，连不上就安静跳过，不影响显示。
 单文件版没有「手机发消息」，要那个功能用文件夹里的启动脚本。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -307,7 +386,7 @@ def collect() -> list[tuple[Path, str]]:
     return items
 
 
-def build_single(out: Path) -> Path:
+def build_single(out: Path, ver: str, build: str) -> Path:
     """把 css/js 全部内联成一个 html。
 
     为什么要有这个：安卓一体机、或者老师只想发一个文件过去时，
@@ -324,7 +403,8 @@ def build_single(out: Path) -> Path:
 
     # 按 APP_FILES 走，别再单独维护一份列表——加了 config.js 容易漏
     for name in [f for f in APP_FILES if f.endswith(".js")]:
-        code = (APP / name).read_text(encoding="utf-8")
+        code = stamped_version_js(ver, build) if name == "version.js" \
+            else (APP / name).read_text(encoding="utf-8")
         # 代码里若出现 </script> 会提前结束标签，转义掉
         code = code.replace("</script>", "<\\/script>")
         html = html.replace(f'<script src="{name}"></script>',
@@ -356,13 +436,17 @@ def main() -> None:
 
     readme = README.format(date=today.isoformat(), klass=name.split("节律屏")[0])
 
-    build_single(single_path)
+    ver, build = version_stamp()
+    build_single(single_path, ver, build)
 
     pyzip = None if "--no-python" in sys.argv else python_runtime()
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for src, arc in items:
-            z.write(src, f"{name}/{arc}")
+            if arc == "app/version.js":
+                z.writestr(f"{name}/{arc}", stamped_version_js(ver, build).encode("utf-8"))
+            else:
+                z.write(src, f"{name}/{arc}")
 
         if pyzip:
             with zipfile.ZipFile(pyzip) as pz:
@@ -389,6 +473,7 @@ def main() -> None:
              else "（没带 Python，一体机要自己装才能用手机发消息）"))
     print(f"已生成 {single_path}")
     print(f"  单文件 {one:.0f} KB，任何系统双击即开（没有手机发消息）")
+    print(f"版本 v{ver} · 构建 {build}")
 
 
 if __name__ == "__main__":

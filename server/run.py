@@ -123,13 +123,36 @@ def say_running(info):
             pass
 
 
+def open_screen(port):
+    """用真实端口打开大屏：端口顺延也跟着走，不用改脚本。失败不影响服务。"""
+    try:
+        import webbrowser
+        webbrowser.open(f"http://127.0.0.1:{port}/screen")
+    except Exception:
+        pass
+
+
+def wait_ready(timeout=12):
+    """等服务起来，返回实际端口；超时就返回 0（大屏这次不自动打开）。"""
+    end = time.time() + timeout
+    while time.time() < end:
+        info = find_running()
+        if info:
+            return info["port"]
+        time.sleep(0.4)
+    return 0
+
+
 def main():
     global _quiet
     _quiet = sys.stdout is None or sys.stderr is None
+    want_open = "--open" in sys.argv[1:]
 
     running = find_running()
     if running:
         say_running(running)
+        if want_open:
+            open_screen(running["port"])
         return 0
 
     trim_log()
@@ -144,6 +167,7 @@ def main():
 
     fails = 0
     proc = None
+    opened = False
     try:
         while True:
             started = time.time()
@@ -160,6 +184,15 @@ def main():
                     log.write(f"\n[guard] 启动失败：{e}\n")
                 say(f"启动失败：{e}")
                 return 1
+
+            # 只在大屏启动入口（--open）时打开一次浏览器，用实际端口
+            if want_open and not opened:
+                opened = True
+                port = wait_ready()
+                if port:
+                    open_screen(port)
+                else:
+                    say("服务还没起来，这次没有自动打开大屏")
 
             code = proc.wait()
             lived = time.time() - started

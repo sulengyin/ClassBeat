@@ -126,7 +126,7 @@ const document = {
  "qr-panel", "qr-url", "qr-empty", "qr-close",
  "qr-copy-row", "qr-copy", "qr-copied", "qr-change",
  "msgModal", "msgCard", "msgContent", "msgBody", "msgTitle", "msgTime", "msgClose",
- "setup", "btn-setup",
+ "setup", "btn-setup", "ver", "tip", "tipText", "tipClose",
  "demo", "d-play", "d-now", "d-ribbon", "d-range", "d-speed", "d-close"].forEach(id => {
   const e = new El(id.indexOf("btn") === 0 || id === "warn-title" ? "button" : "div");
   e.id = id;
@@ -210,7 +210,7 @@ loadVendor("app/vendor/qrcode.min.js", "qrcode");
 /* 固定夹具，不读 app/data.js：本机 app/data.js 是真实班级，CI 是 sample，
    两种数据跑同一套断言必然一边红。夹具由
    `python3 tools/bundle.py --data sample --out tools/fixtures/data.sample.js` 生成。 */
-["tools/fixtures/data.sample.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/demo.js", "app/templates.js", "app/setup.js"]
+["tools/fixtures/data.sample.js", "app/version.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/update.js", "app/demo.js", "app/templates.js", "app/setup.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
@@ -228,6 +228,55 @@ check(!!global.Edit, "edit.js 注册成功");
 check(!!global.Demo, "demo.js 注册成功");
 check(!!global.Remote, "remote.js 注册成功");
 check(global.Remote && /127\.0\.0\.1:8765/.test(global.Remote.hub), "默认连本机服务", global.Remote && global.Remote.hub);
+
+/* 版本号只有一个来源；更新/迁移提示都不该打扰大屏 */
+check(!!global.AppVersion && /^\d+\.\d+\.\d+$/.test(AppVersion.version),
+  "版本号是语义版本", AppVersion && AppVersion.version);
+const verEl = document.getElementById("ver");
+check(verEl.textContent === AppVersion.text(), "界面上的版本取自同一份", verEl.textContent);
+const versionDefs = fs.readdirSync(path.join(ROOT, "app"))
+  .filter(f => f.endsWith(".js") && f !== "version.js")
+  .filter(f => /var\s+VERSION\s*=/.test(fs.readFileSync(path.join(ROOT, "app", f), "utf8")));
+check(versionDefs.length === 0, "版本号只在 app/version.js 定义", versionDefs.join(",") || "无");
+const pageHtml = fs.readFileSync(path.join(ROOT, "app/index.html"), "utf8");
+check((pageHtml.match(/src="version\.js"/g) || []).length === 1, "index.html 只引入一次 version.js");
+check(/stamped_version_js/.test(fs.readFileSync(path.join(ROOT, "tools/package.py"), "utf8")),
+  "打包脚本会把版本与构建号写进发布包");
+
+const tipEl = document.getElementById("tip");
+const tipText = document.getElementById("tipText");
+Update._setLatest("");
+Update._setMigrate(true);
+Update._renderTip();
+check(!tipEl.hidden && tipText.textContent.includes("导出"),
+  "换地址后第一次打开会提示怎么搬设置", tipText.textContent);
+document.getElementById("tipClose")._h.click();
+Update._renderTip();
+check(tipEl.hidden === true && localStorage.getItem("rhythm.migrate.hint.v1") === "1",
+  "迁移提示点掉后不再出现");
+
+Update._setMigrate(false);
+Update._setLatest("9.9.9");
+Update._renderTip();
+check(!tipEl.hidden && tipText.textContent.includes("9.9.9"),
+  "发现新版时给非阻断提示", tipText.textContent);
+document.getElementById("tipClose")._h.click();
+Update._renderTip();
+check(tipEl.hidden === true, "「知道了」能关掉更新提示");
+Update._renderTip();
+check(tipEl.hidden === true, "同一版本关掉后不再反复弹");
+Update._setLatest("9.9.10");
+Update._renderTip();
+check(!tipEl.hidden, "更高的新版本会再提示一次");
+
+Update._setLatest("");
+let updThrew = false;
+const realFetch = global.fetch;
+global.fetch = () => Promise.reject(new Error("offline"));
+try { Update.check(); } catch (e) { updThrew = true; }
+global.fetch = realFetch;
+Update._renderTip();
+check(!updThrew && tipEl.hidden === true, "断网检查更新不抛错、不弹提示");
 
 /* boot 在加载时已跑（readyState=complete） */
 const band = document.getElementById("band");
