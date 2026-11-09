@@ -298,8 +298,11 @@ check(!!document.querySelector(".reminder-line"),
   "提醒和这句话不同时，黄色贴纸仍在");
 global.Store.patchTexts({ reminders: { "default": "戴好红领巾，打扫好个人卫生。" } });
 Screen.render();
-check(!document.querySelector(".reminder-line"),
-  "同一句不再重复贴成提醒事项");
+check(!!document.querySelector(".reminder-line"),
+  "同一句仍然用黄色贴纸呈现，不缺席");
+check(document.getElementById("after").textContent === "",
+  "贴纸已经承载这句话，正文那句不再重复",
+  document.getElementById("after").textContent);
 global.Store.resetTexts();
 
 /* 紧急通知：红色只由老师手动发，文字要能占住主区 */
@@ -707,6 +710,11 @@ global.Remote.info.phone = "";
     String(box.querySelectorAll(".setup-text-sec").length));
   check(doneBtns.indexOf("恢复至修改前") >= 0, "完成页有恢复快照的入口",
     doneBtns.join(" / "));
+  /* 配置本来就一致时，最后一步只给「完成」；「重新应用」是次要动作，
+     不会出现「完成」一关就把草稿丢掉的路径。 */
+  check(doneBtns.indexOf("完成") >= 0 && doneBtns.indexOf("重新应用") >= 0
+        && doneBtns.indexOf("应用到这台机器") < 0,
+    "未改动时最后一步先给「完成」，应用是次要动作", doneBtns.join(" / "));
   check(inputsIn(box).length > 35, "岗位和文案都能直接编辑",
     String(inputsIn(box).length));
 
@@ -908,6 +916,10 @@ global.Remote.info.phone = "";
   check(landed.timetable && landed.timetable.blocks[0].start === "07:40",
     "改的作息也落盘了", landed.timetable && landed.timetable.blocks[0].start);
 
+  const afterBtns = box.querySelectorAll(".setup-btn").map(b => b.textContent);
+  check(afterBtns.indexOf("完成") >= 0 && afterBtns.indexOf("应用到这台机器") < 0,
+    "应用成功后主按钮变成「完成」", afterBtns.join(" / "));
+
   /* 应用后不用刷新，抬头当场就是新班名（B5 真浏览器验收时补上的） */
   Screen.render();
   check(document.getElementById("cls").textContent === "测试二班",
@@ -953,6 +965,23 @@ global.Remote.info.phone = "";
   global.Store.resetConfig();
   loadBrowserScript("app/setup.js");
   check(!box.classList.contains("open"), "配置齐全时启动不自动弹向导");
+
+  /* ---------- 课间：「准备好」提到「课间」下一行、同字号 ---------- */
+  global.__rhythmDate = "2026-11-05";
+  global.__rhythmTime = 10 * 60 + 18;
+  Screen.render();
+  const chipRows = document.getElementById("chips").children;
+  const bTask = document.getElementById("heroTask");
+  const bMain = document.getElementById("heroMain");
+  check(chipRows.length === 1 && chipRows[0].className === "chip-row",
+    "课间底部只留喝水/上厕所，不再重复清单",
+    chipRows.map(r => r.className).join(" → "));
+  check(bTask.textContent.indexOf("准备好") === 0,
+    "「准备好」在「课间」的下一行",
+    bTask.textContent);
+  check(bTask.style.fontSize === bMain.style.fontSize,
+    "「准备好」和「课间」同字号",
+    bTask.style.fontSize + " / " + bMain.style.fontSize);
 
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);

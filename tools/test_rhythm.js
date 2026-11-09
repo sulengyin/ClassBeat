@@ -214,9 +214,11 @@ s = at("2026-11-05", "07:45", {
     reminders: { "default": "戴好红领巾，打扫好个人卫生" }
   }
 });
-check(s.kind === "reading" && s.note === "戴好红领巾，打扫好个人卫生。",
-  "早读期间一句话仍是到校那句", s.note);
-check(s.lines.length === 0, "同一句不重复贴成提醒事项", JSON.stringify(s.lines));
+check(s.kind === "reading" && s.lines.length === 1
+  && s.lines[0].kind === "reminder"
+  && s.lines[0].items[0] === "戴好红领巾，打扫好个人卫生",
+  "同一句用黄色贴纸承载，不缺席", JSON.stringify(s.lines));
+check(s.note === "", "贴纸顶上来后，正文不再重复这句话", s.note);
 
 s = at("2026-11-05", "07:45", {
   texts: {

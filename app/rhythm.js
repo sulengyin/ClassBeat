@@ -184,19 +184,21 @@
           var advice = (rd.task || "").trim();
           var remBefore = reminderFor(opts, day);
           var noteBefore = stageText(opts, "before", "note", "");
+          /* 旧作息没有 reading 块，到校后这一整段就是早读时间。
+             提醒事项一定要出现，而且优先用黄色便签承载；
+             和正文那句重复时，正文让位，避免同一句话出现两次。 */
+          var sameBefore = !!remBefore && bare(remBefore) === bare(noteBefore);
           return {
             kind: "before",
             title: rd.subject + "学习建议",
             sub: c0 ? "第 1 节 " + c0.subject : "",
-            note: noteBefore,
+            note: sameBefore ? "" : noteBefore,
             arrived: true,
             reading: true,
             meta: [],
             items: [],
             advice: advice,
-            /* 旧作息没有 reading 块，到校后这一整段就是早读时间，
-               提醒事项在这里同样要出现，否则改了小标题却丢了提醒。 */
-            lines: remBefore && bare(remBefore) !== bare(noteBefore)
+            lines: remBefore
               ? [{ kind: "reminder", label: "提醒事项", items: [remBefore] }]
               : [],
             countdown: countdownFor("before", first - minutes, mode),
@@ -254,10 +256,11 @@
          和标题同字号——早读就一件事，学生从最后一排也要看得清。 */
       card.advice = tip || "";
       /* 提醒事项排在建议前面：它是今天必须记住的那一件，
-         不能埋在"读第几课"下面。和上面那句完全一样就不再贴一遍，
-         同一句话在屏上出现两次，学生反而以为是两件事。 */
-      if (rem && bare(rem) !== bare(card.note)) {
+         不能埋在"读第几课"下面。这句话和到校那句一样时，仍然要贴黄色便签——
+         纯文字不够醒目；重复的那行正文就不再显示，避免同一句出现两次。 */
+      if (rem) {
         card.lines.push({ kind: "reminder", label: "提醒事项", items: [rem] });
+        if (bare(rem) === bare(card.note)) card.note = "";
       }
     }
 

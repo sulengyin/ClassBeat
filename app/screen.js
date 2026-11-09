@@ -140,15 +140,28 @@
      直到两行加起来塞得进主区——建议写得长时先是折行，还不够就整块缩，
      绝不让提醒贴纸被顶出卡片。 */
   var ADVICE_H = 41;   /* 标题 + 建议可用的高度，vmin */
-  function adviceSize(title, advice, cap) {
+  function adviceSize(title, advice, cap, maxH) {
     var wt = Math.max(weight(title), 1), wa = Math.max(weight(advice), 1);
+    var room = maxH || ADVICE_H;
     var s = cap;
     for (; s > 4.6; s -= 0.12) {
       var lt = Math.max(1, Math.ceil((wt * s - .5) / CARD_W));
       var la = Math.max(1, Math.ceil((wa * s - .5) / CARD_W));
-      if ((lt + la) * s * 1.13 <= ADVICE_H) break;
+      if ((lt + la) * s * 1.13 <= room) break;
     }
     return Math.max(4.6, s);
+  }
+
+  /* 课间的「准备好」不再是底部小字：它和「课间」两个字同一行级、同字号。
+     从 lines 里取出来交给 #heroTask，chips 只留喝水/上厕所。 */
+  function breakPrep(s) {
+    if (!s || s.kind !== "break") return null;
+    var lines = s.lines || [];
+    for (var i = 0; i < lines.length; i++) if (lines[i].kind === "prep") return lines[i];
+    return null;
+  }
+  function prepText(line) {
+    return dot((line.label || "准备好") + "：" + (line.items || []).join("、"));
   }
 
   var BAND = {
@@ -180,6 +193,8 @@
       return "下一节 " + s._next.subject + (s._next.teacher ? "　" + s._next.teacher : "");
     }
     if (s.kind === "closed") return s.note || "整理好书包，明天见";
+    /* 早读没有第二行就留白：别把「第 1 节 语文」顶上来冒充一句话 */
+    if (s.reading) return s.note || "";
     return s.note || s.sub || "";
   }
 
@@ -471,7 +486,7 @@
     el.band.style.letterSpacing = urgent ? ".3em" : ".2em";
 
     /* 主视觉 */
-    var main, sub, after, size, task = "";
+    var main, sub, after, size, task = "", promoted = null;
     if (urgent) {
       main = notice.text;
       sub = "";
@@ -482,18 +497,28 @@
       sub = s.nextLabel || "后上课";
       after = afterText(s);
       size = 20;
+      /* 课间倒计时也把清单留在「还有几分钟」下面，别掉回底部小字 */
+      promoted = breakPrep(s);
+      if (promoted) task = prepText(promoted);
     } else {
       main = s.title;
       sub = "";
       after = afterText(s);
       /* 便签占了一条，主视觉就让一点位置，别把卡片撑破 */
       size = notice ? textSize(main, 13, 17) : textSize(main, 16, 22);
-      /* 早读这块要和下一行同字号，标题先压到一行：六字标题折成两行不好看 */
       if (s.reading) {
+        /* 早读这块要和下一行同字号，标题先压到一行：六字标题折成两行不好看 */
         size = Math.min(size, CARD_W / Math.max(weight(main), 1));
         if (s.advice) {
           task = dot(s.advice);
           size = notice ? Math.min(size, 13) : adviceSize(main, task, size);
+        }
+      } else {
+        /* 课间：「准备好」跟「课间」两个字同字号、紧贴下一行 */
+        promoted = breakPrep(s);
+        if (promoted) {
+          task = prepText(promoted);
+          size = notice ? Math.min(size, 13) : adviceSize(main, task, size, 52);
         }
       }
     }
@@ -505,15 +530,18 @@
     el.heroMain.style.fontSize = size + "vmin";
     if (el.heroTask) {
       el.heroTask.textContent = task;
-      el.heroTask.style.fontSize = size + "vmin";
+      el.heroTask.style.fontSize = (isTicker && task ? 8 : size) + "vmin";
     }
     setText(el.after, after);
 
     /* 普通通知：贴在主区上方一条，不改主视觉 */
     renderNotice(notice && !urgent ? notice : null);
 
-    /* 动作 / 用品：两行——先去做什么，再带什么 */
-    renderChips(urgent ? [] : (s.lines || []));
+    /* 动作 / 用品：两行——先去做什么，再带什么。
+       课间那行「准备好」已经提上去当第二主行，这里不再重复。 */
+    renderChips(urgent ? [] : (s.lines || []).filter(function (l) {
+      return l !== promoted;
+    }));
 
     document.title = CFG.title({ urgent: urgent, title: s.title });
 
@@ -551,7 +579,13 @@
     el.chips.innerHTML = "";
     var k = 0;
 
-    (lines || []).forEach(function (line) {
+    /* 「准备好」永远排在最后一行：课间先说喝水/上厕所，再列要带的东西。
+       稳定排序，其余行（提醒、动作）保持原有先后。 */
+    var ordered = (lines || []).slice().sort(function (a, b) {
+      return (a.kind === "prep" ? 1 : 0) - (b.kind === "prep" ? 1 : 0);
+    });
+
+    ordered.forEach(function (line) {
       var row = document.createElement("div");
       row.className = line.kind === "prep" ? "prep-line"
         : (line.kind === "reminder" ? "reminder-line" : "chip-row");

@@ -133,6 +133,29 @@ body[data-theme="dark"] .aura{
 }
 @keyframes aura{from{transform:translate3d(-.8%,-.6%,0) scale(1)}to{transform:translate3d(1%,.8%,0) scale(1.03)}}
 
+/* 深色模式的粒子光：黑底上飘一点点冷蓝，像夜里教室窗外。
+   只在深色开，浅色纸上加光点会脏。
+   点放在 z-index:0，主卡在 z-index:2——粒子永远在纸卡后面，
+   不会钻进字里。 */
+.field{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  overflow:hidden;display:none;
+}
+body[data-theme="dark"] .field{display:block}
+.field i{
+  position:absolute;border-radius:50%;
+  background:#A8CCFF;
+  box-shadow:0 0 .75vmin rgba(150,195,255,.85);
+  opacity:0;
+  animation:rise var(--d,8s) linear infinite;
+  animation-delay:var(--dl,0s);
+}
+@keyframes rise{
+  0%  {transform:translateY(6vmin) scale(.5);opacity:0}
+  18% {opacity:.8}
+  100%{transform:translateY(-20vmin) scale(1);opacity:0}
+}
+
 /* ---------- 顶栏：班级牌 + 时钟贴纸 ---------- */
 header{
   position:relative;z-index:3;
@@ -296,6 +319,17 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
 .after:empty{display:none}
 @keyframes after-in{from{opacity:0;transform:translateY(1vmin)}to{opacity:1;transform:none}}
 
+/* 早读/到校那句「戴好红领巾…」有时是正文（提醒贴纸与它重复时贴纸不出现），
+   这时动的是这句话本身。align-self 让它按文字宽度收缩，缩放中心才落在字上，
+   否则整行 block 一缩，字会横向漂。 */
+body[data-kind="reading"] .after,
+body[data-kind="before"] .after{
+  align-self:flex-start;max-width:92vmin;
+  transform-origin:50% 50%;
+  animation:after-in .5s var(--e-out) .06s backwards,
+            reminder-hop 2.6s cubic-bezier(.45,0,.55,1) infinite;
+}
+
 /* 动作 / 用品：两行。第一行是"现在去做什么"，第二行是"带什么"。
    分开是因为这两件事发生的时间不一样：先喝水上厕所，再收书包。
    挤在一行，学生会当成一串并列的事一起看过去。 */
@@ -322,15 +356,17 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
 @keyframes chip-in{from{opacity:0;transform:translateY(1.2vmin) scale(.94) rotate(-3deg)}to{opacity:1}}
 
 /* 第二行：准备好。不做成色块，做成"写在纸上的一行字"，
-   和第一行的色块拉开层级——一个是命令，一个是清单。 */
+   和第一行的色块拉开层级——一个是命令，一个是清单。
+   课间那行 chip 有底色和边框，同样 3.6vmin 看着就是比裸字大；
+   所以这里给到 4.2vmin，肉眼才和"喝水 / 上厕所"齐平。 */
 .prep-line{display:flex;align-items:baseline;flex-wrap:wrap;line-height:1.35}
 .prep-line .plabel{
-  font-size:3.5vmin;font-weight:900;color:var(--card-ink);
+  font-size:4.2vmin;font-weight:900;color:var(--card-ink);
   letter-spacing:.04em;flex:none;
 }
 .prep-line .plabel::after{content:"："}
 .prep-line .pitem{
-  font-size:3.4vmin;font-weight:700;color:var(--card-ink);
+  font-size:4.2vmin;font-weight:700;color:var(--card-ink);
   animation:chip-in .42s var(--e-spring) backwards;animation-delay:var(--d,0ms);
 }
 .prep-line .pitem + .pitem::before{
@@ -339,7 +375,9 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
 
 /* 提醒事项：整块黄色贴纸 + 深色感叹号。
    它比"早读建议"重要，所以不跟普通清单共用一行样式：
-   贴在纸上、字号更大、颜色更亮，八米外第一眼看到的是它。 */
+   贴在纸上、字号更大、颜色更亮，八米外第一眼看到的是它。
+   动作走"挤压拉伸"：体积守恒，撞左压扁、拉伸前进、撞右压扁。
+   只动 transform，字号一点不改——字始终是原来那么大。 */
 .reminder-line{
   display:flex;align-items:center;gap:1.6vmin;flex-wrap:wrap;max-width:100%;
   padding:1.4vmin 2.2vmin;
@@ -348,7 +386,20 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
   border-radius:1.2vmin 2.2vmin 1.4vmin 1.6vmin;
   box-shadow:.6vmin .6vmin 0 rgba(58,42,30,.22);
   transform:rotate(-.4deg);
-  animation:chip-in .46s var(--e-spring) backwards;
+  transform-origin:50% 50%;
+  animation:chip-in .46s var(--e-spring) backwards,
+            reminder-hop 2.6s cubic-bezier(.45,0,.55,1) infinite;
+}
+/* 46px/28px 换算到 vmin：大屏也保持同样的相对幅度。
+   rotate 必须写进每一帧，否则动画会把贴纸的轻微倾斜吃掉。 */
+@keyframes reminder-hop{
+  0%,4%  {transform:translateX(-4.2vmin) rotate(-.4deg) scale(1.25,.78)}
+  10%    {transform:translateX(-4.2vmin) rotate(-.4deg) scale(1,1)}
+  46%    {transform:translateX(2.6vmin)  rotate(-.4deg) scale(.82,1.18)}
+  50%,54%{transform:translateX(4.2vmin)  rotate(-.4deg) scale(1.25,.78)}
+  60%    {transform:translateX(4.2vmin)  rotate(-.4deg) scale(1,1)}
+  96%    {transform:translateX(-2.6vmin) rotate(-.4deg) scale(.82,1.18)}
+  100%   {transform:translateX(-4.2vmin) rotate(-.4deg) scale(1.25,.78)}
 }
 .reminder-line .rlabel{
   display:inline-flex;align-items:center;gap:.9vmin;flex:none;
@@ -577,16 +628,18 @@ body[data-alert="1"][data-settled="1"] .alert-frame::before{animation:none;opaci
 
 /* 减少动态：系统偏好 + 手动开关 */
 @media (prefers-reduced-motion: reduce){
-  .aura,.spine .seg.now,.band .dot,.alert-frame::before,.hero-main,.hero-task,.chips .chip,.reminder-line{animation:none!important}
+  .aura,.field i,.spine .seg.now,.band .dot,.alert-frame::before,.hero-main,.hero-task,.chips .chip,.reminder-line,.after{animation:none!important}
   .tk-strip{transition:none!important}
 }
 body[data-reduce="1"] .aura,
+body[data-reduce="1"] .field i,
 body[data-reduce="1"] .spine .seg.now,
 body[data-reduce="1"] .band .dot,
 body[data-reduce="1"] .alert-frame::before,
 body[data-reduce="1"] .hero-main,
 body[data-reduce="1"] .hero-task,
 body[data-reduce="1"] .chip,
+body[data-reduce="1"] .after,
 body[data-reduce="1"] .notice-bar{animation:none!important}
 body[data-reduce="1"] .reminder-line{animation:none!important}
 body[data-reduce="1"] .tk-strip{transition:none!important}
@@ -712,6 +765,24 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 <body data-theme="light" data-kind="break" data-tone="amber" data-focus="status" data-alert="0">
 
 <div class="aura"></div>
+<div class="field" aria-hidden="true">
+  <i style="left:6%;top:88%;width:.3vmin;height:.3vmin;--d:9s;--dl:-3s"></i>
+  <i style="left:17%;top:62%;width:.4vmin;height:.4vmin;--d:12s;--dl:-7s"></i>
+  <i style="left:26%;top:93%;width:.22vmin;height:.22vmin;--d:10s;--dl:-1s"></i>
+  <i style="left:34%;top:48%;width:.34vmin;height:.34vmin;--d:13s;--dl:-9s"></i>
+  <i style="left:41%;top:78%;width:.46vmin;height:.46vmin;--d:8s;--dl:-4s"></i>
+  <i style="left:49%;top:35%;width:.2vmin;height:.2vmin;--d:11s;--dl:-6s"></i>
+  <i style="left:56%;top:84%;width:.34vmin;height:.34vmin;--d:14s;--dl:-2s"></i>
+  <i style="left:63%;top:57%;width:.26vmin;height:.26vmin;--d:9.5s;--dl:-8s"></i>
+  <i style="left:71%;top:92%;width:.42vmin;height:.42vmin;--d:10.5s;--dl:-5s"></i>
+  <i style="left:78%;top:44%;width:.24vmin;height:.24vmin;--d:12.5s;--dl:-3.5s"></i>
+  <i style="left:85%;top:73%;width:.36vmin;height:.36vmin;--d:9s;--dl:-6.5s"></i>
+  <i style="left:93%;top:52%;width:.2vmin;height:.2vmin;--d:11.5s;--dl:-1.5s"></i>
+  <i style="left:12%;top:28%;width:.26vmin;height:.26vmin;--d:13.5s;--dl:-10s"></i>
+  <i style="left:59%;top:21%;width:.3vmin;height:.3vmin;--d:10s;--dl:-4.5s"></i>
+  <i style="left:88%;top:26%;width:.32vmin;height:.32vmin;--d:12s;--dl:-7.5s"></i>
+  <i style="left:3%;top:55%;width:.38vmin;height:.38vmin;--d:14.5s;--dl:-2.5s"></i>
+</div>
 
 <header>
   <div class="buddy" aria-hidden="true">

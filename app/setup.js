@@ -1180,6 +1180,26 @@
     };
   }
 
+  /* 草稿是不是已经和屏上一致。重开向导时，别把昨天已经应用的配置
+     说成「还没生效」；只比向导能改的几块，不去比文案的细节。 */
+  function draftLive() {
+    var c = cfg();
+    var m = c.meta || {};
+    if ((m.klass || "") !== (state.klass || "")) return false;
+    if ((m.school || "") !== (state.school || "")) return false;
+    if ((m.headTeacher || "") !== (state.head || "")) return false;
+    if (!same((c.timetable || {}).blocks, state.blocks)) return false;
+    var cur = ((c.schedule || {}).entries || []).filter(function (e) { return e.subject; });
+    var draft = (state.entries || []).filter(function (e) { return e.subject; });
+    if (!same(cur, draft)) return false;
+    /* 第四步改的文案/岗位还没写回去，也不能算“已生效”，
+       否则右下角给一个「完成」，一关就把改动丢了。 */
+    if (Object.keys(buildTextPatch(state.texts, state.textsBase)).length) return false;
+    return same(c.roles, state.roles);
+  }
+
+  function isLive() { return state.applied || draftLive(); }
+
   /* 旧草稿是 B4 之前存的，没有 roles / texts。补上当前生效值，
      不要把 undefined 当成“老师清空了岗位和文案”。 */
   function fillState(s) {
@@ -1284,7 +1304,7 @@
     p.appendChild(el("h3", "setup-h", "先告诉屏，这是哪个班"));
     p.appendChild(el("p", "setup-p", "这两行会出现在左上角、页面标题和消息服务里。以后想改，从「⋯ → 配置班级」再进来。"));
     p.appendChild(field("学校", state.school, function (v) { state.school = v; }, "text", "例如：春江中心小学"));
-    p.appendChild(field("班级", state.klass, function (v) { state.klass = v; }, "text", "例如：五（5）班"));
+    p.appendChild(field("班级", state.klass, function (v) { state.klass = v; }, "text", "例如：五（1）班"));
     p.appendChild(field("班主任", state.head, function (v) { state.head = v; }, "text", "可以不填"));
     p.appendChild(field("开学日", state.term, function (v) { state.term = v; }, "date"));
     p.appendChild(el("p", "setup-p", "开学日用来算单双周和值日轮次；填错了只影响单双周课程，不影响作息。"));
@@ -2232,12 +2252,18 @@
     var filled = state.entries.filter(function (e) { return e.subject; }).length;
     var classes = state.blocks.filter(function (b) { return b.type === "class"; }).length;
 
-    if (state.applied) {
+    /* 这一页最要紧的不是汇总，而是「现在到底生效没有」。
+       以前「应用」按钮埋在滚动区底部，右下角只有一个「完成」，
+       老师点完成就关掉了，屏上当然还是旧的。 */
+    var live = isLive();
+    if (live) {
       p.appendChild(el("h3", "setup-h", "已经生效"));
-      p.appendChild(el("p", "setup-p", "屏上现在就是新班级、新作息、新课表，岗位和文案也换成了这里填的。"));
+      p.appendChild(el("p", "setup-p", state.applied
+        ? "屏上现在就是新班级、新作息、新课表。点右下角「完成」回到大屏。"
+        : "这份设置已经在这台机器上生效。如果你又改了上面的内容，点右下角「重新应用」再写一次。"));
     } else {
-      p.appendChild(el("h3", "setup-h", "确认一下：岗位和文案也能在这里改"));
-      p.appendChild(el("p", "setup-p", "点「应用到这台机器」之前，改的都还只是草稿，屏上不会变。岗位和文案不改也能直接应用。"));
+      p.appendChild(el("h3", "setup-h", "还没生效"));
+      p.appendChild(el("p", "setup-msg", "下面填的都还只是草稿，屏上不会变。点右下角「应用到这台机器」才会写进去。"));
     }
     if (state.flash) p.appendChild(el("p", "setup-msg ok", state.flash));
 
@@ -2256,11 +2282,6 @@
     p.appendChild(el("p", "setup-p", "文案留空就是回到系统原来那句话。改动只存在这台机器上，不影响别人的班。"));
 
     var acts = el("div", "setup-actions");
-    var apply = el("button", "setup-btn primary", state.applied ? "重新应用" : "应用到这台机器");
-    apply.type = "button";
-    apply.addEventListener("click", applyAll);
-    acts.appendChild(apply);
-
     var snap = localStore().setupSnapshot ? localStore().setupSnapshot() : null;
     var restore = el("button", "setup-btn ghost", "恢复至修改前");
     restore.type = "button";
@@ -2327,10 +2348,25 @@
       });
       f.appendChild(next);
     } else {
-      var done = el("button", "setup-btn primary", "完成");
-      done.type = "button";
-      done.addEventListener("click", close);
-      f.appendChild(done);
+      /* 最后一步按「有没有改动」决定主按钮：
+         - 有草稿没写进去 → 只能「应用」，不给「完成」，免得一关就丢；
+         - 已经和屏上一致 → 主按钮是「完成」，「重新应用」留作次要动作。 */
+      if (isLive()) {
+        var done = el("button", "setup-btn primary", "完成");
+        done.type = "button";
+        done.addEventListener("click", close);
+        f.appendChild(done);
+
+        var again = el("button", "setup-btn ghost", "重新应用");
+        again.type = "button";
+        again.addEventListener("click", applyAll);
+        f.appendChild(again);
+      } else {
+        var apply = el("button", "setup-btn primary", "应用到这台机器");
+        apply.type = "button";
+        apply.addEventListener("click", applyAll);
+        f.appendChild(apply);
+      }
     }
     return f;
   }
