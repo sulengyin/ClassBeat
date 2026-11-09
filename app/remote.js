@@ -18,13 +18,66 @@
      只有双击 html（file://）时才回落到本机 8765。 */
   var sameHost = (root.location && /^https?:$/.test(root.location.protocol))
     ? root.location.host : "";
-  var raw = params.get("hub") || sameHost || "127.0.0.1:8765";
-  var HUB = /^https?:\/\//.test(raw) ? raw.replace(/\/$/, "") : "http://" + raw;
+
+  var BASE_PORT = 8765, PORT_SPAN = 10;
+  var given = params.get("hub") || sameHost;
+  var fixedHub = !!given;
+
+  function normalize(v) {
+    return /^https?:\/\//.test(v) ? v.replace(/\/$/, "") : "http://" + v;
+  }
+
+  var HUB = normalize(given || "127.0.0.1:" + BASE_PORT);
 
   var es = null;
   var lastSeq = 0;
   /* 服务的状态：大屏「手机」面板靠它决定画不画二维码 */
   var info = { online: false, phone: "", addrChanged: false, lastLan: "" };
+  var hubReady = null;
+
+  /* 服务端口被别的软件占了会自己往后挪（8766、8767…），大屏不知道挪到哪，
+     就在本机挨个问 8765–8774。都问不到就按默认端口继续——和没有服务时一样，
+     不报错、不提示、不挡屏。指定了 ?hub= 或同源打开时不扫。 */
+  function withTimeout(promise, ms) {
+    return new Promise(function (resolve, reject) {
+      var t = setTimeout(function () { reject(new Error("timeout")); }, ms);
+      promise.then(
+        function (v) { clearTimeout(t); resolve(v); },
+        function (e) { clearTimeout(t); reject(e); }
+      );
+    });
+  }
+
+  function pingAt(base) {
+    return withTimeout(fetch(base + "/api/ping", { cache: "no-store" }), 900)
+      .then(function (r) { return r.json(); });
+  }
+
+  function discover() {
+    if (fixedHub) return Promise.resolve(HUB);
+    var i = 0;
+    function step() {
+      if (i >= PORT_SPAN) return Promise.resolve(HUB);
+      var base = "http://127.0.0.1:" + (BASE_PORT + i);
+      i++;
+      return pingAt(base).then(function (d) {
+        /* app 用来区分「自己的服务」和「8766 上别的软件」。
+           老版本服务没有这个字段，也认——否则升级到一半会互相找不到。 */
+        var mine = d && d.ok && (d.app === undefined || d.app === "classbeat");
+        if (mine) {
+          HUB = base;
+          if (root.Remote) root.Remote.hub = HUB;
+          return HUB;
+        }
+        return step();
+      }, step);
+    }
+    return step();
+  }
+
+  function hubUrl() {
+    return hubReady || (hubReady = discover());
+  }
 
   function nowHM() {
     var m = Screen.nowMinutes();
@@ -126,45 +179,48 @@
   /* 问服务要它自己的局域网地址。二维码要写这个，不能写 127.0.0.1——
      手机打开 127.0.0.1 打开的是手机自己。 */
   function probe() {
-    return fetch(HUB + "/api/ping", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        info.online = !!(d && d.ok);
-        info.phone = (d && d.lan) || "";
-        /* 服务端记着上次启动的地址：对不上就说明这台机器的 IP 变了，
-           老师存的钉钉链接会失效，面板要提示一句。 */
-        info.addrChanged = !!(d && d.addrChanged);
-        info.lastLan = (d && d.lastLan) || "";
-        return info;
-      })
-      .catch(function () {
-        info.online = false;
-        return info;
-      });
+    return hubUrl().then(function () {
+      return fetch(HUB + "/api/ping", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          info.online = !!(d && d.ok);
+          info.phone = (d && d.lan) || "";
+          /* 服务端记着上次启动的地址：对不上就说明这台机器的 IP 变了，
+             老师存的钉钉链接会失效，面板要提示一句。 */
+          info.addrChanged = !!(d && d.addrChanged);
+          info.lastLan = (d && d.lastLan) || "";
+          return info;
+        });
+    }).catch(function () {
+      info.online = false;
+      return info;
+    });
   }
 
   function boot() {
-    probe();
-    if (root.Clock) syncClock();
-    /* 一台屏可能开一整天，隔一段时间再校一次，避免慢慢走偏 */
-    if (root.setInterval) root.setInterval(syncClock, 10 * 60 * 1000);
+    hubUrl().then(function () {
+      probe();
+      if (root.Clock) syncClock();
+      /* 一台屏可能开一整天，隔一段时间再校一次，避免慢慢走偏 */
+      if (root.setInterval) root.setInterval(syncClock, 10 * 60 * 1000);
 
-    /* 先取最新一条：大屏重启时，如果那条还没过期，应该还在屏上 */
-    fetch(HUB + "/api/messages?n=8", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var list = (d && d.messages) || [];
-        if (list.length) lastSeq = list[list.length - 1].seq || 0;
-        /* 只恢复「没撤回、没过期」的那条，否则一开机把上午的旧通知弹回来 */
-        for (var i = list.length - 1; i >= 0; i--) {
-          if (!list[i].retractedAt && visible(list[i])) { apply(list[i], false); break; }
-        }
-        connect(lastSeq);
-      })
-      .catch(function () {
-        /* 服务不在：什么也不做。大屏继续用本地数据，和没有这个模块一样 */
-        connect(-1);
-      });
+      /* 先取最新一条：大屏重启时，如果那条还没过期，应该还在屏上 */
+      return fetch(HUB + "/api/messages?n=8", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var list = (d && d.messages) || [];
+          if (list.length) lastSeq = list[list.length - 1].seq || 0;
+          /* 只恢复「没撤回、没过期」的那条，否则一开机把上午的旧通知弹回来 */
+          for (var i = list.length - 1; i >= 0; i--) {
+            if (!list[i].retractedAt && visible(list[i])) { apply(list[i], false); break; }
+          }
+          connect(lastSeq);
+        })
+        .catch(function () {
+          /* 服务不在：什么也不做。大屏继续用本地数据，和没有这个模块一样 */
+          connect(-1);
+        });
+    });
   }
 
   root.Remote = {

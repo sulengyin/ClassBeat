@@ -2,8 +2,9 @@
 """把大屏、手机服务、启动脚本和说明打成可以直接发给一体机的 zip。
 
     python3 tools/package.py
+    python3 tools/package.py --name 节律屏-通用版   # 配 sample 数据，打不含真名的通用版
 
-产物：dist/<班名>节律屏-测试包-YYYYMMDD.zip
+产物：dist/<包名>-YYYYMMDD.zip
 
 只装运行需要的东西：
   · app/      大屏本体（file:// 直接能开，配置已内联在 data.js）
@@ -50,7 +51,7 @@ APP_FILES = [
     "runtime.js", "screen.js", "remote.js", "edit.js", "demo.js", "config.js",
     "qr.js", "phoneui.js", "setup.js", "templates.js", "vendor/qrcode.min.js",
 ]
-SERVER_FILES = ["rhythm_server.py", "phone.html"]
+SERVER_FILES = ["rhythm_server.py", "run.py", "phone.html"]
 
 # .bat 内容保持纯 ASCII：cmd 默认 GBK，中文容易花
 BAT_SCREEN = "@echo off\r\nstart \"\" \"%~dp0app\\index.html\"\r\n"
@@ -61,36 +62,42 @@ BAT_DEMO = "@echo off\r\nstart \"\" \"%~dp0app\\preview.html\"\r\n"
 # 屏上直接报 "is not recognized as an internal or external command"。
 # 中文 Windows 的 cmd 默认代码页就是 936，按 GBK 存盘最稳，也不需要 chcp。
 # 另外：echo 里不要出现英文双引号，少一个让 cmd 误解析的机会。
-# Python 探测顺序 py -3 → python → python3：官方安装包的 launcher 最可靠，
-# 而 Windows 自带的 python.exe 可能只是个跳应用商店的 stub。
+# Python 探测顺序 pythonw → pyw -3：都用 pythonw，起子进程时不弹黑窗。
+# 官方安装包的 py launcher 自带 pyw.exe；而 Windows 自带的 python.exe 可能只是
+# 个跳应用商店的 stub，所以要先验一句 import sys 再信它。
+# 真正把服务跑起来的是 server\run.py（守护进程：崩了自动拉起、已经在跑就不再开）。
 BAT_SERVER = (
     "@echo off\r\n"
-    "title 手机消息服务 · 这个窗口不要关\r\n"
+    "title 启动手机消息服务\r\n"
     "cd /d \"%~dp0server\"\r\n"
     "\r\n"
     "rem 包里自带一份 Python，不用装、不用配 PATH\r\n"
-    "if exist \"python\\python.exe\" goto bundled\r\n"
+    "if exist \"python\\pythonw.exe\" goto bundled\r\n"
     "\r\n"
     "rem 没带运行时（--no-python 打的包），退回系统 Python\r\n"
-    "set \"PY=\"\r\n"
-    "python -c \"import sys\" >nul 2>&1\r\n"
-    "if not errorlevel 1 set \"PY=python\"\r\n"
-    "if not defined PY (\r\n"
-    "  py -3 -c \"import sys\" >nul 2>&1\r\n"
-    "  if not errorlevel 1 set \"PY=py -3\"\r\n"
+    "set \"PYW=\"\r\n"
+    "pythonw -c \"import sys\" >nul 2>&1\r\n"
+    "if not errorlevel 1 set \"PYW=pythonw\"\r\n"
+    "if not defined PYW (\r\n"
+    "  pyw -3 -c \"import sys\" >nul 2>&1\r\n"
+    "  if not errorlevel 1 set \"PYW=pyw -3\"\r\n"
     ")\r\n"
-    "if not defined PY goto nopython\r\n"
-    "\r\n"
-    "echo 正在启动手机消息服务，这个窗口最小化就好，不要关。\r\n"
-    "echo.\r\n"
-    "%PY% rhythm_server.py\r\n"
-    "goto done\r\n"
+    "if not defined PYW goto nopython\r\n"
+    "start \"\" %PYW% run.py\r\n"
+    "goto started\r\n"
     "\r\n"
     ":bundled\r\n"
-    "echo 正在启动手机消息服务，这个窗口最小化就好，不要关。\r\n"
+    "start \"\" \"python\\pythonw.exe\" run.py\r\n"
+    "\r\n"
+    ":started\r\n"
     "echo.\r\n"
-    "python\\python.exe rhythm_server.py\r\n"
-    "goto done\r\n"
+    "echo   服务已经在后台跑起来了，没有窗口，不用管它。\r\n"
+    "echo   大屏右下角「手机」里有二维码，手机扫一下就能发消息。\r\n"
+    "echo   要停止：双击「停止手机服务.bat」。\r\n"
+    "echo.\r\n"
+    "echo   （第一次启动 Windows 可能问能不能联网，必须点「允许访问」）\r\n"
+    "timeout /t 5 >nul\r\n"
+    "exit /b 0\r\n"
     "\r\n"
     ":nopython\r\n"
     "echo.\r\n"
@@ -102,11 +109,28 @@ BAT_SERVER = (
     "echo   现在可以直接关掉这个窗口，不影响大屏。\r\n"
     "pause\r\n"
     "exit /b 1\r\n"
-    "\r\n"
-    ":done\r\n"
+)
+
+# 停止靠 pid 文件：无窗之后没有窗口可关，这是唯一的入口。
+BAT_STOP = (
+    "@echo off\r\n"
+    "title 停止手机消息服务\r\n"
+    "cd /d \"%~dp0server\"\r\n"
+    "if not exist \"service.pid\" goto none\r\n"
+    "set \"PID=\"\r\n"
+    "set /p PID=<\"service.pid\"\r\n"
+    "if not defined PID goto none\r\n"
+    "taskkill /PID %PID% /T /F >nul 2>&1\r\n"
+    "del \"service.pid\" >nul 2>&1\r\n"
     "echo.\r\n"
-    "echo 服务已停止（上面几行是最后的输出）。\r\n"
-    "pause\r\n"
+    "echo   手机消息服务已停止。大屏不受影响，照常显示。\r\n"
+    "timeout /t 4 >nul\r\n"
+    "exit /b 0\r\n"
+    "\r\n"
+    ":none\r\n"
+    "echo.\r\n"
+    "echo   没有找到正在运行的服务（可能已经停了）。\r\n"
+    "timeout /t 4 >nul\r\n"
 )
 
 
@@ -206,25 +230,29 @@ Windows 也可以用文件夹里的：
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 不用装任何东西，包里自带运行环境。手机和电脑连同一个 WiFi 就行。
 
-1. 电脑上双击「启动手机服务.bat」
-   ——双击就行，不用"选择用什么程序打开"。会弹出一个黑色窗口，
-   里面出现地址之后把它最小化，不要关：关了手机就连不上。
+1. 双击「启动手机服务.bat」
+   窗口闪一下就没了，这是对的——服务在后台跑，不需要留着窗口。
    （第一次启动可能慢几秒，Windows 在检查这个新程序，属于正常）
+   重复双击也不会开第二个；服务万一崩了会自己起来。
 2. 大屏上点右下角「⋯」→「手机」，屏幕上会出一个二维码
 3. 手机连同一个 WiFi，扫码（或直接输入屏上那行地址）
 4. 写一句话点发送，大屏立刻就出现，不用刷新
 
+要停止服务：双击「停止手机服务.bat」。不停止也没关系，重启电脑后
+再双击一次「启动手机服务.bat」就行。
+
 大屏要用「从服务打开」的地址，手机消息才收得到：
   · 服务就跑在一体机上：大屏开  http://127.0.0.1:8765/screen
   · 服务在另一台电脑上：  大屏开  http://那台电脑的IP:8765/screen
-    （服务窗口里「大屏同源」那行会告诉你是哪个）
-打开后按 F11 全屏。这种开法比双击 html 更稳，不会有本地文件的跨域限制。
+如果 8765 被别的软件占了，服务会自动换到 8766、8767…，
+大屏会自己找到它，不用改地址。
 
 手机打不开？按顺序查：
   · 手机和电脑是不是同一个 WiFi（不要一个连 WiFi、一个连热点）
   · 电脑第一次启动时，Windows 防火墙会弹窗，必须点「允许访问」
   · 地址里的数字要照着屏上抄，0 和 O、1 和 l 别抄错
   · 学校里如果开了「访客网络隔离」，两台设备互相看不见，得找网管
+  · 还不行就看 server\\server.log，最后几行会写清楚卡在哪
 
 不装也可以，大屏单独跑完全没问题。
 
@@ -306,15 +334,27 @@ def build_single(out: Path) -> Path:
     return out
 
 
+def pack_name() -> str:
+    """--name 可以覆盖包名：打通用版时用示例数据，但 data/ 里是本班的真名，
+    不能让「五（5）班」跟着包名跑出去。"""
+    args = sys.argv[1:]
+    if "--name" in args:
+        i = args.index("--name")
+        if i + 1 < len(args):
+            return args[i + 1]
+    return PACK_NAME
+
+
 def main() -> None:
     items = collect()
     DIST.mkdir(exist_ok=True)
+    name = pack_name()
 
     today = dt.date.today()
-    zip_path = DIST / f"{PACK_NAME}-{today.strftime('%Y%m%d')}.zip"
-    single_path = DIST / f"{PACK_NAME}-单文件版.html"
+    zip_path = DIST / f"{name}-{today.strftime('%Y%m%d')}.zip"
+    single_path = DIST / f"{name}-单文件版.html"
 
-    readme = README.format(date=today.isoformat(), klass=PACK_NAME.split("节律屏")[0])
+    readme = README.format(date=today.isoformat(), klass=name.split("节律屏")[0])
 
     build_single(single_path)
 
@@ -322,20 +362,21 @@ def main() -> None:
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for src, arc in items:
-            z.write(src, f"{PACK_NAME}/{arc}")
+            z.write(src, f"{name}/{arc}")
 
         if pyzip:
             with zipfile.ZipFile(pyzip) as pz:
                 for info in pz.infolist():
                     if info.is_dir():
                         continue
-                    z.writestr(f"{PACK_NAME}/server/python/{info.filename}", pz.read(info))
+                    z.writestr(f"{name}/server/python/{info.filename}", pz.read(info))
 
-        z.write(single_path, f"{PACK_NAME}/{PACK_NAME}-单文件版.html")
-        z.writestr(f"{PACK_NAME}/使用说明.txt", readme.encode("utf-8-sig"))
-        z.writestr(f"{PACK_NAME}/打开大屏.bat", bat_bytes(BAT_SCREEN))
-        z.writestr(f"{PACK_NAME}/打开演练版.bat", bat_bytes(BAT_DEMO))
-        z.writestr(f"{PACK_NAME}/启动手机服务.bat", bat_bytes(BAT_SERVER))
+        z.write(single_path, f"{name}/{name}-单文件版.html")
+        z.writestr(f"{name}/使用说明.txt", readme.encode("utf-8-sig"))
+        z.writestr(f"{name}/打开大屏.bat", bat_bytes(BAT_SCREEN))
+        z.writestr(f"{name}/打开演练版.bat", bat_bytes(BAT_DEMO))
+        z.writestr(f"{name}/启动手机服务.bat", bat_bytes(BAT_SERVER))
+        z.writestr(f"{name}/停止手机服务.bat", bat_bytes(BAT_STOP))
 
     size = zip_path.stat().st_size / 1024
     one = single_path.stat().st_size / 1024

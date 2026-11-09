@@ -45,6 +45,10 @@ jobs:
       - name: 页面能起来
         run: node tools/test_dom.js
 
+      # 服务端口被别的软件占了会顺延，大屏要自己找过去
+      - name: 大屏找服务
+        run: node tools/test_remote.js
+
       - name: 配置模板与向导
         run: node tools/test_setup.js
 

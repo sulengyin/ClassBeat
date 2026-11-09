@@ -167,7 +167,7 @@ python3 tools/backup.py
 
 | 层 | 命令 | 管什么 |
 |---|---|---|
-| 逻辑 | `node tools/test_rhythm.js` 等 | 时段判断、岗位、存储、校时、消息服务、配置模板与导入导出，453 项，秒级 |
+| 逻辑 | `node tools/test_rhythm.js` 等 | 时段判断、岗位、存储、校时、消息服务、端口顺延、配置模板与导入导出，496 项，秒级 |
 | 引擎对拍 | `node tools/test_engine.js` | `app/engine/schedule.js` 与 Python 编译器 132 天逐字段一致（基准在 `tools/golden/`） |
 | 换学校 | `python3 tools/test_variants.py` | 4 套作息 × 5 套岗位 × 4 份校历 = 80 套配置，每套连编 70 天 |
 | 真浏览器 | `npx playwright test` | 21 个用例 / 7 个视口项目：一体机 1920/1366、iPad、iPhone、iPhone SE、安卓、鸿蒙视口 |
@@ -209,8 +209,14 @@ npx playwright test
 服务和大屏分开跑，大屏不需要装任何东西：
 
 ```bash
-python3 server/rhythm_server.py --port 8765
+python3 server/run.py          # 守护模式：崩了自动拉起，已经在跑就不再开第二个
+python3 server/rhythm_server.py --port 8765   # 直接跑，排错时看输出用这个
 ```
+
+打包给老师的版本里双击「启动手机服务.bat」即可：走 `pythonw` 无窗口启动，
+日志落在 `server/server.log`，停止用「停止手机服务.bat」。
+8765 被别的软件占了会自动顺延到 8766、8767…（最多到 8774），
+大屏从 8765 起挨个问，找到就切过去，不用改地址。
 
 手机连同一个 WiFi，打开 `http://<电脑IP>:8765`。
 不想抄 IP 就点大屏右下角「⋯」→「手机」：屏上出二维码，手机扫一下直接进发送页；

@@ -10,10 +10,15 @@
 启动：
     python3 server/rhythm_server.py
     python3 server/rhythm_server.py --port 8765 --class "五（1）班"
+
+8765 被别的软件占了会自动顺延到 8766、8767…（最多试 10 个），
+大屏会自己找过来，不用改地址。无人值守时用 server/run.py：
+崩了自动拉起，没有黑窗口。
 """
 
 import argparse
 import datetime as dt
+import errno
 import json
 import os
 import mimetypes
@@ -21,16 +26,21 @@ import socket
 import sys
 import time
 import threading
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 MSG_FILE = os.path.join(BASE, "messages.json")
 NET_FILE = os.path.join(BASE, "net.json")
+LOG_FILE = os.path.join(BASE, "server.log")
 PHONE_FILE = os.path.join(BASE, "phone.html")
 APP_DIR = os.path.abspath(os.path.join(BASE, "..", "app"))
 
-CONF = {"port": 8765, "klass": ""}
+DEFAULT_PORT = 8765
+PORT_SPAN = 10          # 8765 被别的软件占了就往后找，最多到 8774
+
+CONF = {"port": DEFAULT_PORT, "klass": ""}
 
 # 消息的 at / until 是给教室看的，一律按北京时间算，不跟服务器的本地时区走。
 BEIJING = dt.timezone(dt.timedelta(hours=8))
@@ -261,6 +271,8 @@ class Handler(BaseHTTPRequestHandler):
             addr = note_address(lan)
             return self._json({
                 "ok": True,
+                # 大屏扫端口时靠它确认「这是节律屏的服务」，不是别的程序
+                "app": "classbeat",
                 "class": CONF["klass"],
                 "port": CONF["port"],
                 "lan": lan,
@@ -414,32 +426,80 @@ def lan_ip():
         s.close()
 
 
+def ensure_stdio():
+    """pythonw.exe 启动时没有控制台，sys.stdout / stderr 是 None。
+
+    不管的话，第一句 print 就会 AttributeError，服务干脆起不来。
+    这里把输出接到 server.log；连日志都写不了就给个哑写入器，
+    绝不让「打日志」成为起不来的理由。
+    """
+    if sys.stdout is not None and sys.stderr is not None:
+        return None
+    try:
+        f = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
+    except OSError:
+        f = open(os.devnull, "w", encoding="utf-8")
+    if sys.stdout is None:
+        sys.stdout = f
+    if sys.stderr is None:
+        sys.stderr = f
+    return f
+
+
+def _addr_in_use(e):
+    # Windows 的 WSAEADDRINUSE 是 10048，Linux/macOS 走 errno.EADDRINUSE
+    return getattr(e, "winerror", None) == 10048 or e.errno in (errno.EADDRINUSE, 10048)
+
+
+def bind_server(host, port, span=PORT_SPAN):
+    """从 port 起找一个能绑的端口，返回 (server, 实际端口)。
+
+    教室电脑上「8765 已经被别的软件占了」并不少见（装了各种教学软件）。
+    被占就往后挪一个，总比双击后一闪就没强；真的全被占才抛错。
+    只吞「地址被占用」，端口越界、没权限这类错误照旧抛出去。
+    """
+    last = None
+    for p in range(port, port + max(1, span)):
+        try:
+            srv = ThreadingHTTPServer((host, p), Handler)
+            srv.daemon_threads = True
+            # 传 0 时由系统分配，回报真实端口而不是 0
+            return srv, srv.server_address[1]
+        except OSError as e:
+            if not _addr_in_use(e):
+                raise
+            last = e
+    raise last or OSError(f"{port}–{port + span - 1} 都没有可用端口")
+
+
 def main():
+    ensure_stdio()
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--class", dest="klass", default=None, help="不传就从 data/ 或 sample/ 读")
     ap.add_argument("--host", default="0.0.0.0")
     a = ap.parse_args()
 
-    CONF["port"] = a.port
     CONF["klass"] = a.klass or detect_class()
     load_messages()
 
-    srv = ThreadingHTTPServer((a.host, a.port), Handler)
-    srv.daemon_threads = True
+    srv, port = bind_server(a.host, a.port)
+    CONF["port"] = port
 
     ip = lan_ip()
-    CONF["lan"] = f"http://{ip}:{a.port}"
+    CONF["lan"] = f"http://{ip}:{port}"
     addr = note_address(CONF["lan"])
     print("教室消息服务已启动")
+    if port != a.port:
+        print(f"  [!] {a.port} 被别的程序占了，已改用 {port}（大屏会自动找过来）")
     if ip == "127.0.0.1":
         # 没连上局域网时，手机那行地址是打不开的，说清楚比让人瞎试强
         print("  [!] 没找到局域网地址，手机连不上。检查电脑是否连了 WiFi/网线。")
-    print(f"  手机打开  http://{ip}:{a.port}")
+    print(f"  手机打开  http://{ip}:{port}")
     if addr["changed"]:
         print(f"  [!] 地址和上次不同（上次是 {addr['last']}），钉钉里存的链接要重新复制")
-    print(f"  大屏同源  http://127.0.0.1:{a.port}/screen")
-    print(f"  本机自测  http://127.0.0.1:{a.port}/api/ping")
+    print(f"  大屏同源  http://127.0.0.1:{port}/screen")
+    print(f"  本机自测  http://127.0.0.1:{port}/api/ping")
     print(f"  已存消息  {len(_messages)} 条")
     print("  Ctrl+C 停止")
     try:
@@ -451,4 +511,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        # pythonw 下没人看得见异常栈，先落到日志里再退出（run.py 会拉起）
+        ensure_stdio()
+        traceback.print_exc()
+        raise

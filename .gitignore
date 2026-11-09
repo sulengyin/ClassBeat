@@ -23,6 +23,10 @@ server/messages.json
 server/messages.json.bad
 # 上次启动的局域网地址，只对这台机器有意义
 server/net.json
+# 无窗运行时的日志与 pid（排错看它，不进仓库）
+server/server.log
+server/server.log.1
+server/service.pid
 
 # 本地工作文档（含真实姓名与真实数据推导），公开版在 docs/
 /PLAN.md

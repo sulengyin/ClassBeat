@@ -9,6 +9,7 @@ import importlib.util
 import json
 import os
 import shutil
+import socket
 import sys
 import tempfile
 import threading
@@ -17,6 +18,7 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "server", "rhythm_server.py")
+GUARD_SRC = os.path.join(ROOT, "server", "run.py")
 
 pass_n = fail_n = 0
 
@@ -30,6 +32,14 @@ def check(ok, title, detail=""):
 
 def load_module():
     spec = importlib.util.spec_from_file_location("hub", SRC)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def load_guard():
+    """守护进程只拿它的纯函数来测，不真的去拉服务。"""
+    spec = importlib.util.spec_from_file_location("guard", GUARD_SRC)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
@@ -217,6 +227,51 @@ def main():
         hub.load_messages()
         check(hub._messages == [] and os.path.exists(hub.MSG_FILE + ".bad"),
               "⑫ 消息文件损坏时备份并从空开始")
+
+        # ⑰ 端口被占自动 +1：教室电脑上 8765 被别的软件占着很常见
+        srv_a, port_a = hub.bind_server("127.0.0.1", 0, 1)
+        srv_b, port_b = hub.bind_server("127.0.0.1", port_a, 3)
+        try:
+            check(port_a < port_b <= port_a + 3,
+                  "⑰ 端口被占时顺延，不再撞同一个", f"{port_a} → {port_b}")
+            check(srv_b.server_address[1] == port_b,
+                  "⑰a 回报的是真实端口，不是请求值")
+        finally:
+            srv_b.server_close()
+            srv_a.server_close()
+
+        # ⑱ 守护进程认得出「已经在跑」，也认得出「那是别人的程序」
+        guard = load_guard()
+        # 测试服务上的 ping 带 app=classbeat，run.py 靠它认亲
+        found = guard.find_running(port=port, span=1)
+        check(bool(found) and found.get("port") == port and found.get("class") == "测试班",
+              "⑱ 守护进程认得出自己的服务", f'{found.get("port") if found else "无"}')
+        plain = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        plain.bind(("127.0.0.1", 0))
+        plain.listen(1)
+        other = plain.getsockname()[1]
+        try:
+            check(guard.find_running(port=other, span=1) is None,
+                  "⑱a 别人占着的端口不算自己的服务")
+        finally:
+            plain.close()
+
+        # ⑲ pythonw 下 sys.stdout 是 None：print 不能把服务搞崩
+        old_out, old_err = sys.stdout, sys.stderr
+        old_log = hub.LOG_FILE
+        hub.LOG_FILE = os.path.join(tmp, "server.log")
+        try:
+            sys.stdout = sys.stderr = None
+            hub.ensure_stdio()
+            ok_stdio = sys.stdout is not None and sys.stderr is not None
+            sys.stdout.write("pythonw 下也能写日志\n")
+            sys.stdout.flush()
+        finally:
+            sys.stdout, sys.stderr = old_out, old_err
+            hub.LOG_FILE = old_log
+        logged = open(os.path.join(tmp, "server.log"), encoding="utf-8").read()
+        check(ok_stdio and "能写日志" in logged,
+              "⑲ pythonw 无控制台时输出落到日志", logged.strip()[:24])
 
     finally:
         srv.shutdown()
