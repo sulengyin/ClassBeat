@@ -26,6 +26,7 @@ from urllib.parse import urlparse, parse_qs
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 MSG_FILE = os.path.join(BASE, "messages.json")
+NET_FILE = os.path.join(BASE, "net.json")
 PHONE_FILE = os.path.join(BASE, "phone.html")
 APP_DIR = os.path.abspath(os.path.join(BASE, "..", "app"))
 
@@ -180,6 +181,37 @@ def _expired(m, now=None):
     return now >= until
 
 
+# ---------------------------------------------------------------- 地址自检
+
+_addr = {"seen": "", "changed": False, "last": ""}
+
+
+def note_address(lan):
+    """记下这次启动的局域网地址，和上次比一比。
+
+    教室电脑多是 DHCP：重启后地址通常不变，但换网段、跨长假、换网口都会变。
+    变了不阻断任何功能，只让大屏提示一句——老师存的钉钉链接要重新复制。
+    """
+    if not lan or lan == _addr["seen"]:
+        return _addr
+    _addr["seen"] = lan
+    try:
+        last = ""
+        if os.path.isfile(NET_FILE):
+            with open(NET_FILE, encoding="utf-8") as f:
+                last = (json.load(f) or {}).get("lan") or ""
+        if last and last != lan:
+            _addr["changed"] = True
+            _addr["last"] = last
+        with open(NET_FILE, "w", encoding="utf-8") as f:
+            json.dump({"lan": lan, "at": dt.datetime.now(BEIJING).isoformat(timespec="seconds")},
+                      f, ensure_ascii=False)
+    except Exception as e:
+        # 记不住地址不影响发消息，绝不能因此起不来
+        print(f"[warn] 写 net.json 失败：{e}")
+    return _addr
+
+
 # ---------------------------------------------------------------- HTTP
 
 class Handler(BaseHTTPRequestHandler):
@@ -224,12 +256,17 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html", "/phone"):
             return self._phone()
         if path == "/api/ping":
+            # 大屏拿它画二维码：手机要打开的是这个地址，不是 127.0.0.1
+            lan = CONF.get("lan") or f"http://127.0.0.1:{CONF['port']}"
+            addr = note_address(lan)
             return self._json({
                 "ok": True,
                 "class": CONF["klass"],
                 "port": CONF["port"],
-                # 大屏拿它画二维码：手机要打开的是这个地址，不是 127.0.0.1
-                "lan": CONF.get("lan") or f"http://127.0.0.1:{CONF['port']}",
+                "lan": lan,
+                # 这次启动的地址和上次不一样：大屏提示一句，让老师重新复制
+                "addrChanged": bool(addr["changed"]),
+                "lastLan": addr["last"],
                 "now": hhmm(0),
                 "time": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
             })
@@ -393,11 +430,14 @@ def main():
 
     ip = lan_ip()
     CONF["lan"] = f"http://{ip}:{a.port}"
+    addr = note_address(CONF["lan"])
     print("教室消息服务已启动")
     if ip == "127.0.0.1":
         # 没连上局域网时，手机那行地址是打不开的，说清楚比让人瞎试强
         print("  [!] 没找到局域网地址，手机连不上。检查电脑是否连了 WiFi/网线。")
     print(f"  手机打开  http://{ip}:{a.port}")
+    if addr["changed"]:
+        print(f"  [!] 地址和上次不同（上次是 {addr['last']}），钉钉里存的链接要重新复制")
     print(f"  大屏同源  http://127.0.0.1:{a.port}/screen")
     print(f"  本机自测  http://127.0.0.1:{a.port}/api/ping")
     print(f"  已存消息  {len(_messages)} 条")

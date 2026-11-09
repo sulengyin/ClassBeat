@@ -686,6 +686,19 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
   font:600 2.1vmin/1.4 ui-monospace,Consolas,monospace;
   margin:1.8vmin 0 .6vmin;color:#4A3B2C;word-break:break-all;
 }
+.qr-copy-row{display:flex;align-items:center;justify-content:center;gap:1.2vmin;margin:.4vmin 0 0}
+.qr-copy-row[hidden]{display:none}
+#qr-copy{
+  font:700 2vmin/1 inherit;padding:1.2vmin 2.4vmin;border-radius:1.1vmin;
+  border:.24vmin solid #C9B79E;background:#FBF3DF;color:#3E2D20;cursor:pointer;
+}
+#qr-copy:hover{background:#F3E6CB}
+.qr-copied{font-size:1.9vmin;font-weight:700;color:#2E6B3E}
+.qr-change{
+  font-size:2vmin;line-height:1.55;color:#7A3B18;text-align:left;
+  background:#FFF4E2;border:.24vmin solid #E4C79A;border-radius:1.4vmin;
+  padding:1.4vmin 1.8vmin;margin:1.2vmin auto 0;max-width:64vmin;
+}
 .qr-empty{
   font-size:2.2vmin;line-height:1.65;color:#7A3B18;
   background:#FFF4E2;border:.24vmin solid #E4C79A;border-radius:1.6vmin;
@@ -876,12 +889,17 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
     <h2>手机发消息上屏</h2>
     <canvas id="qr-canvas" width="512" height="512" aria-label="手机发消息地址二维码"></canvas>
     <p class="qr-url" id="qr-url"></p>
+    <div class="qr-copy-row" id="qr-copy-row" hidden>
+      <button id="qr-copy" type="button">复制地址</button>
+      <span class="qr-copied" id="qr-copied" hidden>已复制</span>
+    </div>
+    <p class="qr-change" id="qr-change" hidden></p>
     <p class="qr-empty" id="qr-empty" hidden>
       还没找到手机能用的地址。<br>
       先在一台电脑上双击「启动手机服务.bat」，<br>
       再用它打印的那行地址打开大屏。
     </p>
-    <p class="qr-tip">手机和这台电脑连同一个 WiFi。第一次启动时 Windows 会问“是否允许访问网络”，要点「允许」。</p>
+    <p class="qr-tip">手机和这台电脑连同一个 WiFi。第一次启动时 Windows 会问“是否允许访问网络”，要点「允许」。<br>地址一般不会变；哪天打不开，点上面「复制地址」重新发一次。</p>
     <button id="qr-close">关闭</button>
   </div>
 </div>

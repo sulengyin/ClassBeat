@@ -122,6 +122,7 @@ const document = {
  "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner",
  "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
  "qr-panel", "qr-url", "qr-empty", "qr-close",
+ "qr-copy-row", "qr-copy", "qr-copied", "qr-change",
  "msgModal", "msgCard", "msgContent", "msgBody", "msgTitle", "msgTime", "msgClose",
  "setup", "btn-setup",
  "demo", "d-play", "d-now", "d-ribbon", "d-range", "d-speed", "d-close"].forEach(id => {
@@ -626,6 +627,26 @@ check(document.getElementById("qr-url").textContent === "http://192.168.1.5:8765
   "面板上写出手机要打开的地址", document.getElementById("qr-url").textContent);
 check(qrRects > 200, "二维码真的画进了画布", qrRects + " 个方块");
 check(document.getElementById("qr-empty").hidden === true, "有地址时不显示操作提示");
+check(document.getElementById("qr-copy-row").hidden === false, "有地址时出现「复制地址」");
+
+/* 地址变化：服务记着上次的地址，对不上就在面板上说清楚，别让老师以为坏了 */
+global.Remote.info.addrChanged = true;
+global.Remote.info.lastLan = "http://192.168.1.8:8765";
+global.PhoneUI.open();
+const changeEl = document.getElementById("qr-change");
+check(changeEl.hidden === false && String(changeEl.textContent).indexOf("192.168.1.8") >= 0,
+  "地址变了会提示上次的地址", changeEl.textContent);
+
+/* 复制：file:// 下走 textarea + execCommand，成功时给一句「已复制」 */
+El.prototype.select = function () {};
+document.execCommand = () => true;
+document.getElementById("qr-copy")._h.click();
+check(document.getElementById("qr-copied").hidden === false
+      && document.getElementById("qr-copied").textContent === "已复制",
+  "点「复制地址」后有反馈", document.getElementById("qr-copied").textContent);
+
+global.Remote.info.addrChanged = false;
+global.Remote.info.lastLan = "";
 
 /* 服务只报回环地址：手机连不上，必须改成操作步骤，不能画一个扫不开的码 */
 global.Remote.info.phone = "http://127.0.0.1:8765";

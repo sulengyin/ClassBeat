@@ -178,6 +178,11 @@ test("「手机」面板出二维码，地址就是手机要打开的那个", as
   await expect(page.locator("#qr-panel")).toHaveClass(/open/);
   await expect(page.locator("#qr-url")).toHaveText("http://192.168.1.5:8765/");
   await expect(page.locator("#qr-empty")).toBeHidden();
+  await expect(page.locator("#qr-copy-row")).toBeVisible();
+
+  // 复制按钮要么成功要么明确失败，都必须给一句反馈，不能点了没反应
+  await page.locator("#qr-copy").click();
+  await expect(page.locator("#qr-copied")).toBeVisible();
 
   // 画布上真的落了黑块，不是一张空白
   const dark = await page.evaluate(() => {
@@ -188,6 +193,26 @@ test("「手机」面板出二维码，地址就是手机要打开的那个", as
     return n;
   });
   expect(dark, "二维码应该有黑块").toBeGreaterThan(1000);
+});
+
+test("地址变了：面板写出上次的地址，提醒重新复制", async ({ page }) => {
+  await page.route("**/api/ping", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      ok: true, class: "测试班", port: 8765,
+      lan: "http://192.168.1.9:8765",
+      addrChanged: true, lastLan: "http://192.168.1.5:8765",
+    }),
+  }));
+
+  await openScreen(page);
+  await openTools(page);
+  await page.locator("#btn-phone").click();
+
+  await expect(page.locator("#qr-change")).toBeVisible();
+  await expect(page.locator("#qr-change")).toContainText("192.168.1.5");
+  await expect(page.locator("#qr-url")).toHaveText("http://192.168.1.9:8765/");
 });
 
 test("紧急通知走大字区，而不是角落的小提示条", async ({ page, request }) => {

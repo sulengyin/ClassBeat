@@ -13,9 +13,36 @@
   var canvas = doc.getElementById("qr-canvas");
   var urlEl = doc.getElementById("qr-url");
   var emptyEl = doc.getElementById("qr-empty");
+  var copyRow = doc.getElementById("qr-copy-row");
+  var copyBtn = doc.getElementById("qr-copy");
+  var copiedEl = doc.getElementById("qr-copied");
+  var changeEl = doc.getElementById("qr-change");
   var btn = doc.getElementById("btn-phone");
   var closeBtn = doc.getElementById("qr-close");
   if (!panel || !canvas || !btn) return;
+
+  var currentUrl = "";
+
+  /* file:// 下 navigator.clipboard 不一定可用，用 textarea + execCommand 更稳。
+     失败也不抛错——按钮上会说“复制失败，请手动选中”。 */
+  function copyText(text) {
+    try {
+      var ta = doc.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "0";
+      doc.body.appendChild(ta);
+      ta.select();
+      if (ta.setSelectionRange) ta.setSelectionRange(0, text.length);
+      var ok = doc.execCommand("copy");
+      ta.remove();
+      return !!ok;
+    } catch (e) {
+      return false;
+    }
+  }
 
   function isLoopback(u) {
     return /\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/.test(u || "");
@@ -34,6 +61,7 @@
 
   function render(info) {
     var url = phoneUrl(info);
+    currentUrl = url;
     if (url) {
       var ok = root.QR && root.QR.paint(canvas, url);
       canvas.hidden = !ok;
@@ -43,6 +71,16 @@
       canvas.hidden = true;
       emptyEl.hidden = false;
       urlEl.textContent = "";
+    }
+    if (copyRow) copyRow.hidden = !url;
+    if (changeEl) {
+      var changed = !!(url && info && info.addrChanged);
+      changeEl.hidden = !changed;
+      if (changed) {
+        changeEl.textContent = "这台电脑的地址和上次不同"
+          + (info.lastLan ? "（上次是 " + info.lastLan + "）" : "")
+          + "。钉钉里存的链接要重新复制一次。";
+      }
     }
   }
 
@@ -60,6 +98,19 @@
 
   btn.addEventListener("click", open);
   if (closeBtn) closeBtn.addEventListener("click", close);
+  if (copyBtn) {
+    copyBtn.addEventListener("click", function () {
+      if (!currentUrl) return;
+      var ok = copyText(currentUrl);
+      if (copiedEl) {
+        copiedEl.textContent = ok ? "已复制" : "复制失败，请手动选中地址";
+        copiedEl.hidden = false;
+        if (ok && root.setTimeout) {
+          root.setTimeout(function () { copiedEl.hidden = true; }, 2200);
+        }
+      }
+    });
+  }
   panel.addEventListener("click", function (e) {
     if (e.target === panel) close();        /* 点空白处关掉 */
   });
@@ -67,5 +118,5 @@
     if (e.key === "Escape") close();
   });
 
-  root.PhoneUI = { open: open, close: close, url: phoneUrl };
+  root.PhoneUI = { open: open, close: close, url: phoneUrl, copy: copyText };
 })(window);

@@ -55,10 +55,12 @@ def main():
     tmp = tempfile.mkdtemp(prefix="rhythm-hub-")
     hub = load_module()
     hub.MSG_FILE = os.path.join(tmp, "messages.json")
+    hub.NET_FILE = os.path.join(tmp, "net.json")
     hub.PHONE_FILE = os.path.join(ROOT, "server", "phone.html")
     hub.CONF["klass"] = "测试班"
     # 大屏拿这个地址画二维码；真机上由启动时探测，这里钉一个固定值
     hub.CONF["lan"] = "http://192.168.1.5:8765"
+    hub._addr.update({"seen": "", "changed": False, "last": ""})
     hub._messages = []
     hub._seq = 0
 
@@ -75,6 +77,20 @@ def main():
               "① 大屏能探测到服务", f'{code} {d.get("class")}')
         check(d.get("lan") == "http://192.168.1.5:8765",
               "①a ping 报出局域网地址（二维码用）", d.get("lan"))
+        check(d.get("addrChanged") is False and d.get("lastLan") == "",
+              "①c 第一次启动不报地址变化", f'{d.get("addrChanged")} {d.get("lastLan")}')
+
+        # ①c2 地址自检：第二次启动换了地址才标记，并记住上次的
+        hub._addr.update({"seen": "", "changed": False, "last": ""})
+        with open(hub.NET_FILE, "w", encoding="utf-8") as f:
+            json.dump({"lan": "http://192.168.1.5:8765"}, f)
+        st = hub.note_address("http://192.168.1.9:8765")
+        check(st["changed"] is True and st["last"] == "http://192.168.1.5:8765",
+              "①c2 换了局域网地址会标记并记住上次", f'{st["changed"]} {st["last"]}')
+        # 恢复成当前地址，后面的测试不受影响
+        hub._addr.update({"seen": "", "changed": False, "last": ""})
+        with open(hub.NET_FILE, "w", encoding="utf-8") as f:
+            json.dump({"lan": "http://192.168.1.5:8765"}, f)
 
         # ①b 校时：给毫秒时间戳，并明确按 UTC+8
         code, _, raw = req(port, "/api/time")

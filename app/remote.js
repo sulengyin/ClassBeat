@@ -24,7 +24,7 @@
   var es = null;
   var lastSeq = 0;
   /* 服务的状态：大屏「手机」面板靠它决定画不画二维码 */
-  var info = { online: false, phone: "" };
+  var info = { online: false, phone: "", addrChanged: false, lastLan: "" };
 
   function nowHM() {
     var m = Screen.nowMinutes();
@@ -131,6 +131,10 @@
       .then(function (d) {
         info.online = !!(d && d.ok);
         info.phone = (d && d.lan) || "";
+        /* 服务端记着上次启动的地址：对不上就说明这台机器的 IP 变了，
+           老师存的钉钉链接会失效，面板要提示一句。 */
+        info.addrChanged = !!(d && d.addrChanged);
+        info.lastLan = (d && d.lastLan) || "";
         return info;
       })
       .catch(function () {

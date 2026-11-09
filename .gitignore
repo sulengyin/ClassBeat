@@ -21,6 +21,8 @@ e2e-results.json
 # 运行时产生的消息，可能含老师写的话
 server/messages.json
 server/messages.json.bad
+# 上次启动的局域网地址，只对这台机器有意义
+server/net.json
 
 # 本地工作文档（含真实姓名与真实数据推导），公开版在 docs/
 /PLAN.md
