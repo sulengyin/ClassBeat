@@ -207,6 +207,27 @@ s = at("2026-11-06", "07:30", {
 check(s.lines.length === 1 && s.lines[0].items[0] === "带齐回执",
   "没单独配的那天用「每天」的提醒", JSON.stringify(s.lines));
 
+/* 到校一句话跟到 08:10：早读期间它在大字下面，不只在打铃前 10 分钟 */
+s = at("2026-11-05", "07:45", {
+  texts: {
+    stage: { before: { note: "戴好红领巾，打扫好个人卫生。", title: "早上好" } },
+    reminders: { "default": "戴好红领巾，打扫好个人卫生" }
+  }
+});
+check(s.kind === "reading" && s.note === "戴好红领巾，打扫好个人卫生。",
+  "早读期间一句话仍是到校那句", s.note);
+check(s.lines.length === 0, "同一句不重复贴成提醒事项", JSON.stringify(s.lines));
+
+s = at("2026-11-05", "07:45", {
+  texts: {
+    stage: { before: { note: "戴好红领巾，打扫好个人卫生。" } },
+    reminders: { "default": "今天穿校服" }
+  }
+});
+check(s.note.indexOf("戴好红领巾") >= 0 && s.lines.length === 1
+  && s.lines[0].items[0] === "今天穿校服",
+  "到校一句话和当天提醒不同时，两处都出", s.note + " / " + JSON.stringify(s.lines));
+
 /* 旧作息没有 reading 块：到校后到第 1 节这段按早读处理，
    提醒事项不能因为换了分支就丢掉。 */
 const oldDay = JSON.parse(JSON.stringify(RT.day("2026-11-05")));

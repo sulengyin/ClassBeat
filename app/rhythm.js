@@ -95,6 +95,14 @@
 
   /* 「提醒事项」按星期配；没配这一天就用「每天」那条。
      它比早读建议更重要，所以单独一块、单独上色，不和普通清单混在一起。 */
+  /* 比较两句话是不是同一句：标点和空白不算区别。
+     到校一句话和提醒事项默认就是同一句，别在屏上贴两遍。 */
+  function bare(t) {
+    return String(t == null ? "" : t)
+      .replace(/\s+/g, "")
+      .replace(/[。！？!?，,；;、.]+$/, "");
+  }
+
   function reminderFor(opts, day) {
     var R = opts && opts.texts && opts.texts.reminders;
     if (!R) return "";
@@ -175,11 +183,12 @@
         if (rd) {
           var advice = (rd.task || "").trim();
           var remBefore = reminderFor(opts, day);
+          var noteBefore = stageText(opts, "before", "note", "");
           return {
             kind: "before",
             title: rd.subject + "学习建议",
             sub: c0 ? "第 1 节 " + c0.subject : "",
-            note: "",
+            note: noteBefore,
             arrived: true,
             reading: true,
             meta: [],
@@ -187,7 +196,7 @@
             advice: advice,
             /* 旧作息没有 reading 块，到校后这一整段就是早读时间，
                提醒事项在这里同样要出现，否则改了小标题却丢了提醒。 */
-            lines: remBefore
+            lines: remBefore && bare(remBefore) !== bare(noteBefore)
               ? [{ kind: "reminder", label: "提醒事项", items: [remBefore] }]
               : [],
             countdown: countdownFor("before", first - minutes, mode),
@@ -235,7 +244,9 @@
       var tip = rdToday && (rdToday.task || "").trim();
       card.title = (rdToday && rdToday.subject ? rdToday.subject + "学习建议" : (b.name || "早读"));
       card.sub = firstClass && firstClass.subject ? "第 1 节 " + firstClass.subject : "";
-      card.note = "";
+      /* 早读也是「打铃前」，到校那句一句话跟到 08:10：
+         学生边读边把红领巾、个人卫生这些事再看一眼。 */
+      card.note = stageText(opts, "before", "note", "");
       card.items = [];
       card.reading = true;
       card.lines = [];
@@ -243,8 +254,11 @@
          和标题同字号——早读就一件事，学生从最后一排也要看得清。 */
       card.advice = tip || "";
       /* 提醒事项排在建议前面：它是今天必须记住的那一件，
-         不能埋在"读第几课"下面。 */
-      if (rem) card.lines.push({ kind: "reminder", label: "提醒事项", items: [rem] });
+         不能埋在"读第几课"下面。和上面那句完全一样就不再贴一遍，
+         同一句话在屏上出现两次，学生反而以为是两件事。 */
+      if (rem && bare(rem) !== bare(card.note)) {
+        card.lines.push({ kind: "reminder", label: "提醒事项", items: [rem] });
+      }
     }
 
     if (b.type === "class") {

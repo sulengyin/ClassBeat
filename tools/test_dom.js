@@ -285,6 +285,21 @@ check(!!remRow && remRow.textContent.indexOf("带齐回执") >= 0,
   "提醒事项单独一块上屏", remRow ? remRow.textContent : "缺失");
 check(document.querySelectorAll(".prep-line").length === 0,
   "建议不再以小字清单的形式出现");
+
+/* 到校一句话跟到 08:10：早读期间在大字下面，同一句不只留贴纸 */
+global.Store.patchTexts({
+  stage: { before: { title: "早上好", note: "戴好红领巾，打扫好个人卫生。" } }
+});
+Screen.render();
+check(document.getElementById("after").textContent.indexOf("戴好红领巾") >= 0,
+  "早读期间一句话仍是到校那句",
+  document.getElementById("after").textContent);
+check(!!document.querySelector(".reminder-line"),
+  "提醒和这句话不同时，黄色贴纸仍在");
+global.Store.patchTexts({ reminders: { "default": "戴好红领巾，打扫好个人卫生。" } });
+Screen.render();
+check(!document.querySelector(".reminder-line"),
+  "同一句不再重复贴成提醒事项");
 global.Store.resetTexts();
 
 /* 紧急通知：红色只由老师手动发，文字要能占住主区 */
