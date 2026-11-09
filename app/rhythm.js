@@ -174,6 +174,7 @@
 
         if (rd) {
           var advice = (rd.task || "").trim();
+          var remBefore = reminderFor(opts, day);
           return {
             kind: "before",
             title: rd.subject + "学习建议",
@@ -184,7 +185,11 @@
             meta: [],
             items: [],
             advice: advice,
-            lines: [],
+            /* 旧作息没有 reading 块，到校后这一整段就是早读时间，
+               提醒事项在这里同样要出现，否则改了小标题却丢了提醒。 */
+            lines: remBefore
+              ? [{ kind: "reminder", label: "提醒事项", items: [remBefore] }]
+              : [],
             countdown: countdownFor("before", first - minutes, mode),
             clock: m2t(minutes),
             _ctx: { type: "before", remain: first - minutes, dur: 40 }

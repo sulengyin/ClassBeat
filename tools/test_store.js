@@ -34,6 +34,19 @@ check(S.texts().genericPrep === "课本", "本机改过就听本机的");
 S.patchTexts({ genericPrep: null });
 delete D.texts;
 
+/* 老机器上存过半份文案，新包又加了默认文案：新加的那块必须还能出现。
+   这正是五5班一体机上「戴好红领巾」消失的原因。 */
+D.texts = { reading: { "1": { subject: "英语" } } };
+S.resetTexts();
+S.patchTexts({ reading: { "1": { subject: "英语", task: "跟读单词" } } });
+D.texts.reminders = { default: "戴好红领巾，打扫好个人卫生" };
+check(S.texts().reminders && S.texts().reminders.default === "戴好红领巾，打扫好个人卫生",
+  "本机只改过早读，包里新加的提醒事项仍然生效",
+  JSON.stringify(S.texts().reminders || null));
+check(S.texts().reading["1"].task === "跟读单词", "本机改过的那条仍然优先");
+S.resetTexts();
+delete D.texts;
+
 /* ---------- 覆盖：只改指定的一节 ---------- */
 const thu = RT.day("2026-11-05");
 const out = S.applyOverrides(thu, { lessons: { 4: { subject: "自习", teacher: "代课老师" } } });

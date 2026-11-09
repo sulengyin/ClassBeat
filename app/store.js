@@ -314,11 +314,33 @@
      本机没改过就吃包里的默认，改过就吃本机的——换机器不会丢。
      注意是 RHYTHM_DATA：早先这里写成了 root.DATA，那个全局从来不存在，
      烤进去的文案一直是死的，只有本机 localStorage 在起作用。 */
+  function isPlain(v) {
+    return !!v && typeof v === "object" && !Array.isArray(v);
+  }
+
+  /* 本机改过的文案只盖住改到的那一层，没改到的继续吃包里的默认。
+     不这么并：老师早先改过任何一条，localStorage 里就存了半份文案，
+     后来包里新加的「提醒事项」会被整份挡住，屏上再也不出现。
+     数组和字符串当叶子，"" 也算有效值，能用来清空某一句。 */
+  function mergeTexts(base, over) {
+    if (!isPlain(base) || !isPlain(over)) return over;
+    var out = {};
+    Object.keys(base).forEach(function (k) { out[k] = base[k]; });
+    Object.keys(over).forEach(function (k) {
+      out[k] = (isPlain(base[k]) && isPlain(over[k]))
+        ? mergeTexts(base[k], over[k])
+        : over[k];
+    });
+    return out;
+  }
+
   function texts() {
     var local = read(KEY.texts, null);
-    if (local && Object.keys(local).length) return local;
     var baked = root.RHYTHM_DATA && root.RHYTHM_DATA.texts;
-    return (baked && typeof baked === "object") ? baked : (local || {});
+    var hasLocal = !!local && Object.keys(local).length > 0;
+    if (!hasLocal) return isPlain(baked) ? baked : (local || {});
+    if (!isPlain(baked)) return local;
+    return mergeTexts(baked, local);
   }
 
   function patchTexts(patch) {

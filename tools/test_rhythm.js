@@ -207,5 +207,20 @@ s = at("2026-11-06", "07:30", {
 check(s.lines.length === 1 && s.lines[0].items[0] === "带齐回执",
   "没单独配的那天用「每天」的提醒", JSON.stringify(s.lines));
 
+/* 旧作息没有 reading 块：到校后到第 1 节这段按早读处理，
+   提醒事项不能因为换了分支就丢掉。 */
+const oldDay = JSON.parse(JSON.stringify(RT.day("2026-11-05")));
+oldDay.timeline = oldDay.timeline.filter(function (b) { return b.type !== "reading"; });
+s = R.stateAt(oldDay, 7 * 60 + 30, {
+  texts: {
+    reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } },
+    reminders: { "default": "戴好红领巾，打扫好个人卫生" }
+  }
+});
+check(s.kind === "before" && s.reading === true, "旧作息的到校段仍算早读", s.kind);
+check(s.lines.length === 1 && s.lines[0].kind === "reminder"
+  && s.lines[0].items[0] === "戴好红领巾，打扫好个人卫生",
+  "旧作息里提醒事项也上屏", JSON.stringify(s.lines));
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);
