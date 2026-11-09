@@ -2247,6 +2247,124 @@
     }
   }
 
+  /* ---------- 完成页：时间线预览 ----------
+     配完不用等到明天：用草稿里的作息和课表现算一天给老师看。
+     不走 Runtime.day()，那份缓存读的是已保存的配置，看不到还没应用的改动。 */
+  var TL_TYPE = {
+    class: "上课", break: "课间", meal: "午餐", noon: "午间",
+    ritual: "固定", after: "课后服务", closed: "放学"
+  };
+
+  function dayKeyShift(key, n) {
+    var p = String(key).split("-");
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.getUTCFullYear() + "-" +
+      (d.getUTCMonth() < 9 ? "0" : "") + (d.getUTCMonth() + 1) + "-" +
+      (d.getUTCDate() < 10 ? "0" : "") + d.getUTCDate();
+  }
+
+  function draftConfig() {
+    var c = cfg();
+    var tt = clone(c.timetable || {});
+    tt.blocks = clone(state.blocks || []);
+    if (state.noonBand) tt.noonBand = clone(state.noonBand);
+    var sc = clone(c.schedule || {});
+    sc.entries = clone(state.entries || []);
+    sc.class = state.klass;
+    /* 空包没有午间规则；给一个最普通的，预览才不至于算不出来。
+       这和 runtime.js 的 EMPTY_NOON 是同一份兜底。 */
+    var noon = c.noon || {
+      defaultPreset: "rest", weekRule: {},
+      presets: {
+        rest: { label: "午间", title: "午间休息", items: [], tip: "闭眼趴一会儿，不说话，不追跑" }
+      }
+    };
+    return {
+      meta: { school: state.school, klass: state.klass, headTeacher: state.head },
+      timetable: tt,
+      schedule: sc,
+      content: c.content || [],
+      roles: c.roles || { roles: [], dutyCycle: {} },
+      noon: noon,
+      calendar: c.calendar || { days: {} }
+    };
+  }
+
+  /* 今天不上学（周末 / 节假日）就往后找，最多看两周：
+     预览要回答「配完到底长什么样」，不能只甩一张「今天不上学」。 */
+  function previewInfo() {
+    if (!root.Schedule || !root.Schedule.buildDay) return null;
+    var key = (root.Clock && root.Clock.dayKey) ? root.Clock.dayKey() : "";
+    if (!key) return null;
+    var conf = draftConfig(), day = null, moved = false;
+    try {
+      for (var i = 0; i < 15; i++) {
+        var d = root.Schedule.buildDay(conf, dayKeyShift(key, i));
+        if (d && d.inSchool) { day = d; moved = i > 0; break; }
+        if (!day) day = d;
+      }
+    } catch (e) { return null; }
+    if (!day || !day.inSchool) return { day: day, key: key, moved: false, empty: true };
+    return { day: day, key: key, moved: moved };
+  }
+
+  function tlDetail(it) {
+    if (it.type === "class") {
+      var bits = [];
+      if (it.periodNo) bits.push("第" + it.periodNo + "节");
+      bits.push(it.subject || "—");
+      if (it.teacher) bits.push(it.teacher);
+      return bits.join("　");
+    }
+    if (it.items && it.items.length) return it.items.join("、");
+    return it.tip || "";
+  }
+
+  function previewSection(live) {
+    var pv = previewInfo();
+    var box = el("div", "setup-preview");
+    box.appendChild(el("div", "setup-preview-title", "配好之后，屏上是这样"));
+
+    if (!pv) {
+      box.appendChild(el("p", "setup-p", "这台机器的节律引擎没起来，暂时算不出时间线。"));
+      return box;
+    }
+    if (pv.empty || !pv.day || !pv.day.inSchool) {
+      box.appendChild(el("p", "setup-p", "接下来两周都是假期，先检查校历或开学日。"));
+      return box;
+    }
+
+    var d = pv.day;
+    var meta = [d.date, d.weekdayName];
+    if (isFinite(d.weekNo)) meta.push("第 " + d.weekNo + " 周");
+    if (d.calendar && d.calendar.label) meta.push(d.calendar.label);
+    var head = el("div", "setup-preview-meta", meta.join("　·　"));
+    box.appendChild(head);
+    if (pv.moved) {
+      box.appendChild(el("p", "setup-preview-note", "今天不上学，先看下一个上学日。"));
+    }
+
+    var list = el("div", "setup-timeline");
+    (d.timeline || []).forEach(function (it) {
+      var row = el("div", "tl-row tl-" + (it.type || "other"));
+      row.appendChild(el("span", "tl-time", it.start + "–" + it.end));
+      row.appendChild(el("span", "tl-name", it.name || TL_TYPE[it.type] || ""));
+      row.appendChild(el("span", "tl-detail", tlDetail(it)));
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+
+    var warn = (d.warnings || []).filter(function (w) {
+      return w.code === "LESSON_MISSING";
+    }).length;
+    box.appendChild(el("p", "setup-p", live
+      ? "上面就是屏上现在的内容。"
+      : "这只是预览。" + (warn ? "课表里空着的 " + warn + " 节会显示「—」；" : "") +
+        "点「应用到这台机器」后才会上屏。"));
+    return box;
+  }
+
   function pageDone() {
     var p = el("div", "setup-page on");
     var filled = state.entries.filter(function (e) { return e.subject; }).length;
@@ -2276,6 +2394,8 @@
     }
     sum.appendChild(el("div", null, "课表：已填 " + filled + " 格 / " + (periodCount() * 5) + " 格"));
     p.appendChild(sum);
+
+    p.appendChild(previewSection(live));
 
     roleSection(p);
     textSectionList(p);

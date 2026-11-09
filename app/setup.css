@@ -147,6 +147,30 @@ body[data-setup="1"] .warn{display:none}
 .setup-sum b{font-weight:900}
 .setup-actions{display:flex;gap:1.2vmin;flex-wrap:wrap;margin-top:2vmin}
 
+/* 时间线预览：21 行，高了就在框里滚，不把下面的按钮再挤走 */
+.setup-preview{
+  margin-top:2vmin;padding:1.8vmin 2.2vmin 1.4vmin;
+  border:.26vmin solid rgba(58,42,30,.24);border-radius:1.4vmin;
+  background:#FFFCF2;
+}
+.setup-preview-title{font-size:2.2vmin;font-weight:900}
+.setup-preview-meta{font-size:1.9vmin;color:#8A7563;font-weight:700;margin-top:.4vmin}
+.setup-preview-note{margin:.8vmin 0 0;font-size:1.9vmin;color:#8A6A1F;font-weight:700}
+.setup-timeline{margin-top:1.2vmin;max-height:34vmin;overflow:auto}
+.tl-row{
+  display:flex;align-items:baseline;gap:1.4vmin;padding:.45vmin 0;
+  border-bottom:.2vmin dashed rgba(58,42,30,.14);
+  font-size:1.95vmin;line-height:1.45;
+}
+.tl-row:last-child{border-bottom:0}
+.tl-time{flex:none;width:11.5vmin;font-weight:900;font-variant-numeric:tabular-nums}
+.tl-name{flex:none;width:9vmin;font-weight:900;color:#6B5642}
+.tl-detail{flex:1;min-width:0;color:#31231A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-class .tl-name{color:#2F6B3C}
+.tl-class .tl-detail{font-weight:700}
+.tl-break .tl-name,.tl-break .tl-detail{color:#8A7563;font-weight:600}
+.tl-meal .tl-name,.tl-noon .tl-name{color:#9A6216}
+
 /* ---------- 岗位 ---------- */
 .setup-src{
   display:flex;flex-direction:column;gap:.6vmin;

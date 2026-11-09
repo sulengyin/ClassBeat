@@ -715,6 +715,13 @@ global.Remote.info.phone = "";
   check(doneBtns.indexOf("完成") >= 0 && doneBtns.indexOf("重新应用") >= 0
         && doneBtns.indexOf("应用到这台机器") < 0,
     "未改动时最后一步先给「完成」，应用是次要动作", doneBtns.join(" / "));
+
+  /* 完成页的时间线预览：不用等到明天，当场看到配完的样子 */
+  const tl = box.querySelectorAll(".tl-row");
+  check(tl.length >= 10, "完成页有当天时间线预览", tl.length + " 行");
+  check(tl.length && tl[0].textContent.indexOf(
+        (window.RHYTHM_DATA.timetable.blocks || [])[0].start) >= 0,
+    "预览从作息第一段开始", tl.length ? tl[0].textContent : "");
   check(inputsIn(box).length > 35, "岗位和文案都能直接编辑",
     String(inputsIn(box).length));
 
@@ -907,6 +914,10 @@ global.Remote.info.phone = "";
   startInput._h.change();
   next()._h.click();
   next()._h.click();
+  /* 还没点应用，预览也必须是刚改的 07:40——它读的是草稿，不是已保存配置 */
+  const pvEl = box.querySelector(".setup-timeline");
+  check(!!pvEl && pvEl.textContent.indexOf("07:40") >= 0,
+    "预览跟着还没应用的草稿走", pvEl ? pvEl.textContent.slice(0, 60) : "没有预览");
   box.querySelectorAll(".setup-btn").filter(b => b.textContent === "应用到这台机器")[0]._h.click();
   box.querySelectorAll(".setup-btn").filter(b => b.textContent === "确认保存")[0]._h.click();
 
@@ -957,6 +968,10 @@ global.Remote.info.phone = "";
   check(box.querySelectorAll(".setup-row").length > 20,
     "空包第二步已经套上一套模板，不是空表",
     String(box.querySelectorAll(".setup-row").length));
+  next()._h.click();
+  next()._h.click();
+  const blankTl = box.querySelectorAll(".tl-row");
+  check(blankTl.length > 20, "空包完成页也能预览时间线", String(blankTl.length));
   box.querySelector(".setup-x")._h.click();
   check(document.body.dataset.setup === "", "关掉向导后主屏提示恢复");
 

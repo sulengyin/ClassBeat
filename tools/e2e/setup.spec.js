@@ -51,6 +51,10 @@ test("空配置打开就进向导，不碰命令行也能配出当天的屏", as
   await expect(page.locator(".setup-grid-row:not(.head) input")).toHaveCount(35);
   await next(page);
 
+  // 完成页当场给出时间线，不用等第二天
+  await expect(page.locator(".setup-preview")).toBeVisible();
+  expect(await page.locator(".tl-row").count()).toBeGreaterThan(10);
+
   await apply(page);
 
   // 应用后不刷新，屏上立刻换班名，并且算得出当天时间线
@@ -93,6 +97,9 @@ test("改班名和课表后刷新仍在，屏上抬头跟着换", async ({ page 
   // 课表第一格（周一第 1 节）填上数学
   await page.locator(".setup-grid-row:not(.head) input").first().fill("数学");
   await next(page);
+
+  // 还没应用，预览也要显示刚改的 07:40
+  await expect(page.locator(".setup-timeline")).toContainText("07:40");
 
   await apply(page);
 
