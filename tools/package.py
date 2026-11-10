@@ -241,8 +241,40 @@ def bat_bytes(text):
     except UnicodeEncodeError as e:
         raise SystemExit(f"bat 里有 GBK 编不了的字符：{e}\n{text!r}")
 
+
+def write_manifest(zip_path: Path, name: str) -> int:
+    """在包根目录补 MANIFEST.txt：大小 + SHA256 + 相对路径。
+
+    先写完包，再读回包里的字节来算，清单与真实内容一一对应；
+    清单自己不进清单，免得自指。返回条目数。
+    """
+    rows = []
+    with zipfile.ZipFile(zip_path) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            rel = info.filename[len(name) + 1:]
+            if rel == "MANIFEST.txt":
+                continue
+            data = z.read(info)
+            rows.append(f"{len(data):>10}  {hashlib.sha256(data).hexdigest()}  {rel}")
+
+    head = (
+        f"{name}\n"
+        "完整性清单：文件大小（字节）  SHA256  包内相对路径\n"
+        "核对方法：解压后逐行比对；哈希对不上说明文件被改过或没下完整。\n"
+        f"共 {len(rows)} 个文件（MANIFEST.txt 自身不计）\n"
+        "----\n"
+    )
+    with zipfile.ZipFile(zip_path, "a", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"{name}/MANIFEST.txt",
+                   (head + "\n".join(rows) + "\n").encode("utf-8-sig"))
+    return len(rows)
+
+
 README = """{klass} · 班级节律屏
 测试包（{date} 生成）
+本包内是示例班级（化名），不是真实学生。改成自己班级后，请看「八、隐私」。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 一、先做这一步
@@ -356,6 +388,14 @@ Windows 也可以用文件夹里的：
 想恢复出厂：编辑 → 文字 → 「全部恢复系统默认」。
 想重来一遍今天的改动：编辑 → 「撤销上一步」。
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+八、隐私：别把改过的文件夹发给别人
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 这个包里是示例班级（化名），不是真实学生，可以随便试。
+2. 你改成本班之后，学生姓名、老师姓名就存在这个文件夹里。
+   把整个文件夹发出去，等于把全班名册一起给了别人。
+3. 别人也想用，请把原始安装包转发给他，别发你改过的那份。
+
 配置包里没有「哪几天」，当天的课表是大屏自己按作息和课表现算的。
 所以它不会过期，跨学期换课表时才需要重新运行一次 bundle.py。
 """
@@ -462,6 +502,8 @@ def main() -> None:
         z.writestr(f"{name}/启动手机服务.bat", bat_bytes(BAT_SERVER))
         z.writestr(f"{name}/停止手机服务.bat", bat_bytes(BAT_STOP))
 
+    listed = write_manifest(zip_path, name)
+
     size = zip_path.stat().st_size / 1024
     one = single_path.stat().st_size / 1024
     with zipfile.ZipFile(zip_path) as z:
@@ -471,6 +513,7 @@ def main() -> None:
     print(f"  {count} 个文件，{pretty}"
           + ("（含免安装 Python，一体机不用装东西）" if pyzip
              else "（没带 Python，一体机要自己装才能用手机发消息）"))
+    print(f"  MANIFEST.txt：{listed} 个文件的 SHA256")
     print(f"已生成 {single_path}")
     print(f"  单文件 {one:.0f} KB，任何系统双击即开（没有手机发消息）")
     print(f"版本 v{ver} · 构建 {build}")
