@@ -1476,6 +1476,23 @@
         row.appendChild(b);
         box.appendChild(row);
       }
+      /* 双击打开时 localStorage 就是唯一副本，换目录就没了：
+         一个月没导出（或从没导出过）就在面板里催一次，不弹窗、不挡屏。 */
+      if (root.Backup.staleExport()) {
+        var warn = h("div", "ep-warn");
+        var last = root.Backup.lastExport();
+        warn.appendChild(h("p", null, last
+          ? "上次导出设置是 " + Math.floor((Date.now() - last) / 86400000)
+            + " 天前。双击打开时配置只在这个浏览器里，换目录或清缓存就会清零。"
+          : "还没导出过设置。双击打开时配置只在这个浏览器里，"
+            + "换目录、清缓存或换电脑就会清零。"));
+        var exp = h("button", "ep-mini", "现在导出一份");
+        exp.addEventListener("click", function () {
+          doExport(JSON.stringify(S.exportAll(), null, 2));
+        });
+        warn.appendChild(exp);
+        box.appendChild(warn);
+      }
       box.appendChild(h("p", "ep-note",
         "当前是双击文件打开，写不进磁盘。自动备份只能在「打开大屏.bat」的"
         + "8765 地址下落到本机；这里最多留一格浏览器副本。"));
@@ -1528,6 +1545,7 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
       ok = true;
     } catch (e) { ok = false; }
+    if (ok && root.Backup) root.Backup.noteExport();
     flash(ok ? "已下载，下面是同一份内容" : "这台机器不让下载，请复制下面的文字");
   }
 

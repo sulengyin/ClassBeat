@@ -13,6 +13,8 @@
   "use strict";
 
   var KEY = "rhythm.autobak.v1";     // file:// 用的单格副本
+  var EXPORT_KEY = "rhythm.export.v1"; // 上次手动导出设置的时间
+  var STALE = 30 * 24 * 3600 * 1000; // 一个月没导出，就算「很久没导」
   var TICK = 60 * 1000;              // 一分钟比一次：改完最多一分钟落盘
   var FIRST = 3 * 1000;              // 启动 3 秒后再备份，别和首屏抢时间
   var SLOW = 5 * 60 * 1000;          // file:// 没有写盘压力，五分钟一次就够
@@ -145,6 +147,25 @@
     } catch (e) { return null; }
   }
 
+  function lastExport() {
+    try { return Number(root.localStorage.getItem(EXPORT_KEY)) || 0; }
+    catch (e) { return 0; }
+  }
+
+  function noteExport() {
+    try { root.localStorage.setItem(EXPORT_KEY, String(Date.now())); }
+    catch (e) { /* 存不了也不耽误导出本身 */ }
+  }
+
+  /* 只有 file:// 需要催导出：8765 有服务端每天落盘，再提醒就是噪音。
+     没导出过算「很久」；超过 30 天也算。空配置没东西可导，不提醒。 */
+  function staleExport(now) {
+    if (mode === "http") return false;
+    if (!snapshotText()) return false;
+    var t = lastExport();
+    return !t || (now || Date.now()) - t > STALE;
+  }
+
   function apply(obj, cb) {
     var r = null;
     try { r = root.Store.importAll(obj); } catch (e) { r = null; }
@@ -179,6 +200,9 @@
     day: function () { return lastDay; },
     list: list,
     local: local,
+    lastExport: lastExport,
+    noteExport: noteExport,
+    staleExport: staleExport,
     restore: restore,
     restoreLocal: restoreLocal
   };

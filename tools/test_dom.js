@@ -1308,6 +1308,21 @@ global.Remote.info.phone = "";
   check(diskRes && diskRes.ok === false && /8765/.test(diskRes.why || ""),
     "file:// 下点磁盘备份会明确说读不到，而不是静默失败", diskRes && diskRes.why);
 
+  /* file:// 长期没导出：面板里醒目提醒 + 一键导出，但不弹窗 */
+  delete localStorage._d["rhythm.export.v1"];
+  global.Edit.open();
+  document.querySelectorAll(".ep-tab").filter(b => b.textContent === "文字")[0]._h.click();
+  const warnBox = document.querySelector(".ep-warn");
+  const warnBtn = warnBox && warnBox.querySelector("button");
+  check(!!warnBox && warnBtn && warnBtn.textContent.indexOf("导出") >= 0,
+    "file:// 从没导出过时，面板里给提醒和导出按钮", warnBtn && warnBtn.textContent);
+  check(global.Backup.staleExport() === true, "从没导出过算「很久没导」");
+  global.Backup.noteExport();
+  check(global.Backup.staleExport() === false, "刚导出过就不再提醒");
+  localStorage._d["rhythm.export.v1"] = String(Date.now() - 31 * 86400000);
+  check(global.Backup.staleExport() === true, "超过 30 天没导出重新提醒");
+  global.Edit.close();
+
   /* 8765 打开：每分钟把整份配置 POST 给本机服务 */
   global.location = { search: "", protocol: "http:", hostname: "127.0.0.1", port: "8765" };
   let postedUrl = "", postedBody = "";
@@ -1325,6 +1340,14 @@ global.Remote.info.phone = "";
         && postObj.savedAt === undefined,
     "POST 的是整份配置，并去掉每次都变的 savedAt",
     postedUrl + " / " + postedBody.length + " 字节");
+
+  /* 8765 有服务端每天落盘：不该再催老师导出 */
+  localStorage._d["rhythm.export.v1"] = String(Date.now() - 31 * 86400000);
+  check(global.Backup.staleExport() === false, "8765 下不判「很久没导出」");
+  global.Edit.open();
+  document.querySelectorAll(".ep-tab").filter(b => b.textContent === "文字")[0]._h.click();
+  check(!document.querySelector(".ep-warn"), "8765 模式下编辑面板不出现导出提醒");
+  global.Edit.close();
 
   /* 服务没起、断网：只吞掉，不抛错、不动提示条 */
   const tipHiddenBefore = tipEl.hidden, tipTextBefore = tipText.textContent;
