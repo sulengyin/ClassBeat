@@ -65,7 +65,7 @@ jobs:
           name: classbeat-package
           path: |
             dist/*.zip
-            dist/*单文件版.html
+            dist/*-single.html
           retention-days: 30
 
       - name: 发布到 Release
@@ -74,7 +74,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            "$zip" dist/*单文件版.html \
+            "$zip" dist/*-single.html \
             --title "ClassBeat $GITHUB_REF_NAME" \
+            --notes "Windows：下载 classbeat-版本号.zip，解压后双击「打开大屏.bat」。
+只想快速看看大屏：下载 classbeat-版本号-single.html，双击即可，不用解压。
+附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」；包内目录仍是中文，解压不受影响。
+完整说明见仓库 CHANGELOG.md。" \
             --generate-notes \
             --verify-tag

@@ -285,7 +285,7 @@ README = """{klass} · 班级节律屏
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 二、打开大屏
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-最简单：直接双击「{klass}节律屏-单文件版.html」。
+最简单：直接双击「{single}」。
 整个屏只有这一个文件，不用解压，Windows / 安卓 / 鸿蒙都能用浏览器打开。
 
 Windows 也可以用文件夹里的：
@@ -471,12 +471,17 @@ def main() -> None:
     name = pack_name()
 
     today = dt.date.today()
-    zip_path = DIST / f"{name}-{today.strftime('%Y%m%d')}.zip"
-    single_path = DIST / f"{name}-单文件版.html"
-
-    readme = README.format(date=today.isoformat(), klass=name.split("节律屏")[0])
-
     ver, build = version_stamp()
+
+    # 外层文件名只用 ASCII：GitHub Release 会把中文附件名净化成「1.-.-.zip」，
+    # 老师看不出这是什么。包内目录名照旧用中文，解压后的一切名字都不变。
+    slug = f"classbeat-{ver}"
+    zip_path = DIST / f"{slug}.zip"
+    single_path = DIST / f"{slug}-single.html"
+
+    readme = README.format(date=today.isoformat(), klass=name.split("节律屏")[0],
+                           single=f"{name}-单文件版.html")
+
     build_single(single_path, ver, build)
 
     pyzip = None if "--no-python" in sys.argv else python_runtime()

@@ -1,6 +1,6 @@
 {
   "name": "classbeat",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "班级节律屏：大屏与手机端的跨浏览器测试",
   "license": "MIT",
