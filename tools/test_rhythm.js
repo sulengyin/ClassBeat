@@ -122,6 +122,23 @@ s = at("2026-11-05", "12:55");
 check(s.kind === "break" && (s.sub || "").indexOf("下一节") === 0,
   "跨午休的第一节课前照常提示", s.sub || "空");
 
+/* 界面输入归一到 1–30 的整数：空回默认，越界夹住，非数字拒绝 */
+check(R.normalizePrepLead("") === R.PREP_LEAD && R.normalizePrepLead(null) === R.PREP_LEAD,
+  "空值回到默认 10 分钟", String(R.normalizePrepLead("")));
+check(R.normalizePrepLead(0) === null && R.normalizePrepLead(-7) === null,
+  "0 和负数都拒绝，不写入", String(R.normalizePrepLead(0)));
+check(R.normalizePrepLead(99) === 30 && R.normalizePrepLead(30) === 30,
+  "超过 30 夹到 30", String(R.normalizePrepLead(99)));
+check(R.normalizePrepLead("abc") === null && R.normalizePrepLead(NaN) === null,
+  "非数字不写入", String(R.normalizePrepLead("abc")));
+check(R.normalizePrepLead("12.4") === 12, "小数取整", String(R.normalizePrepLead("12.4")));
+
+/* 提前量改成 15：09:18（差 12 分钟）就该开始提示 */
+s = at("2026-11-05", "09:18", { prepLead: 15 });
+check(s.sub === "下一节 数学", "提前量 15 分钟时更早开始提示", s.sub || "空");
+s = at("2026-11-05", "09:18", { prepLead: 10 });
+check(!s.sub, "提前量 10 分钟时同一时刻还不提示", s.sub || "空");
+
 /* 第二行的清单跟科目走，且老师改过的词要顶掉默认 */
 s = at("2026-11-05", "11:10");
 check(s.lines[1].items.indexOf("墨汁") >= 0, "课间第二行列出书法要带的东西",

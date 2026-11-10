@@ -771,6 +771,75 @@ check(document.querySelector(".ep-rows").scrollTop === 77
 global.Store.resetConfig();
 global.Edit.close();
 
+/* ---------- 课前准备提前量：老师自己在「文字」页改 ---------- */
+const prepLead = global.Store.prefs().prepLead;
+check(prepLead === undefined, "默认没写提前量，走系统 10 分钟", String(prepLead));
+
+/* 正在看的课间：09:19 还差 11 分钟，不该提示下一节 */
+global.__rhythmDate = "2026-11-05";
+global.__rhythmTime = 9 * 60 + 19;
+global.Screen.render();
+check(document.getElementById("after").textContent.indexOf("下一节") < 0,
+  "提前 11 分钟时屏上没有下一节");
+
+global.Edit.open();
+const textTab = document.querySelectorAll(".ep-tab").filter(b => b.textContent === "文字")[0];
+textTab._h.click();
+const leadInput = document.querySelector(".ep-stepnum");
+const leadBtns = document.querySelectorAll(".ep-stepbtn");
+check(!!leadInput && leadBtns.length === 2 && leadInput.value === "10",
+  "文字页有分钟数输入框和 − ＋", leadInput ? leadInput.value : "没有输入框");
+
+leadBtns[1]._h.click();
+check(global.Store.prefs().prepLead === 11 && leadInput.value === "11",
+  "点 ＋ 立刻加一分钟并落盘", String(global.Store.prefs().prepLead));
+check(document.getElementById("after").textContent.indexOf("下一节") >= 0,
+  "提前量改完后，当前这一屏马上重算", document.getElementById("after").textContent);
+
+leadInput.value = "15";
+leadInput._h.change();
+check(global.Store.prefs().prepLead === 15, "输入 15 分钟并保存", String(global.Store.prefs().prepLead));
+
+leadInput.value = "";
+leadInput._h.change();
+check(global.Store.prefs().prepLead === 10 && leadInput.value === "10",
+  "清空输入框回到默认 10", String(global.Store.prefs().prepLead));
+
+["0", "-3", "abc"].forEach(function (bad) {
+  leadInput.value = bad;
+  leadInput._h.change();
+  check(global.Store.prefs().prepLead === 10 && leadInput.value === bad,
+    "非法输入 " + bad + " 不改配置，留在框里等重填",
+    "store=" + global.Store.prefs().prepLead + " input=" + leadInput.value);
+});
+leadInput.value = "99";
+leadInput._h.change();
+check(global.Store.prefs().prepLead === 30, "超过上限按 30 分钟算", String(global.Store.prefs().prepLead));
+
+/* 退出重进仍是设定值；导出导入带着走 */
+global.Edit.close();
+global.Edit.open();
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "文字")[0]._h.click();
+check(document.querySelector(".ep-stepnum").value === "30",
+  "退出再进面板，提前量没丢", document.querySelector(".ep-stepnum").value);
+const exported = global.Store.exportAll();
+check(exported.prefs.prepLead === 30, "导出文件里带着提前量", String(exported.prefs.prepLead));
+global.Store.setPref("prepLead", 5);
+const imported = global.Store.importAll(exported);
+check(imported.ok && global.Store.prefs().prepLead === 30,
+  "导入后提前量恢复", imported.ok ? String(global.Store.prefs().prepLead) : imported.why);
+
+/* 步进按钮的触摸区 */
+const stepRule = (fs.readFileSync(path.join(ROOT, "app/edit.css"), "utf8")
+  .match(/\.ep-stepbtn\{[^}]*\}/) || [""])[0];
+check(/min-width:\s*44px/.test(stepRule) && /min-height:\s*44px/.test(stepRule),
+  "− ＋ 按钮触摸区域不小于 44px", stepRule.replace(/\s+/g, " "));
+global.Edit.close();
+delete localStorage._d["rhythm.prefs.v1"];
+
+global.Store.resetConfig();
+global.Edit.close();
+
 /* remote.js 的 hub 选择：从服务打开时同源，双击文件时才用本机 8765。
    以前默认写死 127.0.0.1，服务在另一台电脑上就永远连不上。 */
 function hubFor(loc) {

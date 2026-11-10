@@ -576,6 +576,51 @@
     S.patchTexts({ stage: Object.keys(stage).length ? stage : null });
   }
 
+  /* 课前准备提前量：分钟数输入框配 −/+ 步进，一体机上不用调出键盘。
+     只有 change（离开输入框 / 点步进）才落盘，中途打字不写。
+     空 = 恢复默认；0、负数、非数字一律不写，改成提示。 */
+  function prepLeadRow() {
+    var cur = S.prefs().prepLead;
+    cur = R.normalizePrepLead(cur);
+    if (cur == null) cur = R.PREP_LEAD;
+
+    var row = h("div", "ep-step");
+    row.appendChild(h("span", "ep-flabel", "提前量"));
+
+    var minus = h("button", "ep-stepbtn", "−");
+    minus.type = "button";
+    minus.setAttribute("aria-label", "减少一分钟");
+    var inp = document.createElement("input");
+    inp.className = "ep-input ep-stepnum";
+    inp.type = "text";
+    inp.inputMode = "numeric";
+    inp.value = String(cur);
+    var plus = h("button", "ep-stepbtn", "＋");
+    plus.type = "button";
+    plus.setAttribute("aria-label", "增加一分钟");
+    row.appendChild(minus);
+    row.appendChild(inp);
+    row.appendChild(plus);
+    row.appendChild(h("span", "ep-steptag", "分钟"));
+
+    function apply(raw) {
+      var n = R.normalizePrepLead(raw);
+      if (n == null) {
+        flash("提前量是 1–30 分钟的数，请重填");
+        return;
+      }
+      if (String(n) !== String(raw).trim()) flash("已按 " + n + " 分钟算");
+      cur = n;
+      inp.value = String(n);
+      S.setPref("prepLead", n);
+      if (root.Screen) root.Screen.render();
+    }
+    minus.addEventListener("click", function () { apply(cur - 1); });
+    plus.addEventListener("click", function () { apply(cur + 1); });
+    inp.addEventListener("change", function () { apply(inp.value); });
+    return row;
+  }
+
   function renderText() {
     var T = S.texts();
 
@@ -661,6 +706,10 @@
       function (v) { S.patchTexts({ breakActions: splitWords(v) }); }));
     sec1.appendChild(field("第二行开头", "准备好", T.prepLabel,
       function (v) { S.patchTexts({ prepLabel: v.trim() || null }); }));
+    sec1.appendChild(prepLeadRow());
+    sec1.appendChild(h("p", "ep-note",
+      "下课前多少分钟开始提示下一节要带什么。默认 10 分钟，1–30 分钟都可以；"
+      + "清空输入框就回到默认。普通课间、大课间都按这个提前量，改完大屏立刻跟着变。"));
     bodyEl.appendChild(sec1);
 
     var sec2 = h("section", "ep-sec wide");

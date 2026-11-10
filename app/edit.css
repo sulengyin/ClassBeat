@@ -80,6 +80,18 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-input:focus{border-color:#FFD64F}
 .ep-input::placeholder{color:#7C6A56}
 
+/* 分钟数步进：− 数字 ＋，按钮按 44px 触摸区做，一体机上不用调键盘 */
+.ep-step{display:flex;align-items:center;gap:1.2vmin;margin-top:1.4vmin}
+.ep-step .ep-input{flex:none;margin-bottom:0}
+.ep-stepnum{width:11vmin;text-align:center;font-weight:900;padding:1.2vmin 0}
+.ep-stepbtn{font:inherit;font-size:3vmin;font-weight:900;line-height:1;
+           min-width:44px;min-height:44px;padding:0 1.6vmin;
+           display:flex;align-items:center;justify-content:center;
+           border:.28vmin solid #6B5641;border-radius:1.3vmin;
+           background:#3D2D20;color:#FBF3DF;cursor:pointer}
+.ep-stepbtn:active{background:#FFD64F;color:#2B1D10}
+.ep-steptag{font-size:2.2vmin;color:#C1B09A}
+
 .ep-hintrow{margin-top:1.3vmin}
 .ep-warn{display:flex;align-items:center;gap:1.5vmin;flex-wrap:wrap;
          font-size:2.2vmin;color:#2B1D10;background:#FFD64F;
