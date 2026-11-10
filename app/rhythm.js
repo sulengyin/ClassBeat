@@ -33,6 +33,12 @@
      眼保健操不在此列——闭着眼做操，屏上跳数字只会让人偷看。 */
   var CLOSING = { break: 2, ritual: 3, noon: 3, meal: 5, action: 5 };
 
+  /* 课前准备提前量：距下一节正式上课还有这么多分钟，就把下一节和要带的东西
+     放上屏。普通课间、大课间、眼保健操、大扫除都适用；
+     午餐/午间/放学不提示（见 PREVIEW_KINDS）。 */
+  var PREP_LEAD = 10;
+  var PREVIEW_KINDS = { break: 1, ritual: 1, action: 1 };
+
   /* 动作提示只在刚下课的头 2 分钟出现。挂一整天等于没有提示。
      课间例外：整段都留着"喝水 / 上厕所"，因为这两件事贯穿整个课间。 */
   var HINTS = {
@@ -80,6 +86,29 @@
       if (day.timeline[i].type === type) return day.timeline[i];
     }
     return null;
+  }
+
+  /* 提前量可配：opts.prepLead 来自本机偏好，没给就用默认 10 分钟。
+     小于 0 视为不启用。 */
+  function prepLeadOf(opts) {
+    var v = opts && opts.prepLead;
+    v = (v == null || v === "") ? NaN : Number(v);
+    return isFinite(v) && v >= 0 ? v : PREP_LEAD;
+  }
+
+  /* 距下一节正课开始 lead 分钟内，这段休息/活动要把下一节露出来；
+     没有后续课程、或还早，就返回 null。
+     午餐、午间不在此列：那两段要留给吃饭和休息，不挂"下一节"。 */
+  function previewClass(day, i, minutes, lead) {
+    var b = day.timeline[i];
+    if (!PREVIEW_KINDS[b.type]) return null;
+    var nc = nextOfType(day, i, "class");
+    if (!nc) return null;
+    return (t2m(nc.start) - minutes) <= lead ? nc : null;
+  }
+
+  function prepNext(nc) {
+    return { subject: nc.subject, teacher: nc.teacher, periodNo: nc.periodNo };
   }
 
   /* 早读不出准备清单——课前那点时间，列书单没用。
@@ -232,6 +261,7 @@
 
     var b = t[i];
     var remain = t2m(b.end) - minutes;
+    var lead = prepLeadOf(opts);
     var card = { kind: b.type, title: b.name || "", sub: "", note: b.tip || "",
                  meta: [], items: b.items || [], countdown: countdownFor(b.type, remain, mode),
                  clock: m2t(minutes), range: b.start + "–" + b.end,
@@ -272,29 +302,39 @@
     }
 
     if (b.type === "break") {
-      var nc = nextOfType(day, i, "class");
+      var nc = previewClass(day, i, minutes, lead);
       card.title = (opts.texts && opts.texts.breakTitle) || "课间";
       card.sub = nc ? "下一节 " + (nc.subject || "") : "";
       card.note = "喝水、如厕，回来准备下节课";
       if (nc) {
         if (nc.teacher) card.meta.push({ label: "任课", value: nc.teacher });
         if (nc.place) card.meta.push({ label: "地点", value: nc.place });
-        /* 上课铃响之前这一段，才是准备用品的时间。从课间第一秒就列出来，
-           不再分 level、也不再等最后 2 分钟——学生要有整段课间去拿东西。 */
+        /* 距上课 10 分钟内才把用品提上来：够拿东西，又不至于整个长课间都在搬家。 */
         if (nc.prep && nc.prep.items && nc.prep.items.length) {
           card.items = nc.prep.items;
           card.note = "下节课要用，现在就摆好";
         }
       }
-      card._next = nc ? { subject: nc.subject, teacher: nc.teacher, periodNo: nc.periodNo } : null;
+      card._next = nc ? prepNext(nc) : null;
+    }
+
+    /* 大课间、眼保健操、大扫除：先保留活动本身（标题、安全提示、任务），
+       最后 10 分钟再把下一节和要带的东西接在下面，互不覆盖。 */
+    if (b.type === "ritual" || b.type === "action") {
+      var na = previewClass(day, i, minutes, lead);
+      if (na) {
+        card.sub = "下一节 " + (na.subject || "");
+        card._next = prepNext(na);
+        if (na.prep && na.prep.items && na.prep.items.length) card.prepItems = na.prep.items;
+      }
     }
 
     if (b.type === "noon") {
-      var na = nextOfType(day, i, "class");
+      var ncNoon = nextOfType(day, i, "class");
       card.title = b.name || "午间";
       card.note = b.tip || "";
-      if (na && na.prep && na.prep.level >= 2 && na.prep.items.length) {
-        card.meta.push({ label: "下午第一节", value: na.subject + " · " + na.prep.items.join("、") });
+      if (ncNoon && ncNoon.prep && ncNoon.prep.level >= 2 && ncNoon.prep.items.length) {
+        card.meta.push({ label: "下午第一节", value: ncNoon.subject + " · " + ncNoon.prep.items.join("、") });
       }
     }
 
@@ -385,6 +425,10 @@
       else out.push({ kind: "prep", label: label, items: items });
     }
 
+    /* 活动类（大课间/大扫除）自己的任务不动，下一节的用品单独起一行 */
+    var prep = card.prepItems || [];
+    if (prep.length) out.push({ kind: "prep", label: label, items: prep });
+
     if (card.hints && card.hints.length) out.unshift({ kind: "action", items: card.hints });
     return out;
   }
@@ -434,7 +478,8 @@
   }
 
   var api = { t2m: t2m, m2t: m2t, mmss: mmss, human: human,
-              stateAt: stateAt, dutiesAt: dutiesAt, CD: CD, TONE: TONE, HINTS: HINTS };
+              stateAt: stateAt, dutiesAt: dutiesAt, CD: CD, TONE: TONE, HINTS: HINTS,
+              PREP_LEAD: PREP_LEAD };
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.Rhythm = api;

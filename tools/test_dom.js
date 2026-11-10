@@ -502,6 +502,25 @@ check(beforeShift.indexOf("第 1 节") < 0, "08:10 还没上第一节", beforeSh
 const afterTxt = document.getElementById("after").textContent;
 check(afterTxt.indexOf("下一节") >= 0, "08:10 课间写清楚下一节是什么", afterTxt);
 
+/* 大课间最后 2 分钟：科目和用品不能被「还剩几分钟」挤掉 */
+global.__rhythmDate = "2026-11-05";
+global.__rhythmTime = 9 * 60 + 28;
+Screen.render();
+const bdMain = heroText();
+check(bdMain.indexOf("2:00") >= 0, "大课间剩 2 分钟进入倒计时", bdMain);
+const bdNext = global.Runtime.day("2026-11-05").timeline.filter(b => b.type === "class")[1];
+const bdAfter = document.getElementById("after").textContent;
+check(bdAfter.indexOf("下一节") >= 0 && bdAfter.indexOf(bdNext.subject) >= 0,
+  "倒计时下仍写清下一节是什么", bdAfter);
+const bdTask = document.getElementById("heroTask").textContent;
+check(bdTask.indexOf(bdNext.prep.items[0]) >= 0, "倒计时下仍列出要带的东西", bdTask);
+check(parseFloat(document.getElementById("heroTask").style.fontSize) >= 6,
+  "倒计时下用品字够大，不是小字",
+  document.getElementById("heroTask").style.fontSize);
+global.__rhythmDate = "2026-11-09";
+global.__rhythmTime = 8 * 60 + 10;
+Screen.render();
+
 const moved = JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable));
 /* 第一节前面还有早读和准备课间，不能拿 blocks[0] 当第一节 */
 const classIdx = moved.blocks.findIndex(b => b.type === "class");

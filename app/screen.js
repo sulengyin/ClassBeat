@@ -152,10 +152,10 @@
     return Math.max(4.6, s);
   }
 
-  /* 课间的「准备好」不再是底部小字：它和「课间」两个字同一行级、同字号。
-     从 lines 里取出来交给 #heroTask，chips 只留喝水/上厕所。 */
-  function breakPrep(s) {
-    if (!s || s.kind !== "break") return null;
+  /* 课间 / 大课间最后几分钟的「准备好」不再是底部小字：
+     它和主视觉同一行级、同字号。从 lines 里取出来交给 #heroTask，chips 只留其余行。 */
+  function prepLine(s) {
+    if (!s || !s._next) return null;
     var lines = s.lines || [];
     for (var i = 0; i < lines.length; i++) if (lines[i].kind === "prep") return lines[i];
     return null;
@@ -189,8 +189,10 @@
       if (s.range) parts.push(durText(s.range));
       return parts.join("　·　");
     }
-    if (s.kind === "break" && s._next) {
-      return "下一节 " + s._next.subject + (s._next.teacher ? "　" + s._next.teacher : "");
+    if (s._next) {
+      var nx = "下一节 " + s._next.subject + (s._next.teacher ? "　" + s._next.teacher : "");
+      /* 大课间、大扫除自己的提示不能丢，接在「下一节」后面 */
+      return (s.kind === "break" || !s.note) ? nx : nx + "　·　" + s.note;
     }
     if (s.kind === "closed") return s.note || "整理好书包，明天见";
     /* 早读没有第二行就留白：别把「第 1 节 语文」顶上来冒充一句话 */
@@ -457,9 +459,10 @@
     }
     el.warn.classList.remove("show");
 
-    var mode = (S.prefs().cdMode) || "auto";
+    var p = S.prefs();
+    var mode = p.cdMode || "auto";
     var texts = S.texts ? S.texts() : {};
-    var s = R.stateAt(day, minutes, { countdownMode: mode, texts: texts });
+    var s = R.stateAt(day, minutes, { countdownMode: mode, texts: texts, prepLead: p.prepLead });
 
     /* 老师发的临时通知分两级：普通提示只占一条，紧急占整个主区 */
     var notice = activeNotice(ov);
@@ -497,8 +500,8 @@
       sub = s.nextLabel || "后上课";
       after = afterText(s);
       size = 20;
-      /* 课间倒计时也把清单留在「还有几分钟」下面，别掉回底部小字 */
-      promoted = breakPrep(s);
+      /* 倒计时也把清单留在「还有几分钟」下面，别掉回底部小字 */
+      promoted = prepLine(s);
       if (promoted) task = prepText(promoted);
     } else {
       main = s.title;
@@ -514,8 +517,8 @@
           size = notice ? Math.min(size, 13) : adviceSize(main, task, size);
         }
       } else {
-        /* 课间：「准备好」跟「课间」两个字同字号、紧贴下一行 */
-        promoted = breakPrep(s);
+        /* 课前准备：「准备好」跟标题同字号、紧贴下一行 */
+        promoted = prepLine(s);
         if (promoted) {
           task = prepText(promoted);
           size = notice ? Math.min(size, 13) : adviceSize(main, task, size, 52);

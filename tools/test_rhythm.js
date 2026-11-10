@@ -77,6 +77,51 @@ check(s.kind === "class" && s.title.indexOf("第 1 节") === 0 && s.items.length
 s = at("2026-11-05", "09:00");
 check(s.kind === "ritual" && s.title === "大课间", "09:00 整点切到大课间", s.title);
 
+/* 大课间（09:00–09:30）后是第 2 节（09:30）：最后 10 分钟必须露出下一节。
+   以前大课间走 ritual 分支，到最后 3 分钟只剩「还剩几分钟」，科目和用品全没了。 */
+check(R.PREP_LEAD === 10, "课前准备默认提前 10 分钟", String(R.PREP_LEAD));
+s = at("2026-11-05", "09:28");
+check(s.kind === "ritual" && s.sub === "下一节 数学", "大课间剩 2 分钟写明下一节", s.sub || "空");
+check((s.prepItems || []).indexOf("数学书") >= 0, "大课间剩 2 分钟列出要带的书本",
+  (s.prepItems || []).join("、") || "空");
+check(s.lines.some(l => l.kind === "prep" && l.items.indexOf("数学书") >= 0),
+  "用品单独一行，不和活动提示打架", JSON.stringify(s.lines));
+check(s.note === "排队下楼，靠右行走，不推不挤", "大课间自己的安全提示还在", s.note);
+check(s.focus === "countdown" && s.timer, "倒计时照常，信息没被挤掉", s.timer);
+
+s = at("2026-11-05", "09:20");
+check(s.sub === "下一节 数学", "正好 10 分钟就开始提示", s.sub);
+s = at("2026-11-05", "09:19");
+check(s.kind === "ritual" && !s.sub && !(s.prepItems || []).length,
+  "超过 10 分钟不显示下一节", s.sub || "空");
+
+s = at("2026-11-05", "09:19", { prepLead: 11 });
+check(s.sub === "下一节 数学", "提前量走配置，不是写死", s.sub);
+s = at("2026-11-05", "09:25", { prepLead: 3 });
+check(!s.sub, "把提前量调小也生效", s.sub || "空");
+
+/* 长课间前段先保留「现在是课间」，最后 10 分钟再切准备 */
+s = at("2026-11-05", "11:05");
+check(s.kind === "break" && !s.sub && s.items.length === 0,
+  "长课间前段不抢课间信息", s.sub || "空");
+
+/* 当天已无正课：不挂「下一节」 */
+s = at("2026-11-05", "15:48");
+check(s.kind === "break" && !s._next && s.items.length === 0,
+  "当天没有后续课程时不提示下一节", s.sub || "空");
+
+/* 午休、午餐不进入课前准备 */
+s = at("2026-11-05", "12:20");
+check(s.kind === "noon" && !s._next && !(s.prepItems || []).length,
+  "午休不挂下一节", s.sub || "空");
+s = at("2026-11-05", "12:07");
+check(s.kind === "meal" && !s._next, "午餐不挂下一节", s.sub || "空");
+
+/* 跨午休的第一节：午休结束后的课间照常提示 */
+s = at("2026-11-05", "12:55");
+check(s.kind === "break" && (s.sub || "").indexOf("下一节") === 0,
+  "跨午休的第一节课前照常提示", s.sub || "空");
+
 /* 第二行的清单跟科目走，且老师改过的词要顶掉默认 */
 s = at("2026-11-05", "11:10");
 check(s.lines[1].items.indexOf("墨汁") >= 0, "课间第二行列出书法要带的东西",
