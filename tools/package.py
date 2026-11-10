@@ -598,7 +598,9 @@ def main() -> None:
     zip_path = DIST / f"{slug}.zip"
     single_path = DIST / f"{slug}-single.html"
 
-    readme = README.format(date=today.isoformat(), klass=name.split("节律屏")[0],
+    # 包名以「节律屏」开头时（通用版），首行的班名占位会空出来，退回「通用版」
+    readme = README.format(date=today.isoformat(),
+                           klass=name.split("节律屏")[0] or "通用版",
                            single=f"{name}-单文件版.html")
 
     build_single(single_path, ver, build)
