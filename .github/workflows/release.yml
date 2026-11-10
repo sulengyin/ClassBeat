@@ -49,8 +49,15 @@ jobs:
           unzip -l "$zip" | grep -q "server/python/python.exe"
           unzip -l "$zip" | grep -q "启动手机服务.bat"
           unzip -l "$zip" | grep -q "app/setup.js"
+          unzip -l "$zip" | grep -q "MANIFEST.txt"
+          # 包里绝不能带真实班级数据或运行期文件
+          if unzip -l "$zip" | grep -Eq "/(data/|server/messages\.json|server/server\.log|server/service\.pid)"; then
+            echo "包里混进了不该发布的文件："
+            unzip -l "$zip" | grep -E "/(data/|server/messages\.json|server/server\.log|server/service\.pid)"
+            exit 1
+          fi
           echo "zip=$zip" >> "$GITHUB_ENV"
-          echo "已确认：$zip 自带运行时、手机服务、配置向导"
+          echo "已确认：$zip 自带运行时、手机服务、配置向导、MANIFEST"
 
       - name: 上传产物
         uses: actions/upload-artifact@v7
