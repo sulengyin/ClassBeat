@@ -96,6 +96,15 @@
     return isFinite(v) && v >= 0 ? v : PREP_LEAD;
   }
 
+  /* 界面输入的归一处：空 = 恢复默认；0、负数、非数字都不接受（返回 null，
+     由调用方保持原值并提示）；超过 30 夹到 30；小数取整。 */
+  function normalizePrepLead(v) {
+    if (v == null || (typeof v === "string" && v.trim() === "")) return PREP_LEAD;
+    var n = Number(v);
+    if (!isFinite(n) || n < 1) return null;
+    return Math.min(30, Math.round(n));
+  }
+
   /* 距下一节正课开始 lead 分钟内，这段休息/活动要把下一节露出来；
      没有后续课程、或还早，就返回 null。
      午餐、午间不在此列：那两段要留给吃饭和休息，不挂"下一节"。 */
@@ -479,7 +488,7 @@
 
   var api = { t2m: t2m, m2t: m2t, mmss: mmss, human: human,
               stateAt: stateAt, dutiesAt: dutiesAt, CD: CD, TONE: TONE, HINTS: HINTS,
-              PREP_LEAD: PREP_LEAD };
+              PREP_LEAD: PREP_LEAD, normalizePrepLead: normalizePrepLead };
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.Rhythm = api;
