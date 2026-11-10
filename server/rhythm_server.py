@@ -56,6 +56,87 @@ APP_VERSION = {"version": "", "build": "", "startedAt": ""}
 UPDATE = {"url": "", "interval": 1800, "checkedAt": "", "latest": "", "available": False}
 UPDATE_LOCK = threading.Lock()
 
+# 配置自动备份：大屏把整份导出 JSON POST 过来，一天一份落在 backups/config/。
+# 只有本机回环能读写；文件里有真实名册，所以这个目录在 .gitignore 里。
+BACKUP_DIR = os.path.abspath(os.path.join(BASE, "..", "backups", "config"))
+BACKUP_KEEP = 14          # 一天一份，留两周：够覆盖一次长跑和一次误改
+BACKUP_MAX_BODY = 512 * 1024
+BACKUP_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _backup_path(day):
+    return os.path.join(BACKUP_DIR, "rhythm-%s.json" % day)
+
+
+def _backup_days():
+    try:
+        names = os.listdir(BACKUP_DIR)
+    except OSError:
+        return []
+    days = [n[7:-5] for n in names
+            if n.startswith("rhythm-") and n.endswith(".json")]
+    return sorted(d for d in days if BACKUP_DAY_RE.match(d))
+
+
+def save_snapshot(payload):
+    """一天一份，内容没变就不重写。返回 (saved, day, kept)。
+
+    归一化后再比字节：同一天打开多次屏，不该反复写盘。"""
+    day = dt.datetime.now(BEIJING).strftime("%Y-%m-%d")
+    body = json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                      separators=(",", ":")).encode("utf-8")
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    fp = _backup_path(day)
+    try:
+        with open(fp, "rb") as f:
+            if f.read() == body:
+                return False, day, len(_backup_days())
+    except OSError:
+        pass
+    tmp = fp + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(body)
+    os.replace(tmp, fp)
+    days = _backup_days()
+    for old in days[:-BACKUP_KEEP]:
+        try:
+            os.remove(_backup_path(old))
+        except OSError:
+            pass
+    return True, day, len(_backup_days())
+
+
+def list_snapshots(limit=5):
+    """给面板列最近几份。只回日期、大小、班名，不回名册。"""
+    out = []
+    for day in _backup_days()[-limit:][::-1]:
+        fp = _backup_path(day)
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                obj = json.load(f)
+            st = os.stat(fp)
+        except (OSError, ValueError):
+            continue
+        meta = ((obj.get("config") or {}).get("meta") or {})
+        out.append({
+            "day": day,
+            "savedAt": dt.datetime.fromtimestamp(st.st_mtime, BEIJING)
+                          .isoformat(timespec="minutes"),
+            "size": st.st_size,
+            "klass": str(meta.get("klass") or "")[:40],
+        })
+    return out
+
+
+def load_snapshot(day):
+    if not BACKUP_DAY_RE.match(day or ""):
+        return None
+    try:
+        with open(_backup_path(day), "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
 
 def read_app_version():
     """从 app/version.js 里抠出 VERSION / BUILD；读不到就当空，不抛错。"""
@@ -322,6 +403,11 @@ class Handler(BaseHTTPRequestHandler):
     def _err(self, msg, code=400):
         self._json({"ok": False, "error": msg}, code)
 
+    def _loopback(self):
+        """配置备份只对本机开放：机房局域网里的手机不该能读别人班的名册。"""
+        ip = (self.client_address or ("",))[0]
+        return ip in ("127.0.0.1", "::1") or ip.startswith("::ffff:127.")
+
     def do_OPTIONS(self):
         self._common(204)
         self.send_header("Content-Length", "0")
@@ -392,6 +478,19 @@ class Handler(BaseHTTPRequestHandler):
             q = parse_qs(u.query)
             n = int((q.get("n") or ["5"])[0])
             return self._json({"ok": True, "messages": recent(max(1, min(n, 50)))})
+        if path == "/api/config/backup":
+            # 面板要知道「本机有没有备份、最近几天都有哪些」，只回摘要不回内容
+            if not self._loopback():
+                return self._err("forbidden", 403)
+            return self._json({"ok": True, "keep": BACKUP_KEEP,
+                               "dir": "backups/config", "items": list_snapshots(5)})
+        if path.startswith("/api/config/backup/"):
+            if not self._loopback():
+                return self._err("forbidden", 403)
+            obj = load_snapshot(path.rsplit("/", 1)[1])
+            if obj is None:
+                return self._err("没有这份备份", 404)
+            return self._json(obj)
         if path == "/api/stream":
             return self._stream()
 
@@ -483,6 +582,26 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/retract":
             ev = retract_latest()
             return self._json({"ok": True, "cleared": bool(ev), "event": ev})
+
+        if route == "/api/config/snapshot":
+            # 大屏自动把整份配置 POST 过来；失败一律安静，由调用方吞掉
+            if not self._loopback():
+                return self._err("只接受本机写入", 403)
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                if n <= 0 or n > BACKUP_MAX_BODY:
+                    return self._err("请求体太大或为空", 413)
+                payload = json.loads(self.rfile.read(n).decode("utf-8"))
+                if not isinstance(payload, dict) \
+                        or payload.get("format") != "rhythm-config/v1":
+                    raise ValueError("不是节律屏的设置文件")
+            except Exception as e:
+                return self._err("请求体不是合法配置：%s" % e, 400)
+            try:
+                saved, day, kept = save_snapshot(payload)
+            except OSError as e:
+                return self._err("写不进备份目录：%s" % e, 500)
+            return self._json({"ok": True, "saved": saved, "day": day, "kept": kept})
 
         if route != "/api/messages":
             return self._err("not found", 404)

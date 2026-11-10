@@ -197,6 +197,8 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 
 /* 导出 / 导入：设置只在这台机器上，得能整车搬走 */
 .ep-backup{display:flex;gap:1vmin;flex-wrap:wrap;margin-top:1.6vmin}
+/* 自动备份列表：日期 + 班名 + 大小跟按钮同一行对齐 */
+.ep-auto .ep-backup{align-items:center}
 .ep-dump{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.9vmin;
          line-height:1.5;width:100%;margin-top:1.4vmin;padding:1.5vmin;
          border-radius:1.3vmin;border:.26vmin solid #6B5641;background:#241A13;

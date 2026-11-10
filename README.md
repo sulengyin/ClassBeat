@@ -173,6 +173,12 @@ python3 tools/backup.py
 本地文档、当前安装包、`MANIFEST.txt`（逐文件 SHA256），外加一个 `git bundle`
 （完整提交历史，`git clone xxx.bundle ClassBeat` 就能离线还原）。
 
+大屏自己也会留底，不用点按钮：从本机服务打开（`打开大屏.bat`）时，配置改动后
+一分钟内写到 `backups/config/rhythm-YYYY-MM-DD.json`，一天一份，留最近 14 天。
+换电脑或换地址后，进编辑页「带走这些修改 → 本机自动备份」，按日期点「恢复」。
+这个目录里有真实班名和名册，**不要单独转发**；给别人发原始安装包即可。
+双击 `app/index.html`（`file://`）时没有服务可写盘，只会在浏览器里留一份副本。
+
 ---
 
 ## 测试
@@ -251,6 +257,7 @@ python3 server/rhythm_server.py --port 8765   # 直接跑，排错时看输出�
 这个仓库**不含任何真实学生姓名**。
 
 - `data/` 与 `assets/` 在 `.gitignore` 里，真实名册和学校素材照片不会入库。
+- 自动备份的 `backups/config/` 同样在 `.gitignore` 里；它含真实班名与名册，别单独转发。
 - `sample/` 是 `tools/make_sample.py` 从真实结构生成的**化名**版本：48 个编造的学生名、
   「张老师」这类化名、示例小学、五（1）班。结构完全一致，可以直接拿来演示。
 - `tools/make_sample.py --check` 会扫一遍 `sample/`，确认没有一个真实姓名漏进去。

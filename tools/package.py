@@ -82,7 +82,8 @@ PACK_NAME = class_name().replace("（", "").replace("）", "") + "节律屏-测�
 APP_FILES = [
     "version.js", "index.html", "preview.html", "edit.css", "setup.css",
     "data.js", "engine/schedule.js", "clock.js", "rhythm.js", "store.js",
-    "runtime.js", "screen.js", "remote.js", "edit.js", "update.js", "demo.js",
+    "runtime.js", "screen.js", "remote.js", "edit.js", "update.js", "backup.js",
+    "demo.js",
     "config.js", "qr.js", "phoneui.js", "setup.js", "templates.js",
     "vendor/qrcode.min.js",
 ]
@@ -305,6 +306,12 @@ Windows 也可以用文件夹里的：
 以后一直用「打开大屏.bat」，就不会再变。屏幕底部出现提示条时，
 点「知道了」当天不再弹。
 
+配置还会自动留底：用「打开大屏.bat」打开时，改完一分钟内会把整份配置
+写到文件夹里的 backups\\config\\，一天一份，留最近 14 天，不用点任何按钮。
+以后再换地址或浏览器被清过，进「编辑」→「带走这些修改」→「本机自动备份」，
+按日期点「恢复」就行。双击 app\\index.html 时没有本机服务，
+只能退回浏览器里存一份副本，恢复入口在同一处。
+
 打开后按 F11 全屏（安卓点浏览器菜单里的「全屏」）。
 
 版本号在右下角「⋯」展开后能看到（如 v0.1.0 · a1b2c3d），
@@ -395,6 +402,8 @@ Windows 也可以用文件夹里的：
 2. 你改成本班之后，学生姓名、老师姓名就存在这个文件夹里。
    把整个文件夹发出去，等于把全班名册一起给了别人。
 3. 别人也想用，请把原始安装包转发给他，别发你改过的那份。
+4. backups\\config\\ 里是自动备份，内容和导出设置一样，含真实姓名；
+   别把这个文件夹单独发出去，要分享请发原始安装包。
 
 配置包里没有「哪几天」，当天的课表是大屏自己按作息和课表现算的。
 所以它不会过期，跨学期换课表时才需要重新运行一次 bundle.py。
