@@ -517,15 +517,14 @@
     return out;
   }
 
-  /* 到校前 / 放学后 / 休息日：不在作息表里，是每天的两头 */
+  /* 晨间自主管理 / 放学后 / 休息日：晨间跟着作息走，另外两个是每天的两头 */
   var STAGES = [
-    { key: "before",  label: "到校（第一节课打铃前）", title: "早上好",   note: "到校后先交作业、整理书包" },
+    { key: "before",  label: "晨间自主管理", title: "晨间自主管理", note: "先交作业、整理书包" },
     { key: "closed",  label: "放学以后",       title: "放学了",   note: "整理好书包，路上注意安全" },
     { key: "holiday", label: "休息日",         title: "今天不上学", note: "好好休息，明天见" }
   ];
 
-  /* 早读那段：到校后到第 1 节前。块名和提醒按星期排，
-     空着就等于这天没安排，屏上不显示，不去猜。 */
+  /* 提醒事项按星期排：空着就等于这天没安排，屏上不显示，不去猜。 */
   var WEEKDAYS = [
     { n: 1, label: "周一" }, { n: 2, label: "周二" }, { n: 3, label: "周三" },
     { n: 4, label: "周四" }, { n: 5, label: "周五" }
@@ -552,14 +551,8 @@
     return inp;
   }
 
-  /* 不带左侧标签的一行输入框：小标题已经在上面的「到校」里写过了 */
-  function stageInput(ph, value, onSave) {
-    var row = h("div", "ep-field");
-    row.appendChild(readInput(ph, value, onSave));
-    return row;
-  }
-
-  function setStage(key, field, v) {    var stage = Object.assign({}, S.texts().stage);
+  function setStage(key, field, v) {
+    var stage = Object.assign({}, S.texts().stage);
     var cur = Object.assign({}, stage[key]);
     if (v.trim()) cur[field] = v.trim();
     else delete cur[field];
@@ -617,18 +610,16 @@
     var T = S.texts();
 
     var sec0 = h("section", "ep-sec wide");
-    sec0.appendChild(h("h3", null, "到校 · 放学 · 休息日"));
+    sec0.appendChild(h("h3", null, "晨间自主管理 · 放学 · 休息日"));
     sec0.appendChild(h("p", "ep-note",
-      "这三个时刻不在作息表里，是每天的两头。留空就是原来的话。"));
+      "晨间这两句跟着作息里的晨间段时间走；放学和休息日不在作息表里。留空就是原来的话。"));
     STAGES.forEach(function (st) {
       var cur = (T.stage || {})[st.key] || {};
       if (st.key === "before") {
-        /* 到校这两句共用一个小标题，靠输入框里的灰字区分：
-           上面是到校那一刻的大字，下面是紧跟着的第二行。 */
-        sec0.appendChild(h("div", "ep-flabel ep-flabel-head", st.label));
-        sec0.appendChild(stageInput("大字：" + st.title, cur.title || "",
+        /* 晨间大字和第二行仍写进 stage.before 的两个字段，键不变、数据不动 */
+        sec0.appendChild(field("晨间自主管理 · 大字", st.title, cur.title || "",
           function (v) { setStage(st.key, "title", v); }));
-        sec0.appendChild(stageInput("第二行：" + st.note, cur.note || "",
+        sec0.appendChild(field("晨间自主管理 · 第二行", st.note, cur.note || "",
           function (v) { setStage(st.key, "note", v); }));
         return;
       }

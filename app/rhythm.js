@@ -120,21 +120,14 @@
     return { subject: nc.subject, teacher: nc.teacher, periodNo: nc.periodNo };
   }
 
-  /* 早读不出准备清单——课前那点时间，列书单没用。
-     老师要的是一句"今天读什么"，所以改成一条建议。
+  /* 晨间不出准备清单——课前那点时间，列书单没用。
+     大字留给老师自己写，提醒事项单独做黄色贴纸。
      准备清单只在紧邻上课的课间出现，见下面 break 分支。 */
 
-  function hasReadingBlock(timeline) {
-    for (var i = 0; i < timeline.length; i += 1) {
-      if (timeline[i].type === "reading") return true;
-    }
-    return false;
-  }
-
   /* 「提醒事项」按星期配；没配这一天就用「每天」那条。
-     它比早读建议更重要，所以单独一块、单独上色，不和普通清单混在一起。 */
+     它比晨间建议更重要，所以单独一块、单独上色，不和普通清单混在一起。 */
   /* 比较两句话是不是同一句：标点和空白不算区别。
-     到校一句话和提醒事项默认就是同一句，别在屏上贴两遍。 */
+     晨间第二行和提醒事项默认就是同一句，别在屏上贴两遍。 */
   function bare(t) {
     return String(t == null ? "" : t)
       .replace(/\s+/g, "")
@@ -164,19 +157,12 @@
     };
   }
 
-  /* 「到校前 / 放学后 / 休息日」不是作息表里的块，是两头。
+  /* 「晨间自主管理 / 放学后 / 休息日」不是作息表里的块，是两头。
      它们的话也只由老师定，所以同样要能被 texts 覆盖。 */
   function stageText(opts, kind, field, fallback) {
     var st = opts && opts.texts && opts.texts.stage;
     var v = st && st[kind] ? st[kind][field] : null;
     return (v != null && v !== "") ? v : fallback;
-  }
-
-  /* 到校时刻来自作息表的 marks，不写死。07:40 之前和之后说的话不一样：
-     之前是"还没到校"，之后人已经在教室里了，标签不能还写"还没到校"。 */
-  function arriveOf(day) {
-    var m = (day.marks || []).filter(function (x) { return x.kind === "arrive"; })[0];
-    return m ? t2m(m.at) : null;
   }
 
   /* 「早读」自 0.2.1 起改叫「晨间自主管理」。旧配置里块名存的还是「早读」，
@@ -186,18 +172,6 @@
     if (!b) return "";
     if (b.type === "reading" && (!b.name || b.name === "早读")) return READING_NAME;
     return b.name || "";
-  }
-
-  /* 早读读什么，按星期配，老师自己填；没填不猜科目。
-     时间在作息表里是一段真实的块（reading），不再从"到校后到第 1 节"推算——
-     这样老师才能把结束时间定在 8:10，8:10 之后交给准备课间。 */
-  function readingFor(opts, day, arrived) {
-    if (!arrived || !day) return null;
-    var r = opts && opts.texts && opts.texts.reading;
-    if (!r) return null;
-    var x = r[String(day.weekday)];
-    if (!x || !(x.subject || "").trim()) return null;
-    return x;
   }
 
   function coreStateAt(day, minutes, opts) {
@@ -220,51 +194,33 @@
 
     if (i < 0) {
       if (minutes < first) {
-        var c0 = t.filter(function (b) { return b.type === "class"; })[0];
-        var arr = arriveOf(day);
-        var arrived = arr != null && minutes >= arr;
-        /* 作息表里已经有早读块时，不再把"到校后到第 1 节"整段算成早读，
-           否则 7:45 就会提前上早读，把真正的到校时间吞掉。 */
-        var rd = hasReadingBlock(t) ? null : readingFor(opts, day, arrived);
-
-        if (rd) {
-          var remBefore = reminderFor(opts, day);
-          var noteBefore = stageText(opts, "before", "note", "");
-          /* 旧作息没有 reading 块，到校后这一整段就是早读时间。
-             提醒事项一定要出现，而且优先用黄色便签承载；
-             和正文那句重复时，正文让位，避免同一句话出现两次。
-             学习建议自 0.2.1 起不再上屏；大字改取「到校 · 大字」。 */
-          var sameBefore = !!remBefore && bare(remBefore) === bare(noteBefore);
-          var bigBefore = stageText(opts, "before", "title", "");
-          return {
-            kind: "before",
-            title: String(bigBefore == null ? "" : bigBefore).trim() || READING_NAME,
-            sub: c0 ? "第 1 节 " + c0.subject : "",
-            note: sameBefore ? "" : noteBefore,
-            arrived: true,
-            reading: true,
-            meta: [],
-            items: [],
-            lines: remBefore
-              ? [{ kind: "reminder", label: "提醒事项", items: [remBefore] }]
-              : [],
-            countdown: countdownFor("before", first - minutes, mode),
-            clock: m2t(minutes),
-            _ctx: { type: "before", remain: first - minutes, dur: 40 }
-          };
-        }
-
+        /* 到校到第一节课打铃前整段都是晨间自主管理：
+           作息第一块（晨间）之前的时间也并进来，不再单独有「到校前」。
+           大字和第二行仍取 stage.before 的两个字段，空着就回退「晨间自主管理」。 */
+        var remEarly = reminderFor(opts, day);
+        var noteEarly = stageText(opts, "before", "note", "");
+        var bigEarly = stageText(opts, "before", "title", "");
+        /* 这一段从「到校」算起；没有到校时刻就按第一块前 40 分钟兜底。
+           结束点始终是作息第一块的开始，不写死 8:10。 */
+        var arriveMin = null;
+        (day.marks || []).forEach(function (m) {
+          if (arriveMin == null && m.kind === "arrive") arriveMin = t2m(m.at);
+        });
+        var earlyStart = (arriveMin != null && arriveMin < first) ? arriveMin : first - 40;
         return {
-          kind: "before",
-          title: stageText(opts, "before", "title", "早上好"),
-          sub: c0 ? "今天第 1 节 " + c0.subject : "",
-          note: stageText(opts, "before", "note", "到校后先交作业、整理书包"),
-          arrived: arrived,
-          meta: c0 && c0.teacher ? [{ label: "任课", value: c0.teacher }] : [],
-          items: c0 && c0.prep ? c0.prep.items : [],
-          countdown: countdownFor("before", first - minutes, mode),
+          kind: "reading",
+          title: String(bigEarly == null ? "" : bigEarly).trim() || READING_NAME,
+          sub: "",
+          note: remEarly && bare(remEarly) === bare(noteEarly) ? "" : noteEarly,
+          reading: true,
+          meta: [],
+          items: [],
+          lines: remEarly
+            ? [{ kind: "reminder", label: "提醒事项", items: [remEarly] }]
+            : [],
+          countdown: countdownFor("reading", first - minutes, mode),
           clock: m2t(minutes),
-          _ctx: { type: "before", remain: first - minutes, dur: 40 }
+          _ctx: { type: "reading", remain: first - minutes, dur: Math.max(first - earlyStart, 1) }
         };
       }
       return {
@@ -290,20 +246,19 @@
     if (b.type === "reading") {
       var firstClass = t.filter(function (x) { return x.type === "class"; })[0];
       var rem = reminderFor(opts, day);
-      /* 晨间大字用「到校（第一节课打铃前）」下面那个「大字」框；
+      /* 晨间大字用设置里「晨间自主管理 · 大字」那个框；
          没填或只有空白就回退块名（默认就是「晨间自主管理」）。
          学习建议仍不上屏，旧数据原样留在存储里。 */
       var big = stageText(opts, "before", "title", "");
       card.title = String(big == null ? "" : big).trim() || blockName(b);
       card.sub = firstClass && firstClass.subject ? "第 1 节 " + firstClass.subject : "";
-      /* 早读也是「第一节课打铃前」，到校那句一句话跟到 08:10：
-         学生边读边把红领巾、个人卫生这些事再看一眼。 */
+      /* 第二行用「晨间自主管理 · 第二行」，整段晨间都跟着显示 */
       card.note = stageText(opts, "before", "note", "");
       card.items = [];
       card.reading = true;
       card.lines = [];
       /* 提醒事项是这一段唯一要贴出来的东西；
-         这句话和到校那句一样时，仍然要贴黄色便签——纯文字不够醒目，
+         这句话和晨间第二行一样时，仍然要贴黄色便签——纯文字不够醒目，
          重复的那行正文就不再显示，避免同一句出现两次。 */
       if (rem) {
         card.lines.push({ kind: "reminder", label: "提醒事项", items: [rem] });

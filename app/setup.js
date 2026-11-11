@@ -37,7 +37,7 @@
 
   /* 文案字段与 edit.js 完全同一套键：不新建存储，也不另造一套命名。 */
   var STAGES = [
-    { key: "before",  label: "到校（第一节课打铃前）", title: "早上好",     note: "到校后先交作业、整理书包" },
+    { key: "before",  label: "晨间自主管理", title: "晨间自主管理", note: "先交作业、整理书包" },
     { key: "closed",  label: "放学以后",       title: "放学了",     note: "整理好书包，路上注意安全" },
     { key: "holiday", label: "休息日",         title: "今天不上学", note: "好好休息，明天见" }
   ];
@@ -1319,18 +1319,6 @@
     return row;
   }
 
-  /* 不带左侧标签的一行：小标题已经单独写成一行了 */
-  function bareField(value, onInput, placeholder) {
-    var row = el("div", "setup-field");
-    var input = el("input");
-    input.type = "text";
-    input.value = value || "";
-    if (placeholder) input.placeholder = placeholder;
-    input.addEventListener("input", function () { onInput(input.value.trim()); saveDraft(); });
-    row.appendChild(input);
-    return row;
-  }
-
   function pageClass() {
     var p = el("div", "setup-page on");
     p.appendChild(el("h3", "setup-h", "先告诉屏，这是哪个班"));
@@ -2232,12 +2220,15 @@
     var stageRows = [];
     STAGES.forEach(function (st) {
       if (st.key === "before") {
-        /* 到校这两句共用一个小标题，靠输入框里的灰字区分大字和第二行 */
-        stageRows.push(el("div", "setup-field-head", st.label));
-        stageRows.push(bareField(textAt(["stage", st.key, "title"]),
-          function (v) { setText(["stage", st.key, "title"], v); }, "大字：" + st.title));
-        stageRows.push(bareField(textAt(["stage", st.key, "note"]),
-          function (v) { setText(["stage", st.key, "note"], v); }, "第二行：" + st.note));
+        /* 晨间这两句仍写进 stage.before 的 title / note，键不变、老数据原地保留 */
+        stageRows.push(field("晨间自主管理 · 大字",
+          textAt(["stage", st.key, "title"]),
+          function (v) { setText(["stage", st.key, "title"], v); },
+          "text", st.title));
+        stageRows.push(field("晨间自主管理 · 第二行",
+          textAt(["stage", st.key, "note"]),
+          function (v) { setText(["stage", st.key, "note"], v); },
+          "text", st.note));
         return;
       }
       stageRows.push(field(st.label + " · 大字",
@@ -2249,7 +2240,8 @@
         function (v) { setText(["stage", st.key, "note"], v); },
         "text", st.note));
     });
-    p.appendChild(textSection("到校 · 放学 · 休息日", "这三句话不在作息里，是每天的两头", stageRows));
+    p.appendChild(textSection("晨间自主管理 · 放学 · 休息日",
+      "晨间这两句跟着作息里的晨间段时间走；放学和休息日不在作息表里", stageRows));
 
     var brRows = [
       field("课间 · 大字", textAt(["breakTitle"]),
