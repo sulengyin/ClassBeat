@@ -19,6 +19,7 @@
 import argparse
 import datetime as dt
 import errno
+import hashlib
 import json
 import os
 import mimetypes
@@ -37,6 +38,14 @@ if BASE not in sys.path:
     sys.path.insert(0, BASE)
 import updater  # noqa: E402  同目录的自动更新模块
 
+# 这份安装的身份证。同一台电脑上可能解压着两份（换新版时旧文件夹还没删），
+# 旧的那份可能还占着 8765；靠它认出「跑着的是不是我这个文件夹里的服务」，
+# 免得新包启动脚本把浏览器指向旧包的大屏。只发 8 位哈希，不暴露安装路径。
+def home_id():
+    path = os.path.abspath(BASE).replace("\\", "/").lower()
+    return hashlib.sha256(path.encode("utf-8")).hexdigest()[:8]
+
+HOME_ID = home_id()
 MSG_FILE = os.path.join(BASE, "messages.json")
 NET_FILE = os.path.join(BASE, "net.json")
 LOG_FILE = os.path.join(BASE, "server.log")
@@ -617,6 +626,8 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": True,
                 # 大屏扫端口时靠它确认「这是节律屏的服务」，不是别的程序
                 "app": "classbeat",
+                # 哪一份安装：换新版时新旧文件夹共存，启动脚本靠它避免连到旧的那份
+                "home": HOME_ID,
                 "class": CONF["klass"],
                 "port": CONF["port"],
                 "lan": lan,

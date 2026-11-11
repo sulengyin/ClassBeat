@@ -91,6 +91,9 @@ def main():
               "①a ping 报出局域网地址（二维码用）", d.get("lan"))
         check(d.get("addrChanged") is False and d.get("lastLan") == "",
               "①c 第一次启动不报地址变化", f'{d.get("addrChanged")} {d.get("lastLan")}')
+        # ①d 安装指纹：新包和旧包同时在一台电脑上时，靠它区分谁在服务
+        check(d.get("home") == hub.HOME_ID and re.fullmatch(r"[0-9a-f]{8}", str(d.get("home"))),
+              "①d ping 带安装指纹（8 位哈希）", d.get("home"))
 
         # ①c2 地址自检：第二次启动换了地址才标记，并记住上次的
         hub._addr.update({"seen": "", "changed": False, "last": ""})
@@ -511,6 +514,26 @@ def main():
                   "⑱a 别人占着的端口不算自己的服务")
         finally:
             plain.close()
+
+        # ⑱b 同一个 8765 上，跑着的是「另一个文件夹里的旧包」：不能认成自己，
+        #     否则新包的启动脚本会把浏览器指向旧包的大屏，看起来像没升级
+        real_ping = guard.ping
+        try:
+            guard.ping = lambda p, timeout=0.6: (
+                {"ok": True, "app": "classbeat", "home": "deadbeef", "class": "旧包"}
+                if p == port else None)
+            check(guard.find_running(port=port, span=1, mine=True) is None,
+                  "⑱b 别的文件夹起的服务不算自己",
+                  str(guard.find_running(port=port, span=1, mine=True)))
+            check(guard.find_running(port=port, span=1) is not None,
+                  "⑱c 但默认仍认得出「有个服务在跑」")
+
+            guard.ping = lambda p, timeout=0.6: (
+                {"ok": True, "app": "classbeat", "class": "旧版本"} if p == port else None)
+            check(guard.find_running(port=port, span=1, mine=True) is None,
+                  "⑱d 老版本没有 home 字段，也按别人处理")
+        finally:
+            guard.ping = real_ping
 
         # ⑲ pythonw 下 sys.stdout 是 None：print 不能把服务搞崩
         old_out, old_err = sys.stdout, sys.stderr

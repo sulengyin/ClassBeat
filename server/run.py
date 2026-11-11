@@ -11,6 +11,7 @@
 日志都在 server.log，出问题先看它。
 """
 
+import hashlib
 import json
 import os
 import socket
@@ -27,6 +28,20 @@ PID_FILE = os.path.join(BASE, "service.pid")
 BASE_PORT = 8765
 PORT_SPAN = 10
 LOG_MAX = 1024 * 1024        # 日志过 1 MB 就轮转一份，别让一体机硬盘被写满
+
+
+def home_id():
+    """和 rhythm_server.py 里同一个算法：这份安装的 8 位哈希。
+
+    老师换新版时，旧文件夹常常没删，旧服务还占着 8765。以前新包的启动脚本
+    会认出「已经有一个在跑」，然后把浏览器指向旧包的大屏——屏上还是旧版本，
+    看起来像新包没生效。现在只把同一个文件夹里的服务当成「自己」。
+    """
+    path = BASE.replace("\\", "/").lower()
+    return hashlib.sha256(path.encode("utf-8")).hexdigest()[:8]
+
+
+HOME_ID = home_id()
 
 _quiet = False
 
@@ -63,14 +78,18 @@ def ping(port, timeout=0.6):
         return None
 
 
-def find_running(port=BASE_PORT, span=PORT_SPAN):
+def find_running(port=BASE_PORT, span=PORT_SPAN, mine=False):
     """返回已在运行的服务信息（含 port），没有就 None。
 
     只认 app=classbeat：8765 上要是别的软件，照样算「没在跑」，让服务去占 8766。
+    mine=True 时只认这个文件夹起的服务（home 对得上）；旧版本没有 home 字段，
+    一律当成别人，宁可多起一个，也不能把新包的大屏指到旧包上去。
     """
     for p in range(port, port + span):
         d = ping(p)
         if d:
+            if mine and d.get("home") != HOME_ID:
+                continue
             d = dict(d)
             d["port"] = p
             return d
@@ -136,7 +155,7 @@ def wait_ready(timeout=12):
     """等服务起来，返回实际端口；超时就返回 0（大屏这次不自动打开）。"""
     end = time.time() + timeout
     while time.time() < end:
-        info = find_running()
+        info = find_running(mine=True)
         if info:
             return info["port"]
         time.sleep(0.4)
@@ -148,7 +167,7 @@ def main():
     _quiet = sys.stdout is None or sys.stderr is None
     want_open = "--open" in sys.argv[1:]
 
-    running = find_running()
+    running = find_running(mine=True)
     if running:
         say_running(running)
         if want_open:
