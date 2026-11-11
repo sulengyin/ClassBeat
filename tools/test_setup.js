@@ -83,7 +83,7 @@ T.forEach(tpl => {
     noon ? noon.start + "–" + noon.end : "缺午间块");
 
   check(b[0].type === "reading" && b[0].start === "07:30" && b[0].end === "08:10",
-    tag + "：早读 07:30–08:10", b[0].start + "–" + b[0].end);
+    tag + "：晨间自主管理 07:30–08:10", b[0].start + "–" + b[0].end);
 
   const marks = (tpl.marks || []).map(x => x.kind).sort().join(",");
   check(marks === "arrive,dismiss", tag + "：到校和放学两个标记都有", marks);

@@ -232,7 +232,7 @@ const rd = { texts: { reading: { "4": { subject: "英语", task: "读 Unit 4 单
 
 s = at("2026-11-05", "07:30", rd);
 check(s.kind === "reading" && s.title === "英语学习建议", "周四 7:30 标题写「英语学习建议」", s.title);
-check(s.reading === true, "标了 reading，顶栏写「早读」");
+check(s.reading === true, "标了 reading，顶栏写「晨间自主管理」");
 check(s.advice === "读 Unit 4 单词" && s.lines.length === 0,
   "老师填的建议单独成行，不再挤成小字清单", s.advice + " / " + JSON.stringify(s.lines));
 check(s.items.length === 0, "早读不出准备清单", s.items.join("、") || "空");
@@ -244,8 +244,23 @@ s = at("2026-11-05", "07:29", rd);
 check(s.kind === "before" && s.title === "早上好", "7:29 还没到早读，不提前催", s.title);
 
 s = at("2026-11-06", "07:30", rd);
-check(s.kind === "reading" && s.title === "早读" && s.lines.length === 0 && !s.advice,
-  "周五没配科目：只显示「早读」，不猜科目", s.title);
+check(s.kind === "reading" && s.title === "晨间自主管理" && s.lines.length === 0 && !s.advice,
+  "周五没配科目：只显示「晨间自主管理」，不猜科目", s.title);
+
+/* 旧安装的数据里存的还是「早读」：显示时换新名，数据本身不动 */
+check(R.blockName({ type: "reading", name: "早读" }) === "晨间自主管理",
+  "旧块名「早读」显示成「晨间自主管理」");
+check(R.blockName({ type: "reading", name: "晨间自主管理" }) === "晨间自主管理",
+  "新块名原样显示");
+check(R.blockName({ type: "break", name: "早读" }) === "早读",
+  "只换 reading 段，别的段名字不动");
+
+/* 老安装的作息里块名还是「早读」：走到这一段时，屏上照样是新名 */
+const oldNameDay = JSON.parse(JSON.stringify(RT.day("2026-11-05")));
+oldNameDay.timeline.forEach(function (b) { if (b.type === "reading") b.name = "早读"; });
+s = R.stateAt(oldNameDay, 7 * 60 + 30, {});
+check(s.kind === "reading" && s.title === "晨间自主管理",
+  "旧数据里的「早读」上屏就是「晨间自主管理」", s.title);
 
 s = at("2026-11-05", "07:30", { texts: { reading: { "4": { subject: "英语" } } } });
 check(s.title === "英语学习建议" && !s.advice, "没写建议就只上标题", s.title);
@@ -302,7 +317,7 @@ s = R.stateAt(oldDay, 7 * 60 + 30, {
     reminders: { "default": "戴好红领巾，打扫好个人卫生" }
   }
 });
-check(s.kind === "before" && s.reading === true, "旧作息的到校段仍算早读", s.kind);
+check(s.kind === "before" && s.reading === true, "旧作息的到校段仍算晨间自主管理", s.kind);
 check(s.lines.length === 1 && s.lines[0].kind === "reminder"
   && s.lines[0].items[0] === "戴好红领巾，打扫好个人卫生",
   "旧作息里提醒事项也上屏", JSON.stringify(s.lines));

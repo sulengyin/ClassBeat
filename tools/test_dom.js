@@ -344,7 +344,7 @@ global.Store.patchTexts({
 });
 Screen.render();
 check(document.getElementById("after").textContent.indexOf("戴好红领巾") >= 0,
-  "早读期间一句话仍是到校那句",
+  "晨间自主管理期间一句话仍是到校那句",
   document.getElementById("after").textContent);
 check(!!document.querySelector(".reminder-line"),
   "提醒和这句话不同时，黄色贴纸仍在");
@@ -598,7 +598,7 @@ firstTime.value = "07:45";
 firstTime._h.change();
 const afterTime = global.Runtime.day("2026-11-09").timeline[0].start;
 check(afterTime === "07:45" && beforeTime !== afterTime,
-  "在面板里改早读开始时间，配置立刻重算", beforeTime + " → " + afterTime);
+  "在面板里改晨间自主管理开始时间，配置立刻重算", beforeTime + " → " + afterTime);
 
 /* 校验：把结束时间改到开始之前，必须拒绝，不能写成断档 */
 const endTime = document.querySelectorAll(".tt-time")[1];
