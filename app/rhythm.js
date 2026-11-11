@@ -228,23 +228,23 @@
         var rd = hasReadingBlock(t) ? null : readingFor(opts, day, arrived);
 
         if (rd) {
-          var advice = (rd.task || "").trim();
           var remBefore = reminderFor(opts, day);
           var noteBefore = stageText(opts, "before", "note", "");
           /* 旧作息没有 reading 块，到校后这一整段就是早读时间。
              提醒事项一定要出现，而且优先用黄色便签承载；
-             和正文那句重复时，正文让位，避免同一句话出现两次。 */
+             和正文那句重复时，正文让位，避免同一句话出现两次。
+             学习建议自 0.2.1 起不再上屏；大字改取「到校 · 大字」。 */
           var sameBefore = !!remBefore && bare(remBefore) === bare(noteBefore);
+          var bigBefore = stageText(opts, "before", "title", "");
           return {
             kind: "before",
-            title: rd.subject + "学习建议",
+            title: String(bigBefore == null ? "" : bigBefore).trim() || READING_NAME,
             sub: c0 ? "第 1 节 " + c0.subject : "",
             note: sameBefore ? "" : noteBefore,
             arrived: true,
             reading: true,
             meta: [],
             items: [],
-            advice: advice,
             lines: remBefore
               ? [{ kind: "reminder", label: "提醒事项", items: [remBefore] }]
               : [],
@@ -289,23 +289,22 @@
 
     if (b.type === "reading") {
       var firstClass = t.filter(function (x) { return x.type === "class"; })[0];
-      var rdToday = readingFor(opts, day, true);
       var rem = reminderFor(opts, day);
-      var tip = rdToday && (rdToday.task || "").trim();
-      card.title = (rdToday && rdToday.subject ? rdToday.subject + "学习建议" : blockName(b));
+      /* 晨间大字用「到校（第一节课打铃前）」下面那个「大字」框；
+         没填或只有空白就回退块名（默认就是「晨间自主管理」）。
+         学习建议仍不上屏，旧数据原样留在存储里。 */
+      var big = stageText(opts, "before", "title", "");
+      card.title = String(big == null ? "" : big).trim() || blockName(b);
       card.sub = firstClass && firstClass.subject ? "第 1 节 " + firstClass.subject : "";
-      /* 早读也是「打铃前」，到校那句一句话跟到 08:10：
+      /* 早读也是「第一节课打铃前」，到校那句一句话跟到 08:10：
          学生边读边把红领巾、个人卫生这些事再看一眼。 */
       card.note = stageText(opts, "before", "note", "");
       card.items = [];
       card.reading = true;
       card.lines = [];
-      /* 老师填的那条建议不再挤成小字清单，改成标题下面的一整行大字，
-         和标题同字号——早读就一件事，学生从最后一排也要看得清。 */
-      card.advice = tip || "";
-      /* 提醒事项排在建议前面：它是今天必须记住的那一件，
-         不能埋在"读第几课"下面。这句话和到校那句一样时，仍然要贴黄色便签——
-         纯文字不够醒目；重复的那行正文就不再显示，避免同一句出现两次。 */
+      /* 提醒事项是这一段唯一要贴出来的东西；
+         这句话和到校那句一样时，仍然要贴黄色便签——纯文字不够醒目，
+         重复的那行正文就不再显示，避免同一句出现两次。 */
       if (rem) {
         card.lines.push({ kind: "reminder", label: "提醒事项", items: [rem] });
         if (bare(rem) === bare(card.note)) card.note = "";

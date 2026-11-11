@@ -72,6 +72,8 @@
 /* 一行一条：左边是"这是哪儿的字"，右边是输入框 */
 .ep-field{display:flex;align-items:center;gap:1.4vmin;margin-top:1.2vmin}
 .ep-flabel{width:24vmin;flex:none;font-size:2.2vmin;color:#C1B09A;line-height:1.4}
+/* 「到校」两句共用一个小标题，输入框里的灰字区分大字和第二行 */
+.ep-flabel-head{width:auto;flex:1;margin-top:1.6vmin;font-weight:900;color:#FBF3DF}
 .ep-field .ep-input{flex:1;min-width:0}
 
 .ep-input{font:inherit;font-size:2.8vmin;width:100%;padding:1.5vmin 1.7vmin;border-radius:1.3vmin;

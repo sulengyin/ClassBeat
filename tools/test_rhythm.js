@@ -226,15 +226,16 @@ s = at("2026-11-05", "08:30", { countdownMode: "all" });
 check(s.countdown.visible, "全部显示时上课也倒计时", s.countdown.text);
 
 /* ---------- 早读 ---------- */
-/* 11-05 是周四。早读在作息表里是一段真实的块（07:30–08:10），
-   读什么按星期配；配了才显示科目，没配不猜。 */
+/* 11-05 是周四。早读在作息表里是一段真实的块（07:30–08:10）；
+   0.2.1 起不再上屏学习建议，标题固定，配了也只留在数据里。 */
 const rd = { texts: { reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } } } };
 
 s = at("2026-11-05", "07:30", rd);
-check(s.kind === "reading" && s.title === "英语学习建议", "周四 7:30 标题写「英语学习建议」", s.title);
+check(s.kind === "reading" && s.title === "晨间自主管理",
+  "周四 7:30 标题固定「晨间自主管理」，不再按科目变", s.title);
 check(s.reading === true, "标了 reading，顶栏写「晨间自主管理」");
-check(s.advice === "读 Unit 4 单词" && s.lines.length === 0,
-  "老师填的建议单独成行，不再挤成小字清单", s.advice + " / " + JSON.stringify(s.lines));
+check(!s.advice, "以前填的学习建议不再上屏", String(s.advice));
+check(s.lines.length === 0, "没配提醒时清单是空的", JSON.stringify(s.lines));
 check(s.items.length === 0, "早读不出准备清单", s.items.join("、") || "空");
 
 s = at("2026-11-05", "08:09", rd);
@@ -263,9 +264,21 @@ check(s.kind === "reading" && s.title === "晨间自主管理",
   "旧数据里的「早读」上屏就是「晨间自主管理」", s.title);
 
 s = at("2026-11-05", "07:30", { texts: { reading: { "4": { subject: "英语" } } } });
-check(s.title === "英语学习建议" && !s.advice, "没写建议就只上标题", s.title);
+check(s.title === "晨间自主管理" && !s.advice, "只填了科目也不上屏、不改标题", s.title);
 
-/* 提醒事项：单独一块；建议改成大字正文，不占清单 */
+/* 晨间大字：取「到校（第一节课打铃前）」下面那个「大字」框 */
+s = at("2026-11-05", "07:30", {
+  texts: { stage: { before: { title: "安静读英语，等听写" } } }
+});
+check(s.kind === "reading" && s.title === "安静读英语，等听写",
+  "晨间主标题用「到校 · 大字」", s.title);
+s = at("2026-11-05", "07:30", {
+  texts: { stage: { before: { title: "   " } } }
+});
+check(s.kind === "reading" && s.title === "晨间自主管理",
+  "大字只有空白时回退「晨间自主管理」", JSON.stringify(s.title));
+
+/* 提醒事项：单独一块；学习建议不再上屏，也不进清单 */
 s = at("2026-11-05", "07:30", {
   texts: {
     reading: { "4": { subject: "英语", task: "读 Unit 4 单词" } },
@@ -275,7 +288,7 @@ s = at("2026-11-05", "07:30", {
 check(s.lines[0].kind === "reminder" && s.lines[0].label === "提醒事项"
   && s.lines[0].items[0] === "今天穿校服", "提醒事项仍在清单里",
   JSON.stringify(s.lines));
-check(s.lines.length === 1 && s.advice === "读 Unit 4 单词", "建议不重复进清单",
+check(s.lines.length === 1 && !s.advice, "建议不进清单，也不再单独成行",
   JSON.stringify(s.lines) + " / " + s.advice);
 
 s = at("2026-11-06", "07:30", {
@@ -321,6 +334,15 @@ check(s.kind === "before" && s.reading === true, "旧作息的到校段仍算晨
 check(s.lines.length === 1 && s.lines[0].kind === "reminder"
   && s.lines[0].items[0] === "戴好红领巾，打扫好个人卫生",
   "旧作息里提醒事项也上屏", JSON.stringify(s.lines));
+
+s = R.stateAt(oldDay, 7 * 60 + 30, {
+  texts: {
+    reading: { "4": { subject: "英语" } },
+    stage: { before: { title: "安静读英语" } }
+  }
+});
+check(s.kind === "before" && s.reading === true && s.title === "安静读英语",
+  "旧作息的晨间也认「到校 · 大字」", s.title);
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

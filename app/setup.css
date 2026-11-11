@@ -85,6 +85,8 @@ body[data-setup="1"] .warn{display:none}
   padding:1.2vmin 1.6vmin;outline:none;
 }
 .setup-field input:focus{border-color:#3A2A1E;box-shadow:0 0 0 .3vmin rgba(255,214,79,.7)}
+/* 「到校」两句共用一个小标题，灰字提示区分大字和第二行 */
+.setup-field-head{font-size:1.9vmin;font-weight:700;color:#6B5545;margin:1.2vmin 1.8vmin .2vmin}
 .setup-field input[type="time"]{max-width:22vmin;font-variant-numeric:tabular-nums}
 .setup-hint{font-size:1.8vmin;color:#9B8672;margin-left:1vmin}
 
