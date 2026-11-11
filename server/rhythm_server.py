@@ -61,6 +61,10 @@ UPDATE_LOCK = threading.Lock()
 BACKUP_DIR = os.path.abspath(os.path.join(BASE, "..", "backups", "config"))
 BACKUP_KEEP = 14          # 一天一份，留两周：够覆盖一次长跑和一次误改
 BACKUP_MAX_BODY = 512 * 1024
+# 回 413 前要把请求体读掉，否则对端还在发、这边就关连接，会变成 RST/断管。
+# 最多丢 8 MB、最多读 1 秒：既不把大包整个读进内存，也不让人拿超大体积拖住服务。
+BACKUP_DRAIN_MAX = 8 * 1024 * 1024
+BACKUP_DRAIN_SEC = 1.0
 BACKUP_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -397,6 +401,8 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self._common(code)
         self.send_header("Content-Length", str(len(body)))
+        if self.close_connection:
+            self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
 
@@ -407,6 +413,29 @@ class Handler(BaseHTTPRequestHandler):
         """配置备份只对本机开放：机房局域网里的手机不该能读别人班的名册。"""
         ip = (self.client_address or ("",))[0]
         return ip in ("127.0.0.1", "::1") or ip.startswith("::ffff:127.")
+
+    def _discard_body(self, n):
+        """回 413 前把请求体分块丢掉，最多 8 MB / 1 秒。
+        对端提前断开或读超时就安静收手，绝不让异常冒到请求主流程。"""
+        left = min(n, BACKUP_DRAIN_MAX)
+        try:
+            self.connection.settimeout(BACKUP_DRAIN_SEC)
+        except OSError:
+            pass
+        try:
+            while left > 0:
+                try:
+                    chunk = self.rfile.read(min(65536, left))
+                except (BrokenPipeError, ConnectionResetError, socket.timeout, OSError):
+                    return
+                if not chunk:
+                    return
+                left -= len(chunk)
+        finally:
+            try:
+                self.connection.settimeout(None)
+            except OSError:
+                pass
 
     def do_OPTIONS(self):
         self._common(204)
@@ -588,9 +617,16 @@ class Handler(BaseHTTPRequestHandler):
             if not self._loopback():
                 return self._err("只接受本机写入", 403)
             try:
-                n = int(self.headers.get("Content-Length") or 0)
-                if n <= 0 or n > BACKUP_MAX_BODY:
-                    return self._err("请求体太大或为空", 413)
+                n = int(self.headers.get("Content-Length") or "")
+            except (TypeError, ValueError):
+                n = -1
+            if n <= 0 or n > BACKUP_MAX_BODY:
+                # 先把对端还在发的包读掉再拒；否则这边一关连接就变 RST，调用方只见断管
+                if n > BACKUP_MAX_BODY:
+                    self._discard_body(n)
+                self.close_connection = True
+                return self._err("请求体太大或为空", 413)
+            try:
                 payload = json.loads(self.rfile.read(n).decode("utf-8"))
                 if not isinstance(payload, dict) \
                         or payload.get("format") != "rhythm-config/v1":

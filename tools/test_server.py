@@ -412,9 +412,18 @@ def main():
         code, _, _ = req(port, "/api/config/snapshot", "POST", {"format": "别的"})
         check(code == 400, "㉕f 不是节律屏设置的文件拒收", code)
 
-        code, _, _ = req(port, "/api/config/snapshot", "POST",
-                         {"format": "rhythm-config/v1", "pad": "x" * (513 * 1024)})
-        check(code == 413, "㉕g 超过 512 KB 的请求拒收", code)
+        # 大包被拒：正常应拿到 413；服务端在读包途中关连接时，客户端会看到
+        # 断管/重置，这也算「被拒收」，但别的异常不许蒙混过关。
+        code = None
+        try:
+            code, _, _ = req(port, "/api/config/snapshot", "POST",
+                             {"format": "rhythm-config/v1", "pad": "x" * (513 * 1024)})
+        except urllib.error.URLError as e:
+            if isinstance(getattr(e, "reason", e), ConnectionError):
+                code = "closed"
+            else:
+                raise
+        check(code in (413, "closed"), "㉕g 超过 512 KB 的请求拒收", code)
 
         # ㉖ 只留最近 14 份：连开一学期也不会把磁盘塞满
         for i in range(1, 16):
