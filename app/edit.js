@@ -519,32 +519,17 @@
 
   /* 到校前 / 放学后 / 休息日：不在作息表里，是每天的两头 */
   var STAGES = [
-    { key: "before",  label: "到校（打铃前）", title: "早上好",   note: "到校后先交作业、整理书包" },
+    { key: "before",  label: "到校（第一节课打铃前）", title: "早上好",   note: "到校后先交作业、整理书包" },
     { key: "closed",  label: "放学以后",       title: "放学了",   note: "整理好书包，路上注意安全" },
     { key: "holiday", label: "休息日",         title: "今天不上学", note: "好好休息，明天见" }
   ];
 
-  /* 早读：到校后到第 1 节前。按星期排，因为"周一三五语文、周二四英语"
-     是常态；空着就等于这天没安排，屏上不显示，不去猜。 */
+  /* 早读那段：到校后到第 1 节前。块名和提醒按星期排，
+     空着就等于这天没安排，屏上不显示，不去猜。 */
   var WEEKDAYS = [
     { n: 1, label: "周一" }, { n: 2, label: "周二" }, { n: 3, label: "周三" },
     { n: 4, label: "周四" }, { n: 5, label: "周五" }
   ];
-
-  function setReading(n, field, v) {
-    var r = Object.assign({}, S.texts().reading);
-    var cur = Object.assign({}, r[String(n)]);
-    if (Array.isArray(v)) {
-      if (v.length) cur[field] = v; else delete cur[field];
-    } else if (v && v.trim()) {
-      cur[field] = v.trim();
-    } else {
-      delete cur[field];
-    }
-    if (Object.keys(cur).length) r[String(n)] = cur;
-    else delete r[String(n)];
-    S.patchTexts({ reading: Object.keys(r).length ? r : null });
-  }
 
   /* 提醒事项：单独一条，按天覆盖「每天」。留空 = 用每天那条。 */
   function setReminder(key, v) {
@@ -565,6 +550,13 @@
       if (root.Screen) root.Screen.render();
     });
     return inp;
+  }
+
+  /* 不带左侧标签的一行输入框：小标题已经在上面的「到校」里写过了 */
+  function stageInput(ph, value, onSave) {
+    var row = h("div", "ep-field");
+    row.appendChild(readInput(ph, value, onSave));
+    return row;
   }
 
   function setStage(key, field, v) {    var stage = Object.assign({}, S.texts().stage);
@@ -630,6 +622,16 @@
       "这三个时刻不在作息表里，是每天的两头。留空就是原来的话。"));
     STAGES.forEach(function (st) {
       var cur = (T.stage || {})[st.key] || {};
+      if (st.key === "before") {
+        /* 到校这两句共用一个小标题，靠输入框里的灰字区分：
+           上面是到校那一刻的大字，下面是紧跟着的第二行。 */
+        sec0.appendChild(h("div", "ep-flabel ep-flabel-head", st.label));
+        sec0.appendChild(stageInput("大字：" + st.title, cur.title || "",
+          function (v) { setStage(st.key, "title", v); }));
+        sec0.appendChild(stageInput("第二行：" + st.note, cur.note || "",
+          function (v) { setStage(st.key, "note", v); }));
+        return;
+      }
       sec0.appendChild(field(st.label + " · 大字", st.title, cur.title || "",
         function (v) { setStage(st.key, "title", v); }));
       sec0.appendChild(field(st.label + " · 一句话", st.note, cur.note || "",
@@ -637,42 +639,11 @@
     });
     bodyEl.appendChild(sec0);
 
-    var secR = h("section", "ep-sec wide");
-    secR.appendChild(h("h3", null, "晨间自主管理"));
-    /* 时间从作息里读，不写死：老师改了早读起止，这句话要跟着变 */
-    var rb = ((RT && RT.config && RT.config().timetable) || {}).blocks || [];
-    var rc = rb.filter(function (b) { return b.type === "reading"; })[0];
-    secR.appendChild(h("p", "ep-note",
-      "晨间自主管理在「作息」里是一段真实时间"
-      + (rc ? "（现在 " + rc.start + "–" + rc.end + "）" : "") + "。"
-      + "按星期填科目和读什么，科目空着这天就只显示「晨间自主管理」，不猜。"
-      + "科目填了，屏上标题就是「英语学习建议」，建议本身接在下一行、同字号。"
-      + "晨间自主管理一下课就自动切到第一节课的准备清单。"));
-    var rd = T.reading || {};
-
-    var head = h("div", "ep-read head");
-    head.appendChild(h("span", "ep-read-day", ""));
-    head.appendChild(h("span", "ep-read-tag", "科目"));
-    head.appendChild(h("span", "ep-read-tag", "学习建议（会显示在屏上）"));
-    secR.appendChild(head);
-
-    WEEKDAYS.forEach(function (w) {
-      var cur = rd[String(w.n)] || {};
-      var row = h("div", "ep-read");
-      row.appendChild(h("span", "ep-read-day", w.label));
-      row.appendChild(readInput("语文", cur.subject,
-        function (v) { setReading(w.n, "subject", v); }));
-      row.appendChild(readInput("", cur.task,
-        function (v) { setReading(w.n, "task", v); }));
-      secR.appendChild(row);
-    });
-    bodyEl.appendChild(secR);
-
     /* 提醒事项：黄色贴纸，单独一块。每天一条，某天要换就单独填。 */
     var secM = h("section", "ep-sec wide");
     secM.appendChild(h("h3", null, "晨间自主管理 · 提醒事项"));
     secM.appendChild(h("p", "ep-note",
-      "这块会用黄色贴纸单独显示，比学习建议更醒目，适合放今天必须记住的事"
+      "这块会用黄色贴纸单独显示，适合放今天必须记住的事"
       + "（带回执、穿校服、带水杯）。留空的星期就用「每天」这一条。"));
     var rems = T.reminders || {};
 

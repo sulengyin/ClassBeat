@@ -318,7 +318,7 @@ try { Screen.render(); } catch (e) { holidayErr = e; }
 check(!holidayErr, "周末重绘不报错", holidayErr ? holidayErr.message : "无异常");
 check(heroText() === "今天不上学", "周末主视觉仍是「今天不上学」", heroText());
 
-/* 早读：7:30–8:10 是真实的一段；标题写「英语学习建议」，建议本身另起一行大字 */
+/* 晨间自主管理：7:30–8:10 是真实的一段；标题固定，学习建议不再上屏 */
 global.__rhythmDate = "2026-11-05";
 global.__rhythmTime = 7 * 60 + 30;
 global.Store.patchTexts({
@@ -326,12 +326,10 @@ global.Store.patchTexts({
   reminders: { "default": "带齐回执" }
 });
 Screen.render();
-check(heroText() === "英语学习建议", "周四 7:30 标题是「英语学习建议」", heroText());
+check(heroText() === "晨间自主管理", "周四 7:30 标题是「晨间自主管理」", heroText());
 const taskEl = document.getElementById("heroTask");
-check(taskEl.textContent === "读 Unit 4 单词。",
-  "老师填的建议在标题下一行，自带句号", taskEl.textContent);
-check(taskEl.style.fontSize && taskEl.style.fontSize === document.getElementById("heroMain").style.fontSize,
-  "建议和标题同字号", taskEl.style.fontSize + " / " + document.getElementById("heroMain").style.fontSize);
+check(taskEl.textContent === "",
+  "以前填的学习建议不再上屏，主视觉下面为空", JSON.stringify(taskEl.textContent));
 const remRow = document.querySelector(".reminder-line");
 check(!!remRow && remRow.textContent.indexOf("带齐回执") >= 0,
   "提醒事项单独一块上屏", remRow ? remRow.textContent : "缺失");
@@ -355,6 +353,59 @@ check(!!document.querySelector(".reminder-line"),
 check(document.getElementById("after").textContent === "",
   "贴纸已经承载这句话，正文那句不再重复",
   document.getElementById("after").textContent);
+
+/* 晨间大字：老师在「到校 · 大字」里写的那句话上主视觉。
+   按 screen.js 同一套字宽估算量标题高度，确认长句折行后不顶出贴纸。 */
+function heroHeight(text, size) {
+  const w = Math.max(Array.from(text).reduce((n, ch) => {
+    const c = ch.charCodeAt(0);
+    return n + (c > 255 ? 1 : c === 32 ? 0.3 : 0.58);
+  }, 0), 1);
+  const lines = Math.max(1, Math.ceil((w * size - 0.5) / 70));
+  return { lines, h: lines * size * 1.13 };
+}
+function bigText(title, note, rem) {
+  global.Store.patchTexts({
+    stage: { before: { title: title, note: note || "" } },
+    reminders: { "default": rem || "带齐回执" }
+  });
+  Screen.render();
+  return parseFloat(document.getElementById("heroMain").style.fontSize);
+}
+
+const b1 = bigText("读", "坐直，把书立起来。");
+check(heroText() === "读" && b1 === 16, "一个字的大字顶到 16vmin", b1 + "vmin");
+
+const t12 = "安静读英语，准备好听写本";
+const s12 = bigText(t12);
+const h12 = heroHeight(t12, s12);
+check(heroText() === t12, "十二个字原样上屏", heroText());
+check(s12 < 12 && s12 >= 8, "十二个字自动降一档", s12.toFixed(2) + "vmin");
+check(h12.h <= 30.2, "十二个字折行后不超 30vmin", h12.lines + " 行 / " + h12.h.toFixed(1) + "vmin");
+check(!!document.querySelector(".reminder-line"), "长句时黄色贴纸仍在");
+
+const t32 = "安静读英语，把书立起来，坐直身体，准备好听写本，不要说话，认真读";
+const s32 = bigText(t32, "坐直，把书立起来。");
+const h32 = heroHeight(t32, s32);
+check(heroText() === t32, "三十多个字原样上屏", t32.length + " 字");
+check(s32 >= 4.6, "长句字号有下限，不会缩没", s32.toFixed(2) + "vmin");
+check(h32.h <= 30.2, "长句折行后不超 30vmin", h32.lines + " 行 / " + h32.h.toFixed(1) + "vmin");
+check(h32.h + 5.9 <= 41, "标题 + 第二行仍在 41vmin 的旧预算内",
+  (h32.h + 5.9).toFixed(1) + "vmin");
+check(!!document.querySelector(".reminder-line"), "长句时黄色贴纸没被顶掉");
+check(document.getElementById("after").textContent.indexOf("坐直") >= 0,
+  "第二行还是到校那句话", document.getElementById("after").textContent);
+
+const sEmpty = bigText("   ");
+check(heroText() === "晨间自主管理", "大字只有空白时回退，主视觉不空", JSON.stringify(heroText()));
+check(sEmpty >= 10, "回退标题仍是大字", sEmpty.toFixed(2) + "vmin");
+
+bigText("安静读英语", "戴好红领巾。", "戴好红领巾");
+check(document.getElementById("after").textContent === "",
+  "大字不影响同句让位：正文不再重复", document.getElementById("after").textContent);
+
+bigText("换成新的一句");
+check(heroText() === "换成新的一句", "改大字后不用刷新就能更新", heroText());
 global.Store.resetTexts();
 
 /* 紧急通知：红色只由老师手动发，文字要能占住主区 */

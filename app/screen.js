@@ -152,6 +152,24 @@
     return Math.max(4.6, s);
   }
 
+  /* 晨间大字：短句单行（沿用以前 70/6 的压行），一行会被压到 10vmin
+     以下才允许折行。标题自己最多占 30vmin —— 从 adviceSize 的 41vmin
+     里扣掉第二行 #after（4.2vmin × 1.4 + 1.8 外边距 ≈ 8），
+     剩下的位置留给黄色贴纸，免得长句把它顶出卡片。 */
+  var READING_H = 30, READING_ONE = 10;
+  function readingSize(text, cap, maxH) {
+    var w = Math.max(weight(text), 1);
+    var one = CARD_W / w;
+    if (Math.min(cap, one) >= READING_ONE) return Math.min(cap, one);
+    var room = maxH || READING_H;
+    var s = cap;
+    for (; s > 4.6; s -= 0.12) {
+      var lines = Math.max(1, Math.ceil((w * s - .5) / CARD_W));
+      if (lines * s * 1.13 <= room) break;
+    }
+    return Math.max(4.6, s);
+  }
+
   /* 课间 / 大课间最后几分钟的「准备好」不再是底部小字：
      它和主视觉同一行级、同字号。从 lines 里取出来交给 #heroTask，chips 只留其余行。 */
   function prepLine(s) {
@@ -480,7 +498,7 @@
     var isTicker = !urgent && s.focus === "countdown" && !!s.timer;
     /* 倒计时用滚轮，数字自己动；sig 里不放秒数，否则每秒重播一次入场动画 */
     var sig = [s.kind, s.title, s.focus, isTicker ? "cd" : "", urgent ? 1 : 0,
-               urgent ? notice.text : "", s.advice || "", s.items.length, s.hints.length,
+               urgent ? notice.text : "", s.items.length, s.hints.length,
                s.note, s.range].join("|");
 
     /* 顶栏状态词 */
@@ -510,12 +528,8 @@
       /* 便签占了一条，主视觉就让一点位置，别把卡片撑破 */
       size = notice ? textSize(main, 13, 17) : textSize(main, 16, 22);
       if (s.reading) {
-        /* 早读这块要和下一行同字号，标题先压到一行：六字标题折成两行不好看 */
-        size = Math.min(size, CARD_W / Math.max(weight(main), 1));
-        if (s.advice) {
-          task = dot(s.advice);
-          size = notice ? Math.min(size, 13) : adviceSize(main, task, size);
-        }
+        /* 晨间大字由老师填：短句一行，长句才折行，整体高度封顶 */
+        size = readingSize(main, size, notice ? 17 : READING_H);
       } else {
         /* 课前准备：「准备好」跟标题同字号、紧贴下一行 */
         promoted = prepLine(s);

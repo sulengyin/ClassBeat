@@ -37,13 +37,9 @@
 
   /* 文案字段与 edit.js 完全同一套键：不新建存储，也不另造一套命名。 */
   var STAGES = [
-    { key: "before",  label: "到校（打铃前）", title: "早上好",     note: "到校后先交作业、整理书包" },
+    { key: "before",  label: "到校（第一节课打铃前）", title: "早上好",     note: "到校后先交作业、整理书包" },
     { key: "closed",  label: "放学以后",       title: "放学了",     note: "整理好书包，路上注意安全" },
     { key: "holiday", label: "休息日",         title: "今天不上学", note: "好好休息，明天见" }
-  ];
-  var WEEKDAYS = [
-    { n: 1, label: "周一" }, { n: 2, label: "周二" }, { n: 3, label: "周三" },
-    { n: 4, label: "周四" }, { n: 5, label: "周五" }
   ];
   var TEXT_GROUPS = ["stage", "reminders", "reading", "prep", "tips"];
 
@@ -1323,6 +1319,18 @@
     return row;
   }
 
+  /* 不带左侧标签的一行：小标题已经单独写成一行了 */
+  function bareField(value, onInput, placeholder) {
+    var row = el("div", "setup-field");
+    var input = el("input");
+    input.type = "text";
+    input.value = value || "";
+    if (placeholder) input.placeholder = placeholder;
+    input.addEventListener("input", function () { onInput(input.value.trim()); saveDraft(); });
+    row.appendChild(input);
+    return row;
+  }
+
   function pageClass() {
     var p = el("div", "setup-page on");
     p.appendChild(el("h3", "setup-h", "先告诉屏，这是哪个班"));
@@ -2223,6 +2231,15 @@
 
     var stageRows = [];
     STAGES.forEach(function (st) {
+      if (st.key === "before") {
+        /* 到校这两句共用一个小标题，靠输入框里的灰字区分大字和第二行 */
+        stageRows.push(el("div", "setup-field-head", st.label));
+        stageRows.push(bareField(textAt(["stage", st.key, "title"]),
+          function (v) { setText(["stage", st.key, "title"], v); }, "大字：" + st.title));
+        stageRows.push(bareField(textAt(["stage", st.key, "note"]),
+          function (v) { setText(["stage", st.key, "note"], v); }, "第二行：" + st.note));
+        return;
+      }
       stageRows.push(field(st.label + " · 大字",
         textAt(["stage", st.key, "title"]),
         function (v) { setText(["stage", st.key, "title"], v); },
@@ -2243,16 +2260,6 @@
         function (v) { setText(["prepLabel"], v); }, "text", "准备好")
     ];
     p.appendChild(textSection("课间这一屏", "大字一行，下面两行：先做什么、带什么", brRows));
-
-    var readRows = [];
-    WEEKDAYS.forEach(function (w) {
-      var key = String(w.n);
-      readRows.push(field(w.label + " · 科目", textAt(["reading", key, "subject"]),
-        function (v) { setText(["reading", key, "subject"], v); }, "text", "语文"));
-      readRows.push(field(w.label + " · 学习建议", textAt(["reading", key, "task"]),
-        function (v) { setText(["reading", key, "task"], v); }, "text"));
-    });
-    p.appendChild(textSection("晨间自主管理 5 天建议", "科目空着这一天就只显示「晨间自主管理」，不猜", readRows));
 
     var prepRows = [];
     var subs = (cfg().content || {}).subjects || [];
