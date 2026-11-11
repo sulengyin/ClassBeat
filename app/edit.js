@@ -1440,7 +1440,89 @@
     ta.value = text;
     sec.appendChild(ta);
 
+    renderAutoBackup(sec);
+
     bodyEl.appendChild(sec);
+  }
+
+  /* 本机自动备份：大屏开着就每天存一份，这里只负责「看有哪些、点一下恢复」。
+     backups/config 里有学生名册，所以必须提醒一句别连文件夹一起转出去。 */
+  function renderAutoBackup(sec) {
+    if (!root.Backup) return;
+    sec.appendChild(h("h3", null, "本机自动备份"));
+    var box = h("div", "ep-auto");
+    sec.appendChild(box);
+
+    function done(label) {
+      return function (r) {
+        if (r && r.ok) {
+          flash("已按 " + label + " 恢复，马上刷新");
+          setTimeout(function () { location.reload(); }, 700);
+        } else {
+          flash((r && r.why) || "这份备份打不开");
+        }
+      };
+    }
+
+    if (root.Backup.mode() !== "http") {
+      var saved = root.Backup.local();
+      if (saved) {
+        var when = String(saved.savedAt || "").slice(0, 16).replace("T", " ");
+        var b = h("button", "ep-mini", "恢复浏览器副本（" + when + "）");
+        b.addEventListener("click", function () {
+          root.Backup.restoreLocal(done("浏览器副本"));
+        });
+        var row = h("div", "ep-backup");
+        row.appendChild(b);
+        box.appendChild(row);
+      }
+      /* 双击打开时 localStorage 就是唯一副本，换目录就没了：
+         一个月没导出（或从没导出过）就在面板里催一次，不弹窗、不挡屏。 */
+      if (root.Backup.staleExport()) {
+        var warn = h("div", "ep-warn");
+        var last = root.Backup.lastExport();
+        warn.appendChild(h("p", null, last
+          ? "上次导出设置是 " + Math.floor((Date.now() - last) / 86400000)
+            + " 天前。双击打开时配置只在这个浏览器里，换目录或清缓存就会清零。"
+          : "还没导出过设置。双击打开时配置只在这个浏览器里，"
+            + "换目录、清缓存或换电脑就会清零。"));
+        var exp = h("button", "ep-mini", "现在导出一份");
+        exp.addEventListener("click", function () {
+          doExport(JSON.stringify(S.exportAll(), null, 2));
+        });
+        warn.appendChild(exp);
+        box.appendChild(warn);
+      }
+      box.appendChild(h("p", "ep-note",
+        "当前是双击文件打开，写不进磁盘。自动备份只能在「打开大屏.bat」的"
+        + "8765 地址下落到本机；这里最多留一格浏览器副本。"));
+      return;
+    }
+
+    box.appendChild(h("p", "ep-note", "正在读本机备份…"));
+    root.Backup.list(function (items) {
+      box.textContent = "";
+      if (!items.length) {
+        box.appendChild(h("p", "ep-note",
+          "还没有备份。大屏开着就会每天自动存一份，留最近 14 天。"));
+      } else {
+        items.forEach(function (it) {
+          var row = h("div", "ep-backup");
+          row.appendChild(h("span", "ep-steptag",
+            it.day + " · " + (it.klass || "未命名班") + " · "
+            + Math.max(1, Math.round((it.size || 0) / 1024)) + " KB"));
+          var btn = h("button", "ep-mini", "恢复");
+          btn.addEventListener("click", function () {
+            root.Backup.restore(it.day, done(it.day));
+          });
+          row.appendChild(btn);
+          box.appendChild(row);
+        });
+      }
+      box.appendChild(h("p", "ep-note",
+        "备份在电脑上的 backups/config 里，含学生名册：别把这个文件夹转给别人，"
+        + "要分享请发原始安装包。"));
+    });
   }
 
   function dumpName() {
@@ -1463,6 +1545,7 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
       ok = true;
     } catch (e) { ok = false; }
+    if (ok && root.Backup) root.Backup.noteExport();
     flash(ok ? "已下载，下面是同一份内容" : "这台机器不让下载，请复制下面的文字");
   }
 

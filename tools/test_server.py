@@ -68,6 +68,7 @@ def main():
     hub.MSG_FILE = os.path.join(tmp, "messages.json")
     hub.NET_FILE = os.path.join(tmp, "net.json")
     hub.PHONE_FILE = os.path.join(ROOT, "server", "phone.html")
+    hub.BACKUP_DIR = os.path.join(tmp, "backups", "config")
     hub.CONF["klass"] = "测试班"
     # 大屏拿这个地址画二维码；真机上由启动时探测，这里钉一个固定值
     hub.CONF["lan"] = "http://192.168.1.5:8765"
@@ -361,6 +362,89 @@ def main():
         logged = open(os.path.join(tmp, "server.log"), encoding="utf-8").read()
         check(ok_stdio and "能写日志" in logged,
               "⑲ pythonw 无控制台时输出落到日志", logged.strip()[:24])
+
+        # ㉕ 配置自动备份：大屏把整份配置交上来，一天一份落在本机
+        day = hub.dt.datetime.now(hub.BEIJING).strftime("%Y-%m-%d")
+        snap = {"format": "rhythm-config/v1", "schemaVersion": 1,
+                "texts": {}, "overrides": {}, "phrases": [], "prefs": {},
+                "config": {"meta": {"klass": "测试班"}}}
+        code, _, raw = req(port, "/api/config/snapshot", "POST", snap)
+        d = json.loads(raw)
+        check(code == 200 and d.get("saved") is True and d.get("day") == day
+              and os.path.isfile(hub._backup_path(day)),
+              "㉕ 大屏交上来的配置落成当天一份", f'{code} {d.get("day")}')
+
+        code, _, raw = req(port, "/api/config/snapshot", "POST", snap)
+        d = json.loads(raw)
+        check(code == 200 and d.get("saved") is False and d.get("kept") == 1,
+              "㉕a 同一天内容没变就不重写",
+              f'saved={d.get("saved")} kept={d.get("kept")}')
+
+        # 同一天改了班名：覆盖这一份，不该多出一份
+        snap2 = json.loads(json.dumps(snap))
+        snap2["config"]["meta"]["klass"] = "改名班"
+        code, _, raw = req(port, "/api/config/snapshot", "POST", snap2)
+        d = json.loads(raw)
+        on_disk = json.load(open(hub._backup_path(day), encoding="utf-8"))
+        check(d.get("saved") is True and len(hub._backup_days()) == 1
+              and on_disk["config"]["meta"]["klass"] == "改名班",
+              "㉕b 同一天内容变了就覆盖这一份",
+              f'{len(hub._backup_days())} 份 / {on_disk["config"]["meta"]["klass"]}')
+
+        code, _, raw = req(port, "/api/config/backup")
+        d = json.loads(raw)
+        item = (d.get("items") or [{}])[0]
+        check(code == 200 and d.get("keep") == 14 and len(d.get("items")) == 1
+              and item.get("day") == day and item.get("klass") == "改名班"
+              and "texts" not in json.dumps(d, ensure_ascii=False),
+              "㉕c 列表只回日期/班名/大小，不回名册",
+              f'{item.get("day")} {item.get("klass")} {item.get("size")}B')
+
+        code, _, raw = req(port, "/api/config/backup/" + day)
+        got = json.loads(raw)
+        check(code == 200 and got.get("format") == "rhythm-config/v1"
+              and got["config"]["meta"]["klass"] == "改名班",
+              "㉕d 按天取回完整配置，能直接喂回导入")
+
+        code, _, _ = req(port, "/api/config/backup/2026-13-99")
+        check(code == 404, "㉕e 不存在的日期回 404 而不是 500", code)
+
+        code, _, _ = req(port, "/api/config/snapshot", "POST", {"format": "别的"})
+        check(code == 400, "㉕f 不是节律屏设置的文件拒收", code)
+
+        # 大包被拒：正常应拿到 413；服务端在读包途中关连接时，客户端会看到
+        # 断管/重置，这也算「被拒收」，但别的异常不许蒙混过关。
+        code = None
+        try:
+            code, _, _ = req(port, "/api/config/snapshot", "POST",
+                             {"format": "rhythm-config/v1", "pad": "x" * (513 * 1024)})
+        except urllib.error.URLError as e:
+            if isinstance(getattr(e, "reason", e), ConnectionError):
+                code = "closed"
+            else:
+                raise
+        check(code in (413, "closed"), "㉕g 超过 512 KB 的请求拒收", code)
+
+        # ㉖ 只留最近 14 份：连开一学期也不会把磁盘塞满
+        for i in range(1, 16):
+            with open(hub._backup_path("2026-01-%02d" % i), "w", encoding="utf-8") as f:
+                f.write("{}")
+        snap3 = json.loads(json.dumps(snap))
+        snap3["config"]["meta"]["klass"] = "第三个班"
+        hub.save_snapshot(snap3)
+        days = hub._backup_days()
+        check(len(days) == 14 and "2026-01-01" not in days and day in days,
+              "㉖ 超过 14 份自动淘汰最旧的", f"{len(days)} 份 / 最旧 {days[0]}")
+
+        # ㉗ 备份目录写不进去时只报错，不影响别的接口
+        hub.BACKUP_DIR = os.path.join(tmp, "not-a-dir")
+        with open(hub.BACKUP_DIR, "w", encoding="utf-8") as f:
+            f.write("占位")
+        code, _, raw = req(port, "/api/config/snapshot", "POST", snap3)
+        alive = req(port, "/api/ping")[0]
+        check(code == 500 and alive == 200,
+              "㉗ 写不进备份目录只回 500，服务照常", f"{code} / ping {alive}")
+        hub.BACKUP_DIR = os.path.join(tmp, "backups", "config")
 
     finally:
         srv.shutdown()

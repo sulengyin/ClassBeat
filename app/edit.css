@@ -197,6 +197,13 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 
 /* 导出 / 导入：设置只在这台机器上，得能整车搬走 */
 .ep-backup{display:flex;gap:1vmin;flex-wrap:wrap;margin-top:1.6vmin}
+/* 自动备份列表：日期 + 班名 + 大小跟按钮同一行对齐 */
+.ep-auto .ep-backup{align-items:center}
+/* file:// 长期没导出：配置只在这个浏览器里，给一条不遮挡的醒目提醒 */
+.ep-warn{display:flex;gap:1.2vmin;align-items:center;flex-wrap:wrap;
+         margin-top:1.6vmin;padding:1.4vmin 1.6vmin;border-radius:1.2vmin;
+         border:.26vmin solid #E0A33E;background:rgba(224,163,62,.12)}
+.ep-warn p{margin:0;flex:1 1 26vmin;font-size:1.9vmin;line-height:1.5;color:#F0C776}
 .ep-dump{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.9vmin;
          line-height:1.5;width:100%;margin-top:1.4vmin;padding:1.5vmin;
          border-radius:1.3vmin;border:.26vmin solid #6B5641;background:#241A13;

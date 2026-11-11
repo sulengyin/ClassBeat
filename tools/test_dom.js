@@ -210,7 +210,7 @@ loadVendor("app/vendor/qrcode.min.js", "qrcode");
 /* 固定夹具，不读 app/data.js：本机 app/data.js 是真实班级，CI 是 sample，
    两种数据跑同一套断言必然一边红。夹具由
    `python3 tools/bundle.py --data sample --out tools/fixtures/data.sample.js` 生成。 */
-["tools/fixtures/data.sample.js", "app/version.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/update.js", "app/demo.js", "app/templates.js", "app/setup.js"]
+["tools/fixtures/data.sample.js", "app/version.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/update.js", "app/backup.js", "app/demo.js", "app/templates.js", "app/setup.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
@@ -1279,6 +1279,95 @@ global.Remote.info.phone = "";
   check(bTask.style.fontSize === bMain.style.fontSize,
     "「准备好」和「课间」同字号",
     bTask.style.fontSize + " / " + bMain.style.fontSize);
+
+  /* ---------- 配置自动备份：老师不点按钮，配置也该有第二份 ---------- */
+  check(!!global.Backup && global.Backup.mode() === "local",
+    "双击文件打开（没有服务）时退回浏览器副本，不报错",
+    global.Backup && global.Backup.mode());
+
+  global.Backup.tick();
+  const autoRaw = localStorage.getItem("rhythm.autobak.v1");
+  const autoObj = autoRaw ? JSON.parse(autoRaw) : {};
+  const autoData = autoObj.data || {};
+  check(autoData.format === "rhythm-config/v1"
+        && ((autoData.config || {}).meta || {}).klass === window.RHYTHM_DATA.meta.klass,
+    "file:// 下自动把整份配置写进浏览器副本",
+    ((autoData.config || {}).meta || {}).klass);
+
+  /* 模拟「清了缓存/换了目录」：配置归零，再从自动备份导回来 */
+  const backupKlass = ((autoData.config || {}).meta || {}).klass;
+  global.Store.resetConfig();
+  localStorage.setItem("rhythm.config.v1", JSON.stringify({ meta: { klass: "被清掉的班" } }));
+  let localRes = null;
+  global.Backup.restoreLocal(r => { localRes = r; });
+  check(!!localRes && localRes.ok && global.Store.config().meta.klass === backupKlass,
+    "「恢复浏览器副本」能把班名导回来", localRes && localRes.ok);
+
+  let diskRes = null;
+  global.Backup.restore("2026-11-10", r => { diskRes = r; });
+  check(diskRes && diskRes.ok === false && /8765/.test(diskRes.why || ""),
+    "file:// 下点磁盘备份会明确说读不到，而不是静默失败", diskRes && diskRes.why);
+
+  /* file:// 长期没导出：面板里醒目提醒 + 一键导出，但不弹窗 */
+  delete localStorage._d["rhythm.export.v1"];
+  global.Edit.open();
+  document.querySelectorAll(".ep-tab").filter(b => b.textContent === "文字")[0]._h.click();
+  const warnBox = document.querySelector(".ep-warn");
+  const warnBtn = warnBox && warnBox.querySelector("button");
+  check(!!warnBox && warnBtn && warnBtn.textContent.indexOf("导出") >= 0,
+    "file:// 从没导出过时，面板里给提醒和导出按钮", warnBtn && warnBtn.textContent);
+  check(global.Backup.staleExport() === true, "从没导出过算「很久没导」");
+  global.Backup.noteExport();
+  check(global.Backup.staleExport() === false, "刚导出过就不再提醒");
+  localStorage._d["rhythm.export.v1"] = String(Date.now() - 31 * 86400000);
+  check(global.Backup.staleExport() === true, "超过 30 天没导出重新提醒");
+  global.Edit.close();
+
+  /* 8765 打开：每分钟把整份配置 POST 给本机服务 */
+  global.location = { search: "", protocol: "http:", hostname: "127.0.0.1", port: "8765" };
+  let postedUrl = "", postedBody = "";
+  global.fetch = (url, opt) => {
+    postedUrl = url;
+    postedBody = (opt && opt.body) || "";
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, day: "2026-11-10" }) });
+  };
+  loadBrowserScript("app/backup.js");
+  check(global.Backup.mode() === "http",
+    "从 127.0.0.1:8765 打开时走服务端落盘", global.Backup.mode());
+  global.Backup.tick();
+  const postObj = postedBody ? JSON.parse(postedBody) : {};
+  check(postedUrl === "/api/config/snapshot" && postObj.format === "rhythm-config/v1"
+        && postObj.savedAt === undefined,
+    "POST 的是整份配置，并去掉每次都变的 savedAt",
+    postedUrl + " / " + postedBody.length + " 字节");
+
+  /* 8765 有服务端每天落盘：不该再催老师导出 */
+  localStorage._d["rhythm.export.v1"] = String(Date.now() - 31 * 86400000);
+  check(global.Backup.staleExport() === false, "8765 下不判「很久没导出」");
+  global.Edit.open();
+  document.querySelectorAll(".ep-tab").filter(b => b.textContent === "文字")[0]._h.click();
+  check(!document.querySelector(".ep-warn"), "8765 模式下编辑面板不出现导出提醒");
+  global.Edit.close();
+
+  /* 服务没起、断网：只吞掉，不抛错、不动提示条 */
+  const tipHiddenBefore = tipEl.hidden, tipTextBefore = tipText.textContent;
+  global.Store.patchConfig({ meta: { klass: "断网班" } });
+  global.fetch = () => Promise.reject(new Error("断网"));
+  let postThrew = false;
+  try { global.Backup.tick(); } catch (e) { postThrew = true; }
+  await new Promise(r => setImmediate(r));
+  check(!postThrew && tipEl.hidden === tipHiddenBefore && tipText.textContent === tipTextBefore,
+    "备份失败静默：不抛异常、不改屏上提示");
+
+  /* 别人电脑的地址打开：不把本班名册往别人那儿写 */
+  global.location = { search: "", protocol: "http:", hostname: "192.168.1.5", port: "8765" };
+  let lanFetched = false;
+  global.fetch = () => { lanFetched = true; return Promise.reject(new Error("no hub")); };
+  loadBrowserScript("app/backup.js");
+  global.Store.patchConfig({ meta: { klass: "别人的电脑" } });
+  global.Backup.tick();
+  check(global.Backup.mode() === "local" && !lanFetched,
+    "非本机地址打开时退回浏览器副本，不发写盘请求", global.Backup.mode());
 
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
