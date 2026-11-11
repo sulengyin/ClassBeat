@@ -511,7 +511,7 @@
       ((d && d.timeline) || []).forEach(function (b) {
         if (b.type === "class" || !b.name || seen[b.name]) return;
         seen[b.name] = 1;
-        out.push({ name: b.name, tip: b.tip || "" });
+        out.push({ name: b.name, label: R.blockName(b), tip: b.tip || "" });
       });
     });
     return out;
@@ -638,16 +638,16 @@
     bodyEl.appendChild(sec0);
 
     var secR = h("section", "ep-sec wide");
-    secR.appendChild(h("h3", null, "早读"));
+    secR.appendChild(h("h3", null, "晨间自主管理"));
     /* 时间从作息里读，不写死：老师改了早读起止，这句话要跟着变 */
     var rb = ((RT && RT.config && RT.config().timetable) || {}).blocks || [];
     var rc = rb.filter(function (b) { return b.type === "reading"; })[0];
     secR.appendChild(h("p", "ep-note",
-      "早读在「作息」里是一段真实时间"
+      "晨间自主管理在「作息」里是一段真实时间"
       + (rc ? "（现在 " + rc.start + "–" + rc.end + "）" : "") + "。"
-      + "按星期填科目和读什么，科目空着这天就只显示「早读」，不猜。"
+      + "按星期填科目和读什么，科目空着这天就只显示「晨间自主管理」，不猜。"
       + "科目填了，屏上标题就是「英语学习建议」，建议本身接在下一行、同字号。"
-      + "早读一下课就自动切到第一节课的准备清单。"));
+      + "晨间自主管理一下课就自动切到第一节课的准备清单。"));
     var rd = T.reading || {};
 
     var head = h("div", "ep-read head");
@@ -662,7 +662,7 @@
       row.appendChild(h("span", "ep-read-day", w.label));
       row.appendChild(readInput("语文", cur.subject,
         function (v) { setReading(w.n, "subject", v); }));
-      row.appendChild(readInput("今天读第 5 课，背《古诗三首》", cur.task,
+      row.appendChild(readInput("", cur.task,
         function (v) { setReading(w.n, "task", v); }));
       secR.appendChild(row);
     });
@@ -670,9 +670,9 @@
 
     /* 提醒事项：黄色贴纸，单独一块。每天一条，某天要换就单独填。 */
     var secM = h("section", "ep-sec wide");
-    secM.appendChild(h("h3", null, "早读 · 提醒事项"));
+    secM.appendChild(h("h3", null, "晨间自主管理 · 提醒事项"));
     secM.appendChild(h("p", "ep-note",
-      "这块会用黄色贴纸单独显示，比早读建议更醒目，适合放今天必须记住的事"
+      "这块会用黄色贴纸单独显示，比学习建议更醒目，适合放今天必须记住的事"
       + "（带回执、穿校服、带水杯）。留空的星期就用「每天」这一条。"));
     var rems = T.reminders || {};
 
@@ -716,7 +716,7 @@
     sec2.appendChild(h("h3", null, "各时段的提示语"));
     sec2.appendChild(h("p", "ep-note", "留空就是原来的话，清空即恢复。"));
     blockNames().forEach(function (b) {
-      sec2.appendChild(field(b.name, b.tip || "（这一时段没有提示语）",
+      sec2.appendChild(field(b.label, b.tip || "（这一时段没有提示语）",
         (T.tips || {})[b.name] || "",
         function (v) {
           var tips = Object.assign({}, S.texts().tips);
@@ -766,7 +766,7 @@
   var TT_TYPES = [
     { key: "class",  label: "正课", locked: true },
     { key: "break",  label: "课间" },
-    { key: "reading",label: "早读" },
+    { key: "reading",label: "晨间自主管理" },
     { key: "ritual", label: "集会 / 眼操" },
     { key: "meal",   label: "午餐", locked: true },
     { key: "noon",   label: "午间", locked: true },
@@ -879,7 +879,9 @@
       var meta = TT_TYPES.filter(function (t) { return t.key === b.type; })[0];
       var name = document.createElement("input");
       name.type = "text"; name.className = "tt-name";
-      name.value = b.name || (meta ? meta.label : "");
+      /* 旧配置里这一段还叫「早读」，输入框先显示新名；没真改名字就不回写。 */
+      var shownName = R.blockName(b) || (meta ? meta.label : "");
+      name.value = shownName;
       name.placeholder = "名称";
 
       row.appendChild(st);
@@ -923,7 +925,8 @@
         var next = blocks.map(function (x, i) {
           if (i !== idx) return x;
           return Object.assign({}, x, {
-            start: st.value, end: en.value, name: name.value.trim() || x.name,
+            start: st.value, end: en.value,
+            name: name.value.trim() === shownName ? x.name : (name.value.trim() || x.name),
             type: curType
           });
         });

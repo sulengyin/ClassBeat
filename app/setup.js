@@ -26,6 +26,15 @@
   var DRAFT_DAYS = 7;
   var STEP_NAMES = ["班级", "作息", "课表", "岗位 / 文案"];
 
+  /* 「早读」自 0.2.1 起改叫「晨间自主管理」。旧配置里块名存的还是「早读」，
+     只在显示时换新名；草稿和已保存的数据都不改。 */
+  var READING_NAME = "晨间自主管理";
+  function blockName(b) {
+    if (!b) return "";
+    if (b.type === "reading" && (!b.name || b.name === "早读")) return READING_NAME;
+    return b.name || "";
+  }
+
   /* 文案字段与 edit.js 完全同一套键：不新建存储，也不另造一套命名。 */
   var STAGES = [
     { key: "before",  label: "到校（打铃前）", title: "早上好",     note: "到校后先交作业、整理书包" },
@@ -723,7 +732,7 @@
     }
     if (s.indexOf("大课间") >= 0) return { type: "ritual", name: "大课间", tip: "活动前先热身，出汗及时擦" };
     if (s.indexOf("眼保健操") >= 0) return { type: "ritual", name: "眼保健操", tip: "闭眼，按节拍，坐姿端正" };
-    if (s.indexOf("早读") >= 0) return { type: "reading", name: "早读" };
+    if (s.indexOf("早读") >= 0 || s.indexOf("晨间") >= 0) return { type: "reading", name: READING_NAME };
     if (s.indexOf("课间") >= 0) return { type: "break", name: "课间" };
     return null;
   }
@@ -1362,7 +1371,7 @@
       row.appendChild(el("span", "k", String(i + 1)));
 
       var name = b.type === "class" ? ("第 " + b.periodNo + " 节")
-        : (b.name || b.type);
+        : (blockName(b) || b.type);
       row.appendChild(el("span", null, name));
 
       ["start", "end"].forEach(function (k) {
@@ -1649,13 +1658,14 @@
     return out;
   }
 
-  /* 提示语只做作息里真有名字的时段；正课的名字来自课表，不在这里改。 */
+  /* 提示语只做作息里真有名字的时段；正课的名字来自课表，不在这里改。
+     显示用 blockName(b)（见文件顶部），改字仍按原来的 b.name 存。 */
   function tipBlocks() {
     var seen = {}, out = [];
     (state.blocks || []).forEach(function (b) {
       if (b.type === "class" || !b.name || seen[b.name]) return;
       seen[b.name] = 1;
-      out.push({ name: b.name, tip: b.tip || "" });
+      out.push({ name: b.name, label: blockName(b), tip: b.tip || "" });
     });
     return out;
   }
@@ -2204,7 +2214,7 @@
   function textSectionList(p) {
     var T = state.texts || {};
 
-    var d1 = textSection("每天提醒", "早读时黄色贴纸上的那句话", [
+    var d1 = textSection("每天提醒", "晨间自主管理时黄色贴纸上的那句话", [
       field("每天提醒", textAt(["reminders", "default"]),
         function (v) { setText(["reminders", "default"], v); },
         "text", "带齐今天要用的书和作业，课前摆好。")
@@ -2240,10 +2250,9 @@
       readRows.push(field(w.label + " · 科目", textAt(["reading", key, "subject"]),
         function (v) { setText(["reading", key, "subject"], v); }, "text", "语文"));
       readRows.push(field(w.label + " · 学习建议", textAt(["reading", key, "task"]),
-        function (v) { setText(["reading", key, "task"], v); },
-        "text", "今天读第 5 课，背《古诗三首》"));
+        function (v) { setText(["reading", key, "task"], v); }, "text"));
     });
-    p.appendChild(textSection("早读 5 天建议", "科目空着这一天就只显示「早读」，不猜", readRows));
+    p.appendChild(textSection("晨间自主管理 5 天建议", "科目空着这一天就只显示「晨间自主管理」，不猜", readRows));
 
     var prepRows = [];
     var subs = (cfg().content || {}).subjects || [];
@@ -2269,7 +2278,7 @@
 
     var tipRows = [];
     tipBlocks().forEach(function (b) {
-      tipRows.push(field(b.name, textAt(["tips", b.name]),
+      tipRows.push(field(b.label, textAt(["tips", b.name]),
         function (v) { setText(["tips", b.name], v); },
         "text", b.tip || "（这一时段没有提示语）"));
     });
@@ -2380,7 +2389,7 @@
     (d.timeline || []).forEach(function (it) {
       var row = el("div", "tl-row tl-" + (it.type || "other"));
       row.appendChild(el("span", "tl-time", it.start + "–" + it.end));
-      row.appendChild(el("span", "tl-name", it.name || TL_TYPE[it.type] || ""));
+      row.appendChild(el("span", "tl-name", blockName(it) || TL_TYPE[it.type] || ""));
       row.appendChild(el("span", "tl-detail", tlDetail(it)));
       list.appendChild(row);
     });

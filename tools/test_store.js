@@ -41,7 +41,7 @@ S.resetTexts();
 S.patchTexts({ reading: { "1": { subject: "英语", task: "跟读单词" } } });
 D.texts.reminders = { default: "戴好红领巾，打扫好个人卫生" };
 check(S.texts().reminders && S.texts().reminders.default === "戴好红领巾，打扫好个人卫生",
-  "本机只改过早读，包里新加的提醒事项仍然生效",
+  "本机只改过晨间自主管理，包里新加的提醒事项仍然生效",
   JSON.stringify(S.texts().reminders || null));
 check(S.texts().reading["1"].task === "跟读单词", "本机改过的那条仍然优先");
 S.resetTexts();
@@ -212,7 +212,7 @@ S.patchTexts({ breakTitle: "课间十分钟" });
 var baked = S.texts();
 check(baked.breakTitle === "课间十分钟" && baked.reading && baked.reading["4"]
   && baked.reminders && baked.reminders["default"] === "带齐回执",
-  "改一项文字不会抹掉包里烤好的早读和提醒", JSON.stringify(baked));
+  "改一项文字不会抹掉包里烤好的晨间自主管理和提醒", JSON.stringify(baked));
 S.resetTexts();
 delete D.texts;
 

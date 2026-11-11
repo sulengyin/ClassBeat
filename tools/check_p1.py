@@ -40,7 +40,7 @@ check(not gaps, "① 块首尾相接", "、".join(gaps) if gaps else "从到校�
 check(kinds.get("class") == 7, "① 7 节正课", str(kinds))
 check(kinds.get("ritual") == 4, "① 4 个固定仪式", str(kinds))
 check(kinds.get("break") == 7, "① 7 段课间", str(kinds))
-check(kinds.get("reading") == 1, "① 1 段早读", str(kinds))
+check(kinds.get("reading") == 1, "① 1 段晨间自主管理", str(kinds))
 
 # ② 第 4 节 11:20–11:40（课表笔误 11:30，以作息为准）
 d_thu = build(dt.date(2026, 11, 5))

@@ -173,10 +173,10 @@
   function bandText(s) {
     /* 到校前和到校后是两回事：7:40 人已经在教室里，不能再写"还没到校" */
     if (s.kind === "before") {
-      if (s.reading) return "早读";
+      if (s.reading) return R.READING_NAME;
       return s.arrived ? "到校" : "还没到校";
     }
-    if (s.kind === "reading") return "早读";
+    if (s.kind === "reading") return R.READING_NAME;
     if (s.kind === "ritual") return s.title || "固定安排";
     if (s.kind === "noon") return s.title || "午间";
     return BAND[s.kind] || "";

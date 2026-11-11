@@ -29,7 +29,7 @@
       return b;
     }
 
-    blocks.push({ seq: "0a", start: hm(t), end: hm(t + 40), type: "reading", name: "早读" });
+    blocks.push({ seq: "0a", start: hm(t), end: hm(t + 40), type: "reading", name: "晨间自主管理" });
     t += 40;
     blocks.push({ seq: "0b", start: hm(t), end: hm(t + 10), type: "break", name: "课间" });
     t += 10;

@@ -179,6 +179,15 @@
     return m ? t2m(m.at) : null;
   }
 
+  /* 「早读」自 0.2.1 起改叫「晨间自主管理」。旧配置里块名存的还是「早读」，
+     只在读取时换成新名显示；老师本地的数据一个字都不动，导出仍是原样。 */
+  var READING_NAME = "晨间自主管理";
+  function blockName(b) {
+    if (!b) return "";
+    if (b.type === "reading" && (!b.name || b.name === "早读")) return READING_NAME;
+    return b.name || "";
+  }
+
   /* 早读读什么，按星期配，老师自己填；没填不猜科目。
      时间在作息表里是一段真实的块（reading），不再从"到校后到第 1 节"推算——
      这样老师才能把结束时间定在 8:10，8:10 之后交给准备课间。 */
@@ -271,7 +280,7 @@
     var b = t[i];
     var remain = t2m(b.end) - minutes;
     var lead = prepLeadOf(opts);
-    var card = { kind: b.type, title: b.name || "", sub: "", note: b.tip || "",
+    var card = { kind: b.type, title: blockName(b), sub: "", note: b.tip || "",
                  meta: [], items: b.items || [], countdown: countdownFor(b.type, remain, mode),
                  clock: m2t(minutes), range: b.start + "–" + b.end,
                  _ctx: { type: b.type, remain: remain, dur: t2m(b.end) - t2m(b.start),
@@ -283,7 +292,7 @@
       var rdToday = readingFor(opts, day, true);
       var rem = reminderFor(opts, day);
       var tip = rdToday && (rdToday.task || "").trim();
-      card.title = (rdToday && rdToday.subject ? rdToday.subject + "学习建议" : (b.name || "早读"));
+      card.title = (rdToday && rdToday.subject ? rdToday.subject + "学习建议" : blockName(b));
       card.sub = firstClass && firstClass.subject ? "第 1 节 " + firstClass.subject : "";
       /* 早读也是「打铃前」，到校那句一句话跟到 08:10：
          学生边读边把红领巾、个人卫生这些事再看一眼。 */
@@ -488,7 +497,8 @@
 
   var api = { t2m: t2m, m2t: m2t, mmss: mmss, human: human,
               stateAt: stateAt, dutiesAt: dutiesAt, CD: CD, TONE: TONE, HINTS: HINTS,
-              PREP_LEAD: PREP_LEAD, normalizePrepLead: normalizePrepLead };
+              PREP_LEAD: PREP_LEAD, normalizePrepLead: normalizePrepLead,
+              READING_NAME: READING_NAME, blockName: blockName };
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.Rhythm = api;
