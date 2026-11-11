@@ -184,17 +184,13 @@
 
   var BAND = {
     class: "上课", break: "课间", meal: "午餐", noon: "午间",
-    action: "大扫除", after: "课后服务", before: "还没到校",
+    action: "大扫除", after: "课后服务", before: "晨间自主管理",
     closed: "放学", holiday: "今天休息"
   };
 
   function bandText(s) {
-    /* 到校前和到校后是两回事：7:40 人已经在教室里，不能再写"还没到校" */
-    if (s.kind === "before") {
-      if (s.reading) return R.READING_NAME;
-      return s.arrived ? "到校" : "还没到校";
-    }
-    if (s.kind === "reading") return R.READING_NAME;
+    /* 「到校前」已经并入晨间自主管理，这里只留一条兜底映射 */
+    if (s.kind === "before" || s.kind === "reading") return R.READING_NAME;
     if (s.kind === "ritual") return s.title || "固定安排";
     if (s.kind === "noon") return s.title || "午间";
     return BAND[s.kind] || "";

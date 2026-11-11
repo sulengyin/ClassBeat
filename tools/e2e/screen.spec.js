@@ -103,10 +103,11 @@ test("验证码挡住乱输，答对才进设置", async ({ page, request }) => 
   await expect(page.locator("#epTitle")).toContainText(ping.class);
 });
 
-test("7:29 还没到晨间自主管理，屏上写「到校」", async ({ page }) => {
+test("7:29 打铃前也归入晨间自主管理，提醒事项上屏", async ({ page }) => {
   await openScreen(page, "2026-11-05T07:29:00+08:00");
-  await expect(page.locator("#bandText")).toHaveText("到校");
-  await expect(page.locator(".reminder-line")).toHaveCount(0);
+  await expect(page.locator("#bandText")).toHaveText("晨间自主管理");
+  await expect(page.locator("#heroMain")).toHaveText("晨间自主管理");
+  await expect(page.locator(".reminder-line")).toContainText("戴好红领巾");
 });
 
 test("7:30 晨间自主管理开始，提醒事项贴纸上屏", async ({ page }) => {
@@ -121,7 +122,7 @@ test("晨间自主管理 8:10 结束，屏上立刻换成第一节课的准备�
   await expect(page.locator("#bandText")).toHaveText("课间");
   // 「下一节 语文」走的是主视觉下面那行（#after），不是 #heroSub：
   // #heroSub 只在倒计时接管时写「后上课」。
-  await expect(page.locator("#after")).toContainText("下一节");
+  await expect(page.locator("#after")).toContainText("下一节 语文");
   // 「准备好」并到主视觉下面那一行，和「课间」同字号，不再沉到底部色块里
   await expect(page.locator("#heroTask")).toContainText("准备好");
   await expect(page.locator("#heroTask")).toContainText("语文书");

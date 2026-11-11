@@ -178,20 +178,27 @@ check(s.kind === "closed" && s.title === "放学了", "17:20 之后显示放学"
 s = at("2026-11-07", "10:00");
 check(s.kind === "holiday" && s.title === "今天不上学", "周六显示不上学");
 
-/* 两头的话也能改：到校前、放学后、休息日不在作息表里，但老师最常改的正是这几句 */
+/* 晨间从到校到第一节课打铃整段都算，不再单独有「到校前」阶段；
+   大字和第二行仍来自 stage.before 的两个字段。 */
 s = at("2026-11-05", "07:25");
-check(s.kind === "before" && s.title === "早上好", "7:25 显示到校（早读还没开始）", s.title);
-check(s.note.indexOf("交作业") >= 0, "到校前那句默认是交作业", s.note);
-check(s.arrived === true, "7:25 已经到校（顶部标签不应再写「还没到校」）");
-
-s = at("2026-11-05", "07:15");
-check(s.arrived === false, "7:15 还没到校");
+check(s.kind === "reading" && s.title === "晨间自主管理",
+  "7:25 已进入晨间自主管理", s.kind + " / " + s.title);
+check(s.note === "", "没填第二行时留白", JSON.stringify(s.note));
+check(s.reading === true && s.lines.length === 0, "没配提醒时贴纸不出现", JSON.stringify(s.lines));
 
 s = at("2026-11-05", "07:25", {
-  texts: { stage: { before: { title: "早读开始", note: "交作业、交回执" } } }
+  texts: { stage: { before: { title: "安静读英语", note: "交作业、交回执" } } }
 });
-check(s.title === "早读开始" && s.note === "交作业、交回执", "到校前的话能被老师改",
-  s.title + " / " + s.note);
+check(s.kind === "reading" && s.title === "安静读英语" && s.note === "交作业、交回执",
+  "晨间的两句能被老师改", s.title + " / " + s.note);
+
+/* 老配置里存的还是「早上好 / 到校后先交作业」：读取时直接并入晨间，
+   不改写磁盘上的数据，老师看到的就是自己以前填的那两句。 */
+s = at("2026-11-05", "07:25", {
+  texts: { stage: { before: { title: "早上好", note: "到校后先交作业、整理书包" } } }
+});
+check(s.kind === "reading" && s.title === "早上好" && s.note === "到校后先交作业、整理书包",
+  "老配置的「到校」文案原地并入晨间", s.title + " / " + s.note);
 
 s = at("2026-11-05", "17:30", { texts: { stage: { closed: { note: "排队出校门，跟老师再见" } } } });
 check(s.kind === "closed" && s.note === "排队出校门，跟老师再见", "放学那句能被改", s.note);
@@ -242,7 +249,8 @@ s = at("2026-11-05", "08:09", rd);
 check(s.kind === "reading", "8:09 早读还没下课", s.kind);
 
 s = at("2026-11-05", "07:29", rd);
-check(s.kind === "before" && s.title === "早上好", "7:29 还没到早读，不提前催", s.title);
+check(s.kind === "reading" && s.title === "晨间自主管理",
+  "7:29 在打铃前也算晨间，不提前切走", s.kind + " / " + s.title);
 
 s = at("2026-11-06", "07:30", rd);
 check(s.kind === "reading" && s.title === "晨间自主管理" && s.lines.length === 0 && !s.advice,
@@ -266,12 +274,12 @@ check(s.kind === "reading" && s.title === "晨间自主管理",
 s = at("2026-11-05", "07:30", { texts: { reading: { "4": { subject: "英语" } } } });
 check(s.title === "晨间自主管理" && !s.advice, "只填了科目也不上屏、不改标题", s.title);
 
-/* 晨间大字：取「到校（第一节课打铃前）」下面那个「大字」框 */
+/* 晨间大字：取设置里「晨间自主管理 · 大字」那个框 */
 s = at("2026-11-05", "07:30", {
   texts: { stage: { before: { title: "安静读英语，等听写" } } }
 });
 check(s.kind === "reading" && s.title === "安静读英语，等听写",
-  "晨间主标题用「到校 · 大字」", s.title);
+  "晨间主标题用「晨间自主管理 · 大字」", s.title);
 s = at("2026-11-05", "07:30", {
   texts: { stage: { before: { title: "   " } } }
 });
@@ -297,7 +305,7 @@ s = at("2026-11-06", "07:30", {
 check(s.lines.length === 1 && s.lines[0].items[0] === "带齐回执",
   "没单独配的那天用「每天」的提醒", JSON.stringify(s.lines));
 
-/* 到校一句话跟到 08:10：早读期间它在大字下面，不只在打铃前 10 分钟 */
+/* 第二行整段晨间都在：不只在打铃前 10 分钟 */
 s = at("2026-11-05", "07:45", {
   texts: {
     stage: { before: { note: "戴好红领巾，打扫好个人卫生。", title: "早上好" } },
@@ -318,9 +326,9 @@ s = at("2026-11-05", "07:45", {
 });
 check(s.note.indexOf("戴好红领巾") >= 0 && s.lines.length === 1
   && s.lines[0].items[0] === "今天穿校服",
-  "到校一句话和当天提醒不同时，两处都出", s.note + " / " + JSON.stringify(s.lines));
+  "晨间第二行和当天提醒不同时，两处都出", s.note + " / " + JSON.stringify(s.lines));
 
-/* 旧作息没有 reading 块：到校后到第 1 节这段按早读处理，
+/* 旧作息没有 reading 块：到校后到第一块开始这段也按晨间处理，
    提醒事项不能因为换了分支就丢掉。 */
 const oldDay = JSON.parse(JSON.stringify(RT.day("2026-11-05")));
 oldDay.timeline = oldDay.timeline.filter(function (b) { return b.type !== "reading"; });
@@ -330,7 +338,8 @@ s = R.stateAt(oldDay, 7 * 60 + 30, {
     reminders: { "default": "戴好红领巾，打扫好个人卫生" }
   }
 });
-check(s.kind === "before" && s.reading === true, "旧作息的到校段仍算晨间自主管理", s.kind);
+check(s.kind === "reading" && s.reading === true,
+  "旧作息没有晨间块时，第一块开始前仍算晨间", s.kind);
 check(s.lines.length === 1 && s.lines[0].kind === "reminder"
   && s.lines[0].items[0] === "戴好红领巾，打扫好个人卫生",
   "旧作息里提醒事项也上屏", JSON.stringify(s.lines));
@@ -341,8 +350,22 @@ s = R.stateAt(oldDay, 7 * 60 + 30, {
     stage: { before: { title: "安静读英语" } }
   }
 });
-check(s.kind === "before" && s.reading === true && s.title === "安静读英语",
-  "旧作息的晨间也认「到校 · 大字」", s.title);
+check(s.kind === "reading" && s.reading === true && s.title === "安静读英语",
+  "旧作息的晨间也认「晨间自主管理 · 大字」", s.title);
+
+/* 边界跟着作息走：把晨间块改成 07:20–08:00，屏幕的开始和结束一起动，
+   不看写死的 8:10。 */
+const movedDay = JSON.parse(JSON.stringify(RT.day("2026-11-05")));
+movedDay.timeline[0].start = "07:20";
+movedDay.timeline[0].end = "08:00";
+movedDay.timeline[1].start = "08:00";
+
+s = R.stateAt(movedDay, 7 * 60 + 15, {});
+check(s.kind === "reading", "晨间块 7:20 开始：7:15 已在晨间", s.kind);
+s = R.stateAt(movedDay, 7 * 60 + 59, {});
+check(s.kind === "reading", "晨间块改成 8:00 结束：7:59 仍是晨间", s.kind);
+s = R.stateAt(movedDay, 8 * 60, {});
+check(s.kind === "break", "8:00 打铃后交给下一段，不拖到 8:10", s.kind);
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

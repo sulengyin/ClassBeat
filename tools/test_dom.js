@@ -336,7 +336,18 @@ check(!!remRow && remRow.textContent.indexOf("带齐回执") >= 0,
 check(document.querySelectorAll(".prep-line").length === 0,
   "建议不再以小字清单的形式出现");
 
-/* 到校一句话跟到 08:10：早读期间在大字下面，同一句不只留贴纸 */
+/* 打铃前也归入晨间：7:29 的主视觉和顶栏都不再出现「到校」字样 */
+global.__rhythmTime = 7 * 60 + 29;
+Screen.render();
+check(heroText() === "晨间自主管理", "7:29 打铃前也是「晨间自主管理」", heroText());
+check(document.getElementById("bandText").textContent === "晨间自主管理",
+  "顶栏写「晨间自主管理」", document.getElementById("bandText").textContent);
+check(document.body.textContent.indexOf("到校") < 0,
+  "整屏不再出现「到校」字样");
+global.__rhythmTime = 7 * 60 + 30;
+Screen.render();
+
+/* 第二行整段晨间都在：大字下面，同一句不只留贴纸 */
 global.Store.patchTexts({
   stage: { before: { title: "早上好", note: "戴好红领巾，打扫好个人卫生。" } }
 });
@@ -354,7 +365,7 @@ check(document.getElementById("after").textContent === "",
   "贴纸已经承载这句话，正文那句不再重复",
   document.getElementById("after").textContent);
 
-/* 晨间大字：老师在「到校 · 大字」里写的那句话上主视觉。
+/* 晨间大字：老师在「晨间自主管理 · 大字」里写的那句话上主视觉。
    按 screen.js 同一套字宽估算量标题高度，确认长句折行后不顶出贴纸。 */
 function heroHeight(text, size) {
   const w = Math.max(Array.from(text).reduce((n, ch) => {
@@ -394,7 +405,7 @@ check(h32.h + 5.9 <= 41, "标题 + 第二行仍在 41vmin 的旧预算内",
   (h32.h + 5.9).toFixed(1) + "vmin");
 check(!!document.querySelector(".reminder-line"), "长句时黄色贴纸没被顶掉");
 check(document.getElementById("after").textContent.indexOf("坐直") >= 0,
-  "第二行还是到校那句话", document.getElementById("after").textContent);
+  "第二行还是晨间那句", document.getElementById("after").textContent);
 
 const sEmpty = bigText("   ");
 check(heroText() === "晨间自主管理", "大字只有空白时回退，主视觉不空", JSON.stringify(heroText()));
@@ -641,7 +652,7 @@ check(rows.length >= 10, "作息表按段列出", rows.length + " 段");
 check(document.querySelectorAll(".tt-time").length === rows.length * 2,
   "每段两个时间框", String(document.querySelectorAll(".tt-time").length));
 
-/* 改第一段（早读）的开始时间：不点保存——输入框 change 就该立刻生效。
+/* 改第一段（晨间自主管理）的开始时间：不点保存——输入框 change 就该立刻生效。
    第一段前面没有别的段，改开始时间不会破坏首尾相接。 */
 const beforeTime = global.Runtime.day("2026-11-09").timeline[0].start;
 const firstTime = document.querySelectorAll(".tt-time")[0];

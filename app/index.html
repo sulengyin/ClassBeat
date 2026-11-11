@@ -67,7 +67,6 @@ body[data-kind="noon"]{--accent:#A55C0C}
 body[data-kind="ritual"]{--accent:#6F4CBC}
 body[data-kind="action"]{--accent:#BF5520}
 body[data-kind="after"]{--accent:#7A6A55}
-body[data-kind="before"],
 body[data-kind="closed"],
 body[data-kind="holiday"]{--accent:#7A6A55}
 body[data-alert="1"]{--board:#FFD8D2;--card-ink:#7E1E18;--accent:#C8382F}
@@ -319,11 +318,10 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
 .after:empty{display:none}
 @keyframes after-in{from{opacity:0;transform:translateY(1vmin)}to{opacity:1;transform:none}}
 
-/* 早读/到校那句「戴好红领巾…」有时是正文（提醒贴纸与它重复时贴纸不出现），
+/* 晨间那句「戴好红领巾…」有时是正文（提醒贴纸与它重复时贴纸不出现），
    这时动的是这句话本身。align-self 让它按文字宽度收缩，缩放中心才落在字上，
    否则整行 block 一缩，字会横向漂。 */
-body[data-kind="reading"] .after,
-body[data-kind="before"] .after{
+body[data-kind="reading"] .after{
   align-self:flex-start;max-width:92vmin;
   transform-origin:50% 50%;
   animation:after-in .5s var(--e-out) .06s backwards,
@@ -945,7 +943,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
     <input class="d-range" id="d-range" type="range" min="435" max="1080" step="0.5" value="435" aria-label="时间轴">
   </div>
   <div class="d-jumps">
-    <button class="d-btn d-jump" data-t="07:20">到校</button>
+    <button class="d-btn d-jump" data-t="07:20">晨间</button>
     <button class="d-btn d-jump" data-t="10:16">课间</button>
     <button class="d-btn d-jump" data-t="10:23">倒计时</button>
     <button class="d-btn d-jump" data-t="11:42">午餐</button>
