@@ -29,11 +29,14 @@
 
     head: function () { return meta().headTeacher || ""; },
 
-    /* 页面标题：紧急通知优先，其次当前时段 */
+    /* 页面标题：紧急通知优先，其次当前时段。
+       加「班级节律屏 · 」稳定前缀：kiosk 模式下窗口标题就是网页标题，
+       启动器单实例与看门狗靠它认页面（真机反馈 2026-11-16：标题原本
+       只有「时段 · 班名」，判据永不命中，窗口会被认成不在）。 */
     title: function (state) {
       var head = (state && state.urgent) ? "紧急通知"
         : (state && state.title) || "今日";
-      return head + " · " + CFG.klass();
+      return "班级节律屏 · " + head + " · " + CFG.klass();
     },
 
     /* 设置面板抬头用：「班名 · 设置」 */

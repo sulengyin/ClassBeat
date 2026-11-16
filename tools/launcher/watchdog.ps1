@@ -90,6 +90,57 @@ Write-Log ('看门狗启动：端口 ' + $Port + '，间隔 ' + $IntervalSeconds
 Write-Log ('重启命令：powershell -ExecutionPolicy Bypass -File "' + $LauncherPath + '"')
 if ($DryRun) { Write-Log 'DRYRUN 模式：只判定，不启动任何进程。' }
 
+# 与 start-kiosk.ps1 同一个坑：代理工具同时写 HTTPS_PROXY 和 https_proxy 时，
+# env: 枚举和这里的重启 Start-Process 都会撞键抛异常，页面永远拉不回来。
+# 先探测 env: 能不能用；不能用就走 Win32 API 读原始环境块去重（各留一份）。
+$probeOk = $true
+try { $null = @(Get-ChildItem env: -ErrorAction Stop | Select-Object -First 1) } catch { $probeOk = $false }
+if (-not $probeOk) {
+  Write-Log '环境变量里存在大小写不同的重名（env: 枚举失败），走 Win32 API 去重…'
+  try {
+    try {
+      Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class EnvRawW {
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode)]
+  private static extern IntPtr GetEnvironmentStrings();
+  [DllImport("kernel32.dll")]
+  private static extern bool FreeEnvironmentStrings(IntPtr l);
+  [DllImport("kernel32.dll", CharSet=CharSet.Unicode)]
+  private static extern bool SetEnvironmentVariable(string name, string value);
+  public static string[] RawNames() {
+    var list = new System.Collections.Generic.List<string>();
+    IntPtr p = GetEnvironmentStrings();
+    if (p == IntPtr.Zero) return list.ToArray();
+    try {
+      IntPtr cur = p;
+      while (true) {
+        string s = Marshal.PtrToStringUni(cur);
+        if (s.Length == 0) break;
+        if (s.IndexOf('=') > 0) list.Add(s.Substring(0, s.IndexOf('=')));
+        cur = (IntPtr)((long)cur + (s.Length + 1) * 2);
+      }
+    } finally { FreeEnvironmentStrings(p); }
+    return list.ToArray();
+  }
+  public static void RemoveName(string name) { SetEnvironmentVariable(name, null); }
+}
+"@ -ErrorAction Stop
+    } catch { }   # 类型已加载过就算了
+    $seen = @{}
+    $dups = @()
+    foreach ($n in [EnvRawW]::RawNames()) {
+      $k = $n.ToUpperInvariant()
+      if ($seen.ContainsKey($k)) { $dups += $n } else { $seen[$k] = $true }
+    }
+    foreach ($n in $dups) { [EnvRawW]::RemoveName($n) }
+    Write-Log ('已移除重名环境变量条目：' + ($dups -join '、') + '（各留一份）')
+  } catch {
+    Write-Log ('环境变量去重失败：' + $_.Exception.Message + '（继续，能拉则拉）')
+  }
+}
+
 # 上次「退出大屏」可能留下 stop.flag（看门狗当时没在跑，没人消费它）。
 # 看门狗刚启动时应清掉它，否则会误以为被叫停而直接退出。
 # 退出大屏的正常流程会等看门狗消费完 flag 再关窗口，所以正常路径不会走到这里。

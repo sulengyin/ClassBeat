@@ -310,7 +310,7 @@ GET  /api/ping    配对信息（当前局域网地址 + 端口）
 
 补充（2026-11-11）：`--kiosk` 不只是体验优化，它同时是 9.6「页面被误触关闭」的第一道防线，所以第一档的优先级应当提前，不必等「跑两周再决定」。
 
-进展（2026-11-16）：第一档已实装并随包发布——`tools/launcher/`（start-kiosk / watchdog / install-autostart / exit-kiosk 逃生门），包根三个双击入口（大屏全屏 / 退出大屏 / 安装开机自启），打包清单由 `tools/test_package.py` 钉住；单实例由启动器自己保证（已有 kiosk 窗口不再开第二个）。**教室真机验收 NOT_RUN。**
+进展（2026-11-16）：第一档已实装并随包发布——`tools/launcher/`（start-kiosk / watchdog / install-autostart / exit-kiosk 逃生门），包根三个双击入口（大屏全屏 / 退出大屏 / 安装开机自启），打包清单由 `tools/test_package.py` 钉住；单实例由启动器自己保证（已有 kiosk 窗口不再开第二个）。Windows 测试机 2026-11-16 真跑通过（顺手修掉环境撞键与动态标题两个判据级 bug，见 PLAN.md）。**教室真机验收 NOT_RUN。**
 
 ### 9.4 落地顺序（已确认）
 
