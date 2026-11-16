@@ -256,3 +256,85 @@ test("手机送来的远程设置，屏上几十秒内生效（P2 B2）", async 
     expect(done.result && done.result.ok, "ack 结果是成功").toBeTruthy();
   }).toPass({ timeout: 15_000 });
 });
+
+test("手机上改班名，屏上几十秒内生效（P2 B3）", async ({ page, request }) => {
+  // 手机编辑器的底稿来自最近的配置备份，先落一份今天的
+  await request.post("/api/config/snapshot", {
+    data: {
+      format: "rhythm-config/v1", schemaVersion: 1,
+      config: {
+        meta: { klass: "五（1）班" },
+        // noonBand 是引擎算一天的必需字段，真实备份里一定有；
+        // 测试数据少了它，补丁整份替换后大屏会算不出那天
+        timetable: {
+          noonBand: { lunchEnd: "12:10", bell: "12:10", noonEnd: "12:50" },
+          blocks: [{ seq: 1, type: "class", periodNo: 1, start: "08:20", end: "09:00" }],
+        },
+        schedule: { entries: [{ weekday: 1, periodNo: 1, subject: "数学", teacher: "李老师" }] },
+      },
+      texts: {}, phrases: [],
+    },
+  });
+
+  // 手机页：读取 → 编辑器出现并带上当前值 → 改班名 → 发送
+  await page.goto("/");
+  await page.locator("#cfgLoad").click();
+  await expect(page.locator("#cfgEditor")).toBeVisible();
+  await expect(page.locator("#cfgKlass")).toHaveValue("五（1）班");
+  await expect(page.locator("#cfgBlocks input[type=time]").first()).toHaveValue("08:20");
+  await page.locator("#cfgKlass").fill("手机改的班");
+  await page.locator("#cfgSave").click();
+  await expect(page.locator("#toast")).toHaveText(/已送到教室大屏/);
+
+  // 大屏取走补丁 → 与本地配置合并（名册不动）→ 应用 → 标题换班名
+  await openScreen(page);
+  await expect(page).toHaveTitle(/手机改的班/, { timeout: 30_000 });
+
+  await expect(async () => {
+    const done = await (await request.get("/api/config/remote")).json();
+    expect(done.pending).toBeFalsy();
+    expect(done.result && done.result.ok).toBeTruthy();
+  }).toPass({ timeout: 15_000 });
+});
+
+test("手机上改提醒文字和话术，屏上生效（P2 B3）", async ({ page, request }) => {
+  await request.post("/api/config/snapshot", {
+    data: {
+      format: "rhythm-config/v1", schemaVersion: 1,
+      config: {
+        meta: { klass: "五（1）班" },
+        timetable: {
+          noonBand: { lunchEnd: "12:10", bell: "12:10", noonEnd: "12:50" },
+          blocks: [{ seq: 1, type: "class", periodNo: 1, start: "08:20", end: "09:00" }],
+        },
+        schedule: { entries: [{ weekday: 1, periodNo: 1, subject: "数学", teacher: "李老师" }] },
+      },
+      texts: { reminders: { default: "戴好红领巾" } },
+      phrases: ["翻到第 12 页"],
+    },
+  });
+
+  // 手机页：读取 → 改提醒文字与话术 → 发送
+  await page.goto("/");
+  await page.locator("#cfgLoad").click();
+  await expect(page.locator("#cfgEditor")).toBeVisible();
+  const remind = page.locator("#cfgTexts input");
+  await expect(remind).toHaveValue("戴好红领巾");
+  await remind.fill("戴好红领巾，带好水杯");
+  const phrase = page.locator("#cfgPhrases input");
+  await expect(phrase).toHaveValue("翻到第 12 页");
+  await phrase.fill("翻到第 20 页");
+  await page.locator("#cfgSave").click();
+  await expect(page.locator("#toast")).toHaveText(/已送到教室大屏/);
+
+  // 大屏取走补丁应用后，屏上的文字与话术都是新的
+  await openScreen(page);
+  await expect(async () => {
+    const got = await page.evaluate(() => ({
+      text: Store.texts().reminders.default,
+      phrases: Store.allPhrases(),
+    }));
+    expect(got.text, "提醒文字要换").toBe("戴好红领巾，带好水杯");
+    expect(got.phrases, "话术要换").toEqual(["翻到第 20 页"]);
+  }).toPass({ timeout: 30_000 });
+});

@@ -193,6 +193,67 @@ def main():
         code, _, raw = req(port, "/api/config/remote/ack", "POST", {"ok": True})
         check(code == 404, "③c 没有待办时 ack 不重复清", code)
 
+        # ③d 远程编辑（B3）：裁剪状态给手机读，补丁只装改动字段
+        full = {"format": "rhythm-config/v1", "schemaVersion": 1,
+                "config": {"meta": {"klass": "五（1）班", "school": "示例小学"},
+                           "students": [{"id": "s1", "name": "张小明"}],
+                           "peopleGroups": [{"name": "值日组", "memberIds": ["s1"]}],
+                           "timetable": {"blocks": [{"seq": 1, "type": "class", "periodNo": 1,
+                                                     "start": "08:20", "end": "09:00"}]},
+                           "schedule": {"entries": [{"weekday": 1, "periodNo": 1,
+                                                     "subject": "数学", "teacher": "李老师"}]}},
+                "texts": {"reminders": {"default": "戴好红领巾"}}, "phrases": ["翻到第 12 页"]}
+        hub.save_snapshot(full)
+        code, _, raw = req(port, "/api/config/remote/state")
+        d = json.loads(raw)
+        cfg = d.get("config") or {}
+        check(code == 200 and (cfg.get("meta") or {}).get("klass") == "五（1）班"
+              and isinstance((cfg.get("timetable") or {}).get("blocks"), list),
+              "③d 手机读得到裁剪后的当前设置", str(list(cfg.keys())))
+        check("students" not in cfg and "peopleGroups" not in cfg
+              and "张小明" not in json.dumps(d, ensure_ascii=False),
+              "③d 名册不出服务（裁剪白名单）", str(cfg.get("students"))[:30])
+        check(d.get("format") == "rhythm-config-state/v1" and isinstance(d.get("day"), str),
+              "③d 状态带来源（哪一天的备份）", str(d.get("day")))
+        code, _, raw = req(port, "/api/config/remote/patch", "POST",
+                           {"format": "rhythm-config-patch/v1",
+                            "config": {"meta": {"klass": "五（2）班"},
+                                       "schedule": {"entries": [{"weekday": 1, "periodNo": 1,
+                                                                 "subject": "语文", "teacher": "王老师"}]}}})
+        d = json.loads(raw)
+        check(code == 200 and d.get("ok"), "③d 手机送上补丁", str(d.get("receivedAt")))
+        code, _, raw = req(port, "/api/config/remote")
+        d = json.loads(raw)
+        p = d.get("patch") or {}
+        check(d.get("pending") is True and d.get("kind") == "patch"
+              and (p.get("config") or {}).get("meta", {}).get("klass") == "五（2）班"
+              and "students" not in json.dumps(p, ensure_ascii=False),
+              "③d 待办是补丁形态，里面没有名册", d.get("kind"))
+        code, _, raw = req(port, "/api/config/remote/patch", "POST",
+                           {"format": "rhythm-config/v1", "config": {}})
+        check(code == 400, "③d 整份设置混进补丁口拒收（格式标记不对）", code)
+        code, _, raw = req(port, "/api/config/remote/patch", "POST",
+                           {"format": "rhythm-config-patch/v1"})
+        check(code == 400, "③d 空补丁拒收（没有可改的东西）", code)
+        req(port, "/api/config/remote/ack", "POST", {"ok": True})
+        code, _, raw = req(port, "/api/config/remote")
+        check(json.loads(raw).get("pending") is False, "③d 补丁应用完清空待办")
+
+        # ③e 文字与话术也能远程改（B3 后续批）
+        code, _, raw = req(port, "/api/config/remote/patch", "POST",
+                           {"format": "rhythm-config-patch/v1",
+                            "texts": {"reminders": {"default": "戴好红领巾，带好水杯"}},
+                            "phrases": ["翻到第 12 页", "现在交作业"]})
+        check(code == 200, "③e 文字/话术补丁收下", code)
+        code, _, raw = req(port, "/api/config/remote")
+        d = json.loads(raw)
+        p = d.get("patch") or {}
+        check(d.get("kind") == "patch"
+              and (p.get("texts") or {}).get("reminders", {}).get("default") == "戴好红领巾，带好水杯"
+              and p.get("phrases") == ["翻到第 12 页", "现在交作业"],
+              "③e 待办里带着文字与话术", d.get("kind"))
+        req(port, "/api/config/remote/ack", "POST", {"ok": True})
+
         # ④ 发一条
         code, _, raw = req(port, "/api/messages", "POST",
                            {"text": "现在到走廊集合", "level": "urgent", "minutes": 10})

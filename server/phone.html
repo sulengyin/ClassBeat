@@ -87,6 +87,50 @@
     font-family:inherit;font-weight:700;font-size:14.5px;
     box-shadow:2px 2px 0 rgba(58,42,30,.14);cursor:pointer}
   .cfgbtn:active{background:#F3E8D2}
+  #cfgEditor{margin-top:14px}
+  .cfgText{width:100%;padding:11px 12px;border:2px solid var(--line);border-radius:10px;
+    background:#FFFDF6;color:var(--ink);font-family:inherit;font-size:16px;
+    box-sizing:border-box}
+  .cfgText:focus{outline:none;border-color:var(--green)}
+  .blk{display:flex;align-items:center;gap:8px;margin:0 0 8px;
+    background:#FFFDF6;border:2px solid var(--line);border-radius:10px;padding:8px 10px}
+  .blk .bn{flex:1;min-width:0}
+  .blk .bn b{display:block;font-size:12px;color:var(--ink3);font-weight:500}
+  .blk input{border:none;background:transparent;color:var(--ink);
+    font-family:inherit;font-size:16px;width:100%;padding:2px 0}
+  .blk input:focus{outline:none}
+  .blk time{font-family:var(--mono);font-size:12px;color:var(--ink3);
+    display:flex;flex-direction:column;gap:4px;flex:none}
+  .blk time input{width:74px;font-size:15px;border:1.5px solid var(--line);
+    border-radius:7px;padding:4px 5px;background:#FFF;color:var(--ink);text-align:center}
+  .per{margin:0 0 10px;border:2px solid var(--line);border-radius:10px;
+    background:#FFFDF6;overflow:hidden}
+  .per h4{margin:0;padding:7px 10px;font-size:13px;color:var(--ink3);font-weight:600;
+    background:#F7EFDC;border-bottom:2px solid var(--line)}
+  .per .day{display:flex;align-items:center;gap:8px;padding:6px 10px}
+  .per .day + .day{border-top:1px dashed #E5D9BE}
+  .per .day b{flex:none;width:34px;font-size:13px;color:var(--ink3);font-weight:500}
+  .per .day input{flex:1;min-width:0;border:none;background:transparent;
+    color:var(--ink);font-family:inherit;font-size:16px;padding:3px 0}
+  .per .day input:focus{outline:none}
+  .per .day input + input{border-left:1.5px solid var(--line);padding-left:8px}
+
+  /* 提醒文字 / 话术 */
+  .txtRow{display:flex;align-items:center;gap:8px;margin:0 0 8px;
+    background:#FFFDF6;border:2px solid var(--line);border-radius:10px;padding:7px 10px}
+  .txtRow b{flex:none;max-width:88px;font-size:12px;color:var(--ink3);
+    font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .txtRow input{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);
+    font-family:inherit;font-size:16px;padding:2px 0}
+  .txtRow input:focus{outline:none}
+  .phRow{display:flex;align-items:center;gap:8px;margin:0 0 8px;
+    background:#FFFDF6;border:2px solid var(--line);border-radius:10px;padding:6px 8px 6px 10px}
+  .phRow input{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);
+    font-family:inherit;font-size:16px;padding:3px 0}
+  .phRow input:focus{outline:none}
+  .phRow .del{flex:none;border:2px solid var(--line);background:var(--card);color:#B02A22;
+    border-radius:8px;padding:5px 10px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+  .cfgMini{margin:0 0 14px;padding:10px;background:#FFFDF6;box-shadow:none;font-weight:600}
 
   /* 现在屏上是什么 */
   .live{display:none;margin-bottom:14px;padding:13px 15px;border-radius:16px 13px 15px 12px;
@@ -188,9 +232,33 @@
 </div>
 
 <div class="card" id="cfgCard">
-  <div class="label">改教室设置（课程表 / 作息 / 文字）</div>
-  <div class="cfgHint">把在大屏上导出的设置文件（.json）发过去，屏上马上换。
-  屏上没生效就还能重发，大屏只认最新的这一份。</div>
+  <div class="label">改教室设置</div>
+  <div class="cfgHint">读取大屏当前的班名、作息和课表，改完发回去，屏上几十秒内生效。
+  名册等学生信息不会离开大屏，手机上看不到也改不了。</div>
+  <button class="cfgbtn" id="cfgLoad">读取教室当前设置</button>
+
+  <div id="cfgEditor" hidden>
+    <div class="label">班名</div>
+    <input class="cfgText" id="cfgKlass" type="text" maxlength="20">
+
+    <div class="label">作息时间</div>
+    <div id="cfgBlocks"></div>
+
+    <div class="label">课表（科目 / 任课老师）</div>
+    <div id="cfgTable"></div>
+
+    <div class="label">提醒文字</div>
+    <div id="cfgTexts"></div>
+
+    <div class="label">常用话术</div>
+    <div id="cfgPhrases"></div>
+    <button class="cfgbtn cfgMini" id="cfgPhraseAdd">＋ 添加一条话术</button>
+
+    <button class="send" id="cfgSave">改完，发到大屏</button>
+  </div>
+
+  <div class="cfgHint">改更大规模的（换课程包、增删时段、名册修正），还是在大屏上最稳妥；
+  或者把导出的设置文件发过去：</div>
   <input id="cfgFile" type="file" accept=".json,application/json" hidden>
   <button class="cfgbtn" id="cfgSend">选择设置文件发送</button>
 </div>
@@ -220,7 +288,16 @@
     pwaInstall: document.getElementById("pwaInstall"),
     pwaIos: document.getElementById("pwaIos"),
     cfgFile: document.getElementById("cfgFile"),
-    cfgSend: document.getElementById("cfgSend")
+    cfgSend: document.getElementById("cfgSend"),
+    cfgLoad: document.getElementById("cfgLoad"),
+    cfgEditor: document.getElementById("cfgEditor"),
+    cfgKlass: document.getElementById("cfgKlass"),
+    cfgBlocks: document.getElementById("cfgBlocks"),
+    cfgTable: document.getElementById("cfgTable"),
+    cfgSave: document.getElementById("cfgSave"),
+    cfgTexts: document.getElementById("cfgTexts"),
+    cfgPhrases: document.getElementById("cfgPhrases"),
+    cfgPhraseAdd: document.getElementById("cfgPhraseAdd")
   };
 
   var level = "normal";
@@ -426,6 +503,210 @@
         });
     };
     reader.readAsText(f);
+  });
+
+  /* ---------- 改教室设置（ROADMAP 9.4 P2 B3） ----------
+     手机端只拿得到白名单字段（班名/作息/课表/话术），名册
+     从不离开大屏；送回去的也只是改过的字段（补丁），名册合并
+     由大屏自己完成——手机永远不碰学生信息。 */
+  var cfgState = null;
+  var WD = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+  function periodLabel(no) {
+    var blocks = ((cfgState.config || {}).timetable || {}).blocks || [];
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i].type === "class" && blocks[i].periodNo === no) {
+        return "第 " + no + " 节 · " + blocks[i].start + "–" + blocks[i].end;
+      }
+    }
+    return "第 " + no + " 节";
+  }
+
+  function renderBlocks() {
+    el.cfgBlocks.textContent = "";
+    var blocks = cfgState.config.timetable.blocks;
+    blocks.forEach(function (b) {
+      var row = document.createElement("div");
+      row.className = "blk";
+      var nm = document.createElement("div");
+      nm.className = "bn";
+      if (b.type === "class") {
+        var cap = document.createElement("b");
+        cap.textContent = "第 " + b.periodNo + " 节";
+        nm.appendChild(cap);
+      } else {
+        var inp = document.createElement("input");
+        inp.value = b.name || "";
+        inp.setAttribute("aria-label", "时段名");
+        inp.addEventListener("input", function () { b.name = inp.value; });
+        nm.appendChild(inp);
+      }
+      var tm = document.createElement("time");
+      var s = document.createElement("input");
+      var e = document.createElement("input");
+      s.type = e.type = "time";
+      s.value = b.start || "";
+      e.value = b.end || "";
+      s.addEventListener("input", function () { b.start = s.value; });
+      e.addEventListener("input", function () { b.end = e.value; });
+      tm.appendChild(s);
+      tm.appendChild(e);
+      row.appendChild(nm);
+      row.appendChild(tm);
+      el.cfgBlocks.appendChild(row);
+    });
+  }
+
+  function renderTable() {
+    el.cfgTable.textContent = "";
+    var entries = cfgState.config.schedule.entries || [];
+    var byPeriod = {};
+    entries.forEach(function (en) {
+      (byPeriod[en.periodNo] = byPeriod[en.periodNo] || []).push(en);
+    });
+    Object.keys(byPeriod).map(Number).sort(function (a, b) { return a - b; })
+      .forEach(function (no) {
+        var box = document.createElement("div");
+        box.className = "per";
+        var h = document.createElement("h4");
+        h.textContent = periodLabel(no);
+        box.appendChild(h);
+        byPeriod[no].slice().sort(function (a, b) { return a.weekday - b.weekday; })
+          .forEach(function (en) {
+            var row = document.createElement("div");
+            row.className = "day";
+            var d = document.createElement("b");
+            d.textContent = WD[en.weekday - 1] || "周" + en.weekday;
+            var sub = document.createElement("input");
+            var tea = document.createElement("input");
+            sub.value = en.subject || "";
+            tea.value = en.teacher || "";
+            tea.placeholder = "老师";
+            sub.addEventListener("input", function () { en.subject = sub.value; });
+            tea.addEventListener("input", function () { en.teacher = tea.value; });
+            row.appendChild(d);
+            row.appendChild(sub);
+            row.appendChild(tea);
+            box.appendChild(row);
+          });
+        el.cfgTable.appendChild(box);
+      });
+  }
+
+  /* 提醒文字：texts 是嵌套对象，递归摊平成「路径标签 + 输入框」，
+     改哪个字段就写回哪个字段；结构上没有名册，可以放心展示。 */
+  function renderTexts(obj, path, box) {
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k];
+      if (v && typeof v === "object") {
+        renderTexts(v, path ? path + " · " + k : k, box);
+        return;
+      }
+      var row = document.createElement("div");
+      row.className = "txtRow";
+      var b = document.createElement("b");
+      b.textContent = path ? path + " · " + k : k;
+      var inp = document.createElement("input");
+      inp.value = String(v == null ? "" : v);
+      inp.addEventListener("input", function () { obj[k] = inp.value; });
+      row.appendChild(b);
+      row.appendChild(inp);
+      box.appendChild(row);
+    });
+  }
+
+  function renderPhrases() {
+    el.cfgPhrases.textContent = "";
+    (cfgState.phrases || []).forEach(function (ph, i) {
+      var row = document.createElement("div");
+      row.className = "phRow";
+      var inp = document.createElement("input");
+      inp.value = ph;
+      inp.addEventListener("input", function () { cfgState.phrases[i] = inp.value; });
+      var del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "删";
+      del.addEventListener("click", function () {
+        cfgState.phrases.splice(i, 1);
+        renderPhrases();
+      });
+      row.appendChild(inp);
+      row.appendChild(del);
+      el.cfgPhrases.appendChild(row);
+    });
+  }
+
+  el.cfgPhraseAdd.addEventListener("click", function () {
+    if (!cfgState) return;
+    if (!Array.isArray(cfgState.phrases)) cfgState.phrases = [];
+    cfgState.phrases.push("");
+    renderPhrases();
+    var rows = el.cfgPhrases.querySelectorAll("input");
+    if (rows.length) rows[rows.length - 1].focus();
+  });
+
+  el.cfgLoad.addEventListener("click", function () {
+    el.cfgLoad.disabled = true;
+    fetch(API + "/api/config/remote/state", { cache: "no-store" })
+      .then(function (r) { return r.json().then(function (d) { return { code: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.code !== 200 || !res.d.config) {
+          toast((res.d && res.d.error) || "读不到教室设置", true);
+          return;
+        }
+        cfgState = res.d;
+        el.cfgKlass.value = (cfgState.config.meta || {}).klass || "";
+        renderBlocks();
+        renderTable();
+        el.cfgTexts.textContent = "";
+        renderTexts(cfgState.texts || {}, "", el.cfgTexts);
+        renderPhrases();
+        el.cfgEditor.hidden = false;
+        toast("已读到大屏当前设置");
+      })
+      .catch(function () {
+        toast("没连上教室，检查手机是否连了学校 WiFi", true);
+      })
+      .then(function () {
+        el.cfgLoad.disabled = false;
+      });
+  });
+
+  el.cfgSave.addEventListener("click", function () {
+    if (!cfgState) return;
+    var klass = el.cfgKlass.value.trim();
+    if (!klass) { toast("班名不能空", true); return; }
+    var patch = {
+      format: "rhythm-config-patch/v1",
+      config: {
+        meta: { klass: klass },
+        timetable: cfgState.config.timetable,
+        schedule: cfgState.config.schedule
+      },
+      texts: cfgState.texts || {},
+      phrases: (cfgState.phrases || []).map(function (s) { return String(s).trim(); })
+                                       .filter(function (s) { return s; })
+    };
+    el.cfgSave.disabled = true;
+    fetch(API + "/api/config/remote/patch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    })
+      .then(function (r) { return r.json().then(function (d) { return { code: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.code === 200 && res.d.ok) {
+          toast("已送到教室大屏，几十秒内生效");
+        } else {
+          toast((res.d && res.d.error) || "没送到，再试一次", true);
+        }
+      })
+      .catch(function () {
+        toast("没连上教室，检查手机是否连了学校 WiFi", true);
+      })
+      .then(function () {
+        el.cfgSave.disabled = false;
+      });
   });
 
   /* ---------- 历史 ---------- */
