@@ -150,6 +150,50 @@ def load_snapshot(day):
         return None
 
 
+# 远程改配置（ROADMAP 9.4 P2 B2）：手机把整份 rhythm-config/v1 POST 上来，
+# 落成一份「待应用」文件；大屏轮询取走，经 Store.importAll 的整份原子校验
+# 后应用，再回来 ack。同一时刻只留最新一份——后来的改法覆盖前面的。
+# 读（GET/ack）只给本机：名册不该被局域网里随便一部手机读到；
+# 写（POST）放开到局域网——这是老师主动递上来的文件，和发消息同理。
+# 待办文件跟着 BACKUP_DIR 走（测试会换目录），所以用函数现取，不存常量。
+_remote_result = {"ok": None, "why": "", "at": ""}   # 最近一次大屏应用的结果，纯反馈用
+
+
+def _remote_path():
+    return os.path.join(BACKUP_DIR, "remote-pending.json")
+
+
+def _remote_read():
+    try:
+        with open(_remote_path(), "r", encoding="utf-8") as f:
+            obj = json.load(f)
+        if isinstance(obj, dict) and obj.get("pending") and isinstance(obj.get("config"), dict):
+            return obj
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _remote_write(payload, received_at):
+    body = json.dumps({"pending": True, "receivedAt": received_at, "config": payload},
+                      ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    tmp = _remote_path() + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(body)
+    os.replace(tmp, _remote_path())
+
+
+def _remote_clear(ok, why):
+    try:
+        os.remove(_remote_path())
+    except OSError:
+        pass
+    _remote_result["ok"] = bool(ok)
+    _remote_result["why"] = str(why or "")[:200]
+    _remote_result["at"] = dt.datetime.now(BEIJING).isoformat(timespec="seconds")
+
+
 def read_app_version():
     """从 app/version.js 里抠出 VERSION / BUILD；读不到就当空，不抛错。"""
     try:
@@ -580,6 +624,18 @@ class Handler(BaseHTTPRequestHandler):
             if obj is None:
                 return self._err("没有这份备份", 404)
             return self._json(obj)
+        if path == "/api/config/remote":
+            # 大屏轮询「手机有没有送来新配置」。名册会整份出去，只对本机开放。
+            if not self._loopback():
+                return self._err("forbidden", 403)
+            obj = _remote_read()
+            return self._json({
+                "ok": True,
+                "pending": bool(obj),
+                "receivedAt": obj.get("receivedAt") if obj else None,
+                "config": obj.get("config") if obj else None,
+                "result": dict(_remote_result),
+            })
         if path == "/api/stream":
             return self._stream()
 
@@ -750,6 +806,59 @@ class Handler(BaseHTTPRequestHandler):
             except OSError as e:
                 return self._err("写不进备份目录：%s" % e, 500)
             return self._json({"ok": True, "saved": saved, "day": day, "kept": kept})
+
+        if route == "/api/config/remote":
+            # 手机把整份设置 POST 上来等大屏应用。文件从手机递过来是老师
+            # 主动的动作，和发消息一样放行局域网；读回去仍然是本机专属。
+            try:
+                n = int(self.headers.get("Content-Length") or "")
+            except (TypeError, ValueError):
+                n = -1
+            if n <= 0 or n > BACKUP_MAX_BODY:
+                if n > BACKUP_MAX_BODY:
+                    self._discard_body(n)
+                self.close_connection = True
+                return self._err("请求体太大或为空", 413)
+            try:
+                payload = json.loads(self.rfile.read(n).decode("utf-8"))
+                if not isinstance(payload, dict) \
+                        or payload.get("format") != "rhythm-config/v1":
+                    raise ValueError("不是节律屏的设置文件")
+            except Exception as e:
+                return self._err("请求体不是合法配置：%s" % e, 400)
+            received_at = int(time.time() * 1000)
+            try:
+                _remote_write(payload, received_at)
+            except OSError as e:
+                return self._err("写不进备份目录：%s" % e, 500)
+            return self._json({"ok": True, "receivedAt": received_at})
+
+        if route == "/api/config/remote/ack":
+            # 大屏报告应用结果并取走待办：成功失败都清掉，
+            # 否则同一份坏配置会被大屏反复拒绝、反复重试。
+            if not self._loopback():
+                return self._err("forbidden", 403)
+            try:
+                n = int(self.headers.get("Content-Length") or "")
+            except (TypeError, ValueError):
+                n = -1
+            if n > BACKUP_MAX_BODY:
+                self._discard_body(n)
+                self.close_connection = True
+                return self._err("请求体太大", 413)
+            why = ""
+            ok = True
+            if n > 0:
+                try:
+                    body = json.loads(self.rfile.read(n).decode("utf-8"))
+                    ok = body.get("ok") is True
+                    why = str(body.get("why") or "")
+                except Exception:
+                    ok, why = True, ""
+            if _remote_read() is None:
+                return self._err("没有待应用的配置", 404)
+            _remote_clear(ok, why)
+            return self._json({"ok": True})
 
         if route in ("/api/update/check", "/api/update/apply", "/api/update/rollback"):
             # 会改本机文件，只允许在本机操作；手机端推送更新留到后面的阶段。

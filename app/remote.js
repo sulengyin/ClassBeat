@@ -129,6 +129,38 @@
     }
   }
 
+  /* 远程改配置（ROADMAP 9.4 P2 B2）：手机把整份设置送到服务，这里取回
+     应用。应用只走 Store.importAll 一条路——要么整份成功，要么一个字
+     不动；校验不在此地重复做。应用结果回 ack 给服务，手机那头看得到。
+     服务不在、没待办、校验失败，都安静收手：大屏继续用本机配置。 */
+  var configBusy = false;
+  function pullConfig() {
+    if (configBusy) return null;
+    configBusy = true;
+    var done = function () { configBusy = false; };
+    try {
+      return fetch(HUB + "/api/config/remote", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.pending || !d.config) return false;
+          var res = null;
+          try { res = Store.importAll(d.config); } catch (e) { res = null; }
+          var ok = !!(res && res.ok);
+          var why = ok ? "" : ((res && res.why) || "大屏拒绝应用这份设置");
+          return fetch(HUB + "/api/config/remote/ack", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ok: ok, why: why })
+          }).catch(function () {}).then(function () { return ok; });
+        })
+        .catch(function () { return false; })
+        .then(function (v) { done(); return v; });
+    } catch (e) {
+      done();
+      return null;
+    }
+  }
+
   /* fresh=true 才是"刚到的消息"，要弹卡片；开机恢复的那条只贴便签。
      否则早上发的一条通知，中午重启大屏会再吓全班一次。 */
   function apply(msg, fresh) {
@@ -207,6 +239,11 @@
       /* 一台屏可能开一整天，隔一段时间再校一次，避免慢慢走偏 */
       if (root.setInterval) root.setInterval(syncClock, 10 * 60 * 1000);
 
+      /* 手机改了设置要及时上屏。开机先拉一次，之后隔 15 秒再问；
+         没有待办就是一次极小的 GET，服务不在时安静失败。 */
+      pullConfig();
+      if (root.setInterval) root.setInterval(pullConfig, 15 * 1000);
+
       /* 老师常常先开大屏、后双击启动服务。没连上就每分钟重找一次，
          一旦连上就补一次 connect，屏不用刷新。 */
       if (root.setInterval) {
@@ -239,7 +276,8 @@
 
   root.Remote = {
     hub: HUB, info: info, probe: probe,
-    connect: connect, retract: retract, syncClock: syncClock
+    connect: connect, retract: retract, syncClock: syncClock,
+    pullConfig: pullConfig
   };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

@@ -80,6 +80,14 @@
     box-shadow:2px 2px 0 rgba(58,42,30,.18);cursor:pointer}
   .pwa i{font-style:normal}
 
+  /* 改教室设置 */
+  .cfgHint{font-size:12.5px;color:var(--ink3);line-height:1.6;margin:4px 0 10px}
+  .cfgbtn{width:100%;padding:13px;border:2px solid var(--line);
+    border-radius:12px;background:var(--card);color:var(--ink);
+    font-family:inherit;font-weight:700;font-size:14.5px;
+    box-shadow:2px 2px 0 rgba(58,42,30,.14);cursor:pointer}
+  .cfgbtn:active{background:#F3E8D2}
+
   /* 现在屏上是什么 */
   .live{display:none;margin-bottom:14px;padding:13px 15px;border-radius:16px 13px 15px 12px;
     background:var(--yellow);border:2px solid var(--line);
@@ -179,6 +187,14 @@
   <div id="list"><div class="empty">还没有发过</div></div>
 </div>
 
+<div class="card" id="cfgCard">
+  <div class="label">改教室设置（课程表 / 作息 / 文字）</div>
+  <div class="cfgHint">把在大屏上导出的设置文件（.json）发过去，屏上马上换。
+  屏上没生效就还能重发，大屏只认最新的这一份。</div>
+  <input id="cfgFile" type="file" accept=".json,application/json" hidden>
+  <button class="cfgbtn" id="cfgSend">选择设置文件发送</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -202,7 +218,9 @@
     mins: document.getElementById("mins"),
     pwa: document.getElementById("pwa"),
     pwaInstall: document.getElementById("pwaInstall"),
-    pwaIos: document.getElementById("pwaIos")
+    pwaIos: document.getElementById("pwaIos"),
+    cfgFile: document.getElementById("cfgFile"),
+    cfgSend: document.getElementById("cfgSend")
   };
 
   var level = "normal";
@@ -367,6 +385,47 @@
         busy = false;
         setTimeout(function () { el.send.disabled = false; }, 900);
       });
+  });
+
+  /* ---------- 改教室设置（ROADMAP 9.4 P2 B2） ----------
+     手机上选一份设置文件（大屏导出的 .json）POST 给服务；
+     大屏轮询取到后经整份原子校验应用。文件不合规矩
+     服务就当场拒绝，不会把屏弄坏。*/
+  el.cfgSend.addEventListener("click", function () { el.cfgFile.click(); });
+  el.cfgFile.addEventListener("change", function () {
+    var f = el.cfgFile.files && el.cfgFile.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var obj = null;
+      try { obj = JSON.parse(String(reader.result)); } catch (e) {}
+      if (!obj || obj.format !== "rhythm-config/v1") {
+        toast("这不是节律屏导出的设置文件", true);
+        return;
+      }
+      el.cfgSend.disabled = true;
+      fetch(API + "/api/config/remote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(obj)
+      })
+        .then(function (r) { return r.json().then(function (d) { return { code: r.status, d: d }; }); })
+        .then(function (res) {
+          if (res.code === 200 && res.d.ok) {
+            toast("已送到教室大屏，几十秒内生效");
+          } else {
+            toast((res.d && res.d.error) || "没送到，再试一次", true);
+          }
+        })
+        .catch(function () {
+          toast("没连上教室，检查手机是否连了学校 WiFi", true);
+        })
+        .then(function () {
+          el.cfgSend.disabled = false;
+          el.cfgFile.value = "";
+        });
+    };
+    reader.readAsText(f);
   });
 
   /* ---------- 历史 ---------- */
