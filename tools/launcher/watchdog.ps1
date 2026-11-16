@@ -90,6 +90,16 @@ Write-Log ('看门狗启动：端口 ' + $Port + '，间隔 ' + $IntervalSeconds
 Write-Log ('重启命令：powershell -ExecutionPolicy Bypass -File "' + $LauncherPath + '"')
 if ($DryRun) { Write-Log 'DRYRUN 模式：只判定，不启动任何进程。' }
 
+# 上次「退出大屏」可能留下 stop.flag（看门狗当时没在跑，没人消费它）。
+# 看门狗刚启动时应清掉它，否则会误以为被叫停而直接退出。
+# 退出大屏的正常流程会等看门狗消费完 flag 再关窗口，所以正常路径不会走到这里。
+if (Test-Path $stopFlag) {
+  try {
+    Remove-Item $stopFlag -Force -ErrorAction Stop
+    Write-Log '清除遗留的 stop.flag（上次退出大屏时留下）。'
+  } catch { }
+}
+
 while ($true) {
   $round = $round + 1
 

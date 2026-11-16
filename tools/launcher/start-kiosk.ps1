@@ -41,6 +41,15 @@ function Fail([string]$msg, [int]$code) {
   exit $code
 }
 
+# 上次「退出大屏」可能留下 stop.flag（看门狗没在跑时没人消费它）。
+# 不清掉的话，本次启动的看门狗会以为自己被叫停，直接退出。
+if (Test-Path (Join-Path $scriptDir 'stop.flag')) {
+  try {
+    Remove-Item (Join-Path $scriptDir 'stop.flag') -Force -ErrorAction Stop
+    Write-Log '已清除遗留的 stop.flag。'
+  } catch { }
+}
+
 # ---------- 1. 定位项目根目录 ----------
 $root = Split-Path -Parent $scriptDir            # tools\launcher -> tools
 $root = Split-Path -Parent $root                 # tools -> 仓库根
@@ -140,6 +149,28 @@ function Get-PortOwner([int]$p) {
     }
   } catch { }
   return $null
+}
+
+function Test-KioskWindow([int]$p) {
+  # 与 watchdog.ps1 同一套判据：窗口标题带「班级节律屏」，
+  # 或命令行同时含 --kiosk 与 127.0.0.1:<端口>。
+  # 用途：单实例——窗口已经在了就不开第二个（重复双击、看门狗误拉都到此为止）。
+  foreach ($name in @('chrome', 'msedge')) {
+    foreach ($proc in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
+      if ($proc.MainWindowTitle -and $proc.MainWindowTitle -match '班级节律屏') { return $true }
+    }
+  }
+  $needle = '127.0.0.1:' + $p
+  foreach ($name in @('chrome', 'msedge')) {
+    try {
+      $filter = "Name='" + $name + ".exe'"
+      foreach ($proc in @(Get-CimInstance Win32_Process -Filter $filter -ErrorAction Stop)) {
+        $cmd = [string]$proc.CommandLine
+        if ($cmd -match '--kiosk' -and $cmd -like ('*' + $needle + '*')) { return $true }
+      }
+    } catch { }
+  }
+  return $false
 }
 
 $activePort = 0
@@ -299,6 +330,15 @@ Write-Log ('浏览器完整命令行：' + $cmdLine)
 if ($DryRun) {
   Write-Output ('[DRYRUN] 将启动浏览器：' + $cmdLine)
   Write-Output '[DRYRUN] 未启动任何进程。'
+  Write-Output '[DRYRUN] 单实例：真跑时若已有大屏 kiosk 窗口，不会开第二个。'
+  exit 0
+}
+
+# ---------- 5.5 单实例 ----------
+# kiosk 没有关闭按钮，叠两个全屏窗口只能硬关，所以在这里拦住：
+# 重复双击、看门狗误拉，都到这一步为止。
+if (Test-KioskWindow $activePort) {
+  Write-Log '检测到大屏 kiosk 窗口已在运行，不开第二个（单实例）。要退出请用「退出大屏.bat」。'
   exit 0
 }
 

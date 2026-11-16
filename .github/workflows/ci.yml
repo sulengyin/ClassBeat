@@ -65,6 +65,10 @@ jobs:
       - name: 消息服务
         run: python3 tools/test_server.py
 
+      # 启动器三件套 + 逃生门进了发布包，清单是逐文件手列的，漏一个老师就拿不到
+      - name: 打包清单
+        run: python3 tools/test_package.py
+
       # 真实班级数据一旦入库就收不回来，这里守住最后一道
       - name: 隐私检查
         run: |
