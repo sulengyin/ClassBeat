@@ -299,6 +299,40 @@ def main():
               f'bad_json={bad_ok} threw={threw}')
         hub.UPDATE["url"] = ""
 
+        # ㉔a 更新器状态接口：形状稳定，不泄露更新源
+        install = os.path.join(tmp, "install")
+        os.makedirs(os.path.join(install, "app"), exist_ok=True)
+        os.makedirs(os.path.join(install, "server"), exist_ok=True)
+        with open(os.path.join(install, "app", "version.js"), "w", encoding="utf-8") as f:
+            f.write('var VERSION = "0.2.1";\nvar BUILD = "test";\n')
+        hub.INSTALL_ROOT = install
+        hub.UPDATER = None
+        code, _, raw = req(port, "/api/update/status")
+        s = json.loads(raw)
+        check(code == 200 and s.get("ok") is True and s.get("version") == src_version
+              and isinstance(s.get("progress"), int) and s.get("selfUpdate") is True
+              and bool(s.get("downloadPage")) and "url" not in raw.decode("utf-8"),
+              "㉔a /api/update/status 给出状态且不泄露更新源",
+              f'{s.get("state")} {s.get("currentVersion")}')
+
+        # ㉔b 没配更新源时手动检查：502 + 一句可读提示
+        code, _, raw = req(port, "/api/update/check", "POST", {})
+        d = json.loads(raw)
+        check(code == 502 and d.get("ok") is False and "更新源" in d.get("error", ""),
+              "㉔b 没配更新源时检查更新给可读提示", f'{code} {d.get("error")}')
+
+        # ㉔c 没配更新源时点更新：409，服务不异常
+        code, _, raw = req(port, "/api/update/apply", "POST", {})
+        d = json.loads(raw)
+        check(code == 409 and "更新源" in d.get("error", ""),
+              "㉔c 不能更新时点更新给出原因", f'{code} {d.get("error")}')
+
+        # ㉔d 没有备份时点回滚：409
+        code, _, raw = req(port, "/api/update/rollback", "POST", {})
+        d = json.loads(raw)
+        check(code == 409 and "回滚" in d.get("error", ""),
+              "㉔d 没有备份时点回滚给出原因", f'{code} {d.get("error")}')
+
         # ⑪ 落盘与重载
         hub.save_messages()
         saved = json.load(open(hub.MSG_FILE, encoding="utf-8"))

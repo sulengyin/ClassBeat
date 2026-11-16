@@ -87,7 +87,7 @@ APP_FILES = [
     "config.js", "qr.js", "phoneui.js", "setup.js", "templates.js",
     "vendor/qrcode.min.js",
 ]
-SERVER_FILES = ["rhythm_server.py", "run.py", "phone.html"]
+SERVER_FILES = ["rhythm_server.py", "run.py", "phone.html", "update_manifest.py", "updater.py"]
 
 # .bat 内容保持纯 ASCII：cmd 默认 GBK，中文容易花
 # 大屏优先走本机服务：同一个来源，端口顺延也能跟上；没有 Python 才退回 file://。

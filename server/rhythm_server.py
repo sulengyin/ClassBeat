@@ -33,6 +33,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+if BASE not in sys.path:
+    sys.path.insert(0, BASE)
+import updater  # noqa: E402  同目录的自动更新模块
+
 MSG_FILE = os.path.join(BASE, "messages.json")
 NET_FILE = os.path.join(BASE, "net.json")
 LOG_FILE = os.path.join(BASE, "server.log")
@@ -43,6 +47,10 @@ DEFAULT_PORT = 8765
 PORT_SPAN = 10          # 8765 被别的软件占了就往后找，最多到 8774
 
 CONF = {"port": DEFAULT_PORT, "klass": ""}
+
+# 自动更新只动程序文件，data/、assets/、server/messages.json 永远不碰。
+INSTALL_ROOT = os.path.abspath(os.path.join(BASE, ".."))
+UPDATER = None
 
 # 消息的 at / until 是给教室看的，一律按北京时间算，不跟服务器的本地时区走。
 BEIJING = dt.timezone(dt.timedelta(hours=8))
@@ -163,6 +171,25 @@ def app_version():
     return APP_VERSION
 
 
+def refresh_app_version():
+    """更新或回滚后重新读磁盘上的 version.js，让 /version 立刻跟上。"""
+    ver, build = read_app_version()
+    if ver:
+        APP_VERSION["version"] = ver
+        APP_VERSION["build"] = build
+
+
+def updater_manager():
+    """懒建更新器；每次调用都同步最新的更新源、版本和本机端口。"""
+    global UPDATER
+    if UPDATER is None:
+        UPDATER = updater.UpdateManager(INSTALL_ROOT)
+    UPDATER.manifest_url = UPDATE.get("url") or ""
+    UPDATER.current_version = app_version()["version"]
+    UPDATER.base_url = "http://127.0.0.1:%d" % CONF["port"]
+    return UPDATER
+
+
 def version_key(v):
     """0.2.1 / v0.2.1 这类写法变成可比较的三元组；解析不了的段按 0 算。"""
     v = (v or "").strip().lstrip("vV")
@@ -199,6 +226,24 @@ def update_loop():
     while True:
         check_update_once()
         time.sleep(max(60, int(UPDATE.get("interval") or 1800)))
+
+
+def _run_update_job(mgr, action):
+    """后台跑更新/回滚；异常只落状态和日志，不能打死服务。"""
+    try:
+        if action == "update":
+            mgr.apply()
+        else:
+            mgr.rollback()
+    except Exception:
+        traceback.print_exc()
+    finally:
+        refresh_app_version()
+        st = mgr.status()
+        if action == "update" and st.get("state") == "done" and not st.get("available"):
+            with UPDATE_LOCK:
+                UPDATE["available"] = False
+                UPDATE["latest"] = ""
 
 
 def detect_class() -> str:
@@ -495,6 +540,15 @@ class Handler(BaseHTTPRequestHandler):
                 "available": bool(st["available"]),
                 "latest": st["latest"] if st["available"] else "",
             })
+        if path == "/api/update/status":
+            # 给大屏/设置页轮询：当前状态、进度、说明、失败原因、能否回滚。
+            # 只回本机信息，不回更新源地址。
+            st = updater_manager().status()
+            st["ok"] = True
+            ver = app_version()
+            st["version"] = ver["version"]
+            st["build"] = ver["build"]
+            return self._json(st)
         # 大屏用它校准设备时钟。给毫秒时间戳，客户端自己换算北京时间。
         if path == "/api/time":
             return self._json({
@@ -638,6 +692,44 @@ class Handler(BaseHTTPRequestHandler):
             except OSError as e:
                 return self._err("写不进备份目录：%s" % e, 500)
             return self._json({"ok": True, "saved": saved, "day": day, "kept": kept})
+
+        if route in ("/api/update/check", "/api/update/apply", "/api/update/rollback"):
+            # 会改本机文件，只允许在本机操作；手机端推送更新留到后面的阶段。
+            if not self._loopback():
+                return self._err("只接受本机操作", 403)
+            mgr = updater_manager()
+
+            if route == "/api/update/check":
+                try:
+                    st = mgr.check()
+                except updater.UpdateError as e:
+                    return self._json({
+                        "ok": False,
+                        "error": str(e),
+                        "state": mgr.status().get("state"),
+                    }, 502)
+                st["ok"] = True
+                return self._json(st)
+
+            if mgr.busy():
+                return self._err("正在更新，请稍等", 409)
+
+            if route == "/api/update/apply":
+                try:
+                    mgr.ensure_ready()
+                except updater.UpdateError as e:
+                    return self._err(str(e), 409)
+                threading.Thread(target=_run_update_job,
+                                 args=(mgr, "update"), daemon=True).start()
+                return self._json({"ok": True, "state": "starting",
+                                   "message": "开始更新"}, 202)
+
+            if not mgr.has_backup():
+                return self._err("没有可回滚的上一版", 409)
+            threading.Thread(target=_run_update_job,
+                             args=(mgr, "rollback"), daemon=True).start()
+            return self._json({"ok": True, "state": "starting",
+                               "message": "开始回滚"}, 202)
 
         if route != "/api/messages":
             return self._err("not found", 404)

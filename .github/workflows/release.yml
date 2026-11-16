@@ -41,6 +41,21 @@ jobs:
       - name: 打包（含免安装 Python）
         run: python3 tools/package.py
 
+      # 更新清单只对正式 tag 有意义：下载地址要用 tag 才拼得出来。
+      # 生成后会按安装器的同一套规则自校验，坏清单不会流到 Release。
+      - name: 生成更新清单
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -e
+          zip=$(ls dist/*.zip | head -1)
+          python3 tools/make_update.py \
+            --zip "$zip" \
+            --tag "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --notes-file CHANGELOG.md \
+            --min-version 0.2.0
+          test -s dist/update.json
+
       - name: 检查产物
         run: |
           set -e
@@ -57,6 +72,9 @@ jobs:
             exit 1
           fi
           echo "zip=$zip" >> "$GITHUB_ENV"
+          if [ -f dist/update.json ]; then
+            python3 tools/make_update.py --check-only --dist dist
+          fi
           echo "已确认：$zip 自带运行时、手机服务、配置向导、MANIFEST"
 
       - name: 上传产物
@@ -68,13 +86,21 @@ jobs:
             dist/*-single.html
           retention-days: 30
 
+      - name: 上传更新清单
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: classbeat-update-manifest
+          path: dist/update.json
+          retention-days: 30
+
       - name: 发布到 Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            "$zip" dist/*-single.html \
+            "$zip" dist/*-single.html dist/update.json \
             --title "ClassBeat $GITHUB_REF_NAME" \
             --notes "Windows：下载 classbeat-版本号.zip，解压后双击「打开大屏.bat」；只想看看效果可下载 classbeat-版本号-single.html 双击打开；附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」，包内目录仍是中文；完整说明见仓库 CHANGELOG.md。" \
             --generate-notes \

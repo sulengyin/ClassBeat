@@ -2471,6 +2471,15 @@
 
     p.appendChild(el("p", "setup-p", "导出的是整份设置（含岗位、文案和本机偏好）。换电脑后点「导入设置 JSON」，选对方给的这份文件，班级、作息、课表、岗位、文案一起搬过来。"));
 
+    /* 版本与更新：入口放在设置最后一页，和「导出/导入」同属维护动作。 */
+    var upBox = el("div", "setup-update");
+    upBox.appendChild(el("h3", "setup-h", "版本与更新"));
+    var upHost = el("div");
+    upHost.id = "setupUpdate";
+    upBox.appendChild(upHost);
+    p.appendChild(upBox);
+    if (root.Update && root.Update.mount) root.Update.mount(upHost);
+
     if (root.Runtime && root.Runtime.ready && !root.Runtime.ready()) {
       p.appendChild(el("p", "setup-msg", "提醒：这个包本身缺配置，应用后仍可能算不出全天。"));
     }

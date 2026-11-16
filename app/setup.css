@@ -356,3 +356,25 @@ body[data-setup="1"] .warn{display:none}
 .setup-foot .grow{flex:1}
 .setup-msg{font-size:1.9vmin;color:#B23A32;font-weight:700}
 .setup-msg.ok{color:#3C7F3A}
+
+/* ---------- 版本与更新：大屏弹层和设置页共用 ----------
+ * 按钮沿用 .setup-btn，字色和描边跟向导一致；
+ * 这里只管版本行、进度条、更新说明和一句失败提示。 */
+.up-ver{font-size:2.2vmin;font-weight:700;color:#6B5545;margin:0 0 .6vmin}
+.up-state{font-size:2.3vmin;font-weight:600;line-height:1.6;margin:0 0 1vmin;color:#31231A}
+.up-bar{height:1.3vmin;border-radius:1vmin;background:#EFE2CB;overflow:hidden;margin:1vmin 0 1.6vmin}
+.up-bar[hidden]{display:none}
+.up-bar i{display:block;height:100%;width:0;background:#3A2A1E;transition:width .3s ease}
+.up-notes{
+  white-space:pre-wrap;font-size:2vmin;line-height:1.7;color:#6B5545;
+  margin:0 0 1.4vmin;padding:1.1vmin 1.4vmin;border-radius:.8vmin;
+  background:#FFF1D8;border-left:.5vmin solid #FFD64F;
+}
+.up-error{font-size:2vmin;font-weight:700;line-height:1.6;color:#B23A32;margin:0 0 1.2vmin}
+.up-restart{font-size:2vmin;font-weight:700;line-height:1.6;color:#3C7F3A;margin:0 0 1.2vmin}
+.up-notes[hidden],.up-error[hidden],.up-restart[hidden]{display:none}
+.up-acts{display:flex;flex-wrap:wrap;align-items:center;gap:1.2vmin;margin-top:1.4vmin}
+.up-acts a.setup-btn{display:inline-flex;align-items:center;text-decoration:none}
+.up-acts .setup-btn[hidden]{display:none}
+.setup-update{margin-top:3.4vmin;padding-top:2vmin;border-top:.3vmin dashed rgba(58,42,30,.24)}
+

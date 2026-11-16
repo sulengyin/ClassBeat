@@ -47,7 +47,7 @@ module.exports = defineConfig({
   projects: [
     {
       name: "一体机",
-      testMatch: /(screen|soak|setup)\.spec\.js/,
+      testMatch: /(screen|soak|setup|update)\.spec\.js/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1920, height: 1080 } },
     },
     {

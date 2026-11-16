@@ -693,6 +693,26 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
   background:transparent;color:var(--ink-2);cursor:pointer;
 }
 
+/* ---------- 版本与更新：大屏弹层（按钮、进度条等细节在 setup.css，两处共用） ---------- */
+.up-modal{
+  position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;
+  background:rgba(30,20,12,.58);padding:4vmin;
+}
+.up-modal[hidden]{display:none}
+.up-card{
+  width:min(84vmin,94vw);max-height:88vh;overflow:auto;
+  background:#FFF8E7;color:#31231A;border:.42vmin solid #3A2A1E;border-radius:2.2vmin;
+  box-shadow:1vmin 1.2vmin 0 rgba(58,42,30,.18),0 4vmin 12vmin rgba(0,0,0,.3);
+  padding:2.6vmin 3.2vmin;
+}
+.up-head{display:flex;align-items:center;gap:2vmin;margin:0 0 1.4vmin}
+.up-title{font:900 3vmin/1.2 inherit;letter-spacing:.03em}
+.up-x{
+  margin-left:auto;width:4.4vmin;height:4.4vmin;flex:none;
+  border:.28vmin solid #3A2A1E;border-radius:50%;
+  background:#FFF8E7;color:#31231A;font-size:2.6vmin;line-height:1;cursor:pointer;
+}
+
 /* ---------- 手机发消息：二维码面板 ---------- */
 .qr-panel{
   position:fixed;inset:0;z-index:80;display:none;
@@ -885,6 +905,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
     <button id="btn-cd">倒计时 · 按推荐</button>
     <button id="btn-reduce">减少动效</button>
     <button id="btn-phone">手机</button>
+    <button id="btn-update">更新</button>
     <button id="btn-setup">配置班级</button>
     <button id="btn-edit">编辑</button>
     <span class="ver" id="ver"></span>
@@ -897,6 +918,16 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 <div class="tip" id="tip" hidden>
   <span id="tipText"></span>
   <button id="tipClose" type="button">知道了</button>
+</div>
+
+<div class="up-modal" id="updatePanel" hidden>
+  <section class="up-card" role="dialog" aria-modal="true" aria-labelledby="upTitle">
+    <div class="up-head">
+      <span class="up-title" id="upTitle">版本与更新</span>
+      <button class="up-x" id="upClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="updateBody"></div>
+  </section>
 </div>
 
 <div class="msg-modal" id="msgModal" data-level="normal" aria-hidden="true">
