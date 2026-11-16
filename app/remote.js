@@ -129,11 +129,33 @@
     }
   }
 
-  /* 远程改配置（ROADMAP 9.4 P2 B2）：手机把整份设置送到服务，这里取回
-     应用。应用只走 Store.importAll 一条路——要么整份成功，要么一个字
-     不动；校验不在此地重复做。应用结果回 ack 给服务，手机那头看得到。
+  /* 远程改配置（ROADMAP 9.4 P2 B2/B3）：手机把设置送到服务，这里取回
+     应用。两种形态：
+     - kind=full：整份 rhythm-config/v1，直接 importAll；
+     - kind=patch：手机只送改动的字段（名册在手机上看不到），这里以
+       当前配置为底稿合并后再 importAll。
+     应用只走 Store.importAll 一条路——要么整份成功，要么一个字不动；
+     校验不在此地重复做。应用结果回 ack 给服务，手机那头看得到。
      服务不在、没待办、校验失败，都安静收手：大屏继续用本机配置。 */
   var configBusy = false;
+  function ackConfig(ok, why) {
+    return fetch(HUB + "/api/config/remote/ack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ok: ok, why: why })
+    }).catch(function () {});
+  }
+
+  function mergePatch(base, patch) {
+    var p = patch || {}, c = p.config || {};
+    if (p.texts) base.texts = p.texts;
+    if (p.phrases) base.phrases = p.phrases;
+    if (c.meta) base.config.meta = Object.assign({}, base.config.meta || {}, c.meta);
+    if (c.timetable) base.config.timetable = c.timetable;
+    if (c.schedule) base.config.schedule = c.schedule;
+    return base;
+  }
+
   function pullConfig() {
     if (configBusy) return null;
     configBusy = true;
@@ -142,16 +164,25 @@
       return fetch(HUB + "/api/config/remote", { cache: "no-store" })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          if (!d || !d.pending || !d.config) return false;
+          if (!d || !d.pending) return false;
+          var target = null;
+          if (d.kind === "patch" && d.patch) {
+            var base = null;
+            try { base = Store.exportAll(); } catch (e) { base = null; }
+            if (!base || !base.config) {
+              return ackConfig(false, "大屏拿不到当前配置，补丁没法合并")
+                .then(function () { return false; });
+            }
+            target = mergePatch(base, d.patch);
+          } else if (d.config) {
+            target = d.config;
+          }
+          if (!target) return false;
           var res = null;
-          try { res = Store.importAll(d.config); } catch (e) { res = null; }
+          try { res = Store.importAll(target); } catch (e) { res = null; }
           var ok = !!(res && res.ok);
           var why = ok ? "" : ((res && res.why) || "大屏拒绝应用这份设置");
-          return fetch(HUB + "/api/config/remote/ack", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ok: ok, why: why })
-          }).catch(function () {}).then(function () { return ok; });
+          return ackConfig(ok, why).then(function () { return ok; });
         })
         .catch(function () { return false; })
         .then(function (v) { done(); return v; });

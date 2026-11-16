@@ -167,8 +167,12 @@ def _remote_read():
     try:
         with open(_remote_path(), "r", encoding="utf-8") as f:
             obj = json.load(f)
-        if isinstance(obj, dict) and obj.get("pending") and isinstance(obj.get("config"), dict):
-            return obj
+        if not isinstance(obj, dict) or not obj.get("pending"):
+            return None
+        if obj.get("kind") == "patch" and isinstance(obj.get("patch"), dict):
+            return obj                          # B3 补丁形态
+        if isinstance(obj.get("config"), dict):
+            return obj                          # B2 整份形态
     except (OSError, ValueError):
         pass
     return None
@@ -192,6 +196,56 @@ def _remote_clear(ok, why):
     _remote_result["ok"] = bool(ok)
     _remote_result["why"] = str(why or "")[:200]
     _remote_result["at"] = dt.datetime.now(BEIJING).isoformat(timespec="seconds")
+
+
+# 手机端编辑视图（B3）：手机要看见「现在是什么」才能改。
+# 白名单裁剪——只给 meta / timetable / schedule / texts / phrases，
+# 学生名单与人群组（students / peopleGroups）和当日临时调整（overrides）
+# 一律不出服务：局域网里能打开手机页的人不该读到名册。
+_REMOTE_STATE_KEYS = ("meta", "timetable", "schedule")
+
+
+def _remote_state():
+    days = _backup_days()
+    obj = load_snapshot(days[-1]) if days else None
+    if not obj:
+        return None
+    cfg = obj.get("config") or {}
+    if not (cfg.get("meta") or {}).get("klass"):
+        return None                     # 空壳页面的快照不往外递
+    return {
+        "format": "rhythm-config-state/v1",
+        "schemaVersion": obj.get("schemaVersion", 0),
+        "savedAt": obj.get("savedAt", ""),
+        "day": days[-1],
+        "config": {k: cfg[k] for k in _REMOTE_STATE_KEYS if k in cfg},
+        "texts": obj.get("texts") or {},
+        "phrases": obj.get("phrases") or [],
+    }
+
+
+def _valid_patch(p):
+    """形状校验。深层校验（课表条目、作息块内部）交给大屏 importAll，
+    这里只挡住明显不是补丁的东西，避免把垃圾写成待办文件。"""
+    if not isinstance(p, dict) or p.get("format") != "rhythm-config-patch/v1":
+        return False
+    if "config" in p:
+        c = p["config"]
+        if not isinstance(c, dict):
+            return False
+        if "meta" in c and not isinstance(c["meta"], dict):
+            return False
+        if "timetable" in c and (not isinstance(c["timetable"], dict)
+                                 or not isinstance(c["timetable"].get("blocks"), list)):
+            return False
+        if "schedule" in c and (not isinstance(c["schedule"], dict)
+                                or not isinstance(c["schedule"].get("entries"), list)):
+            return False
+    if "texts" in p and not isinstance(p["texts"], dict):
+        return False
+    if "phrases" in p and not isinstance(p["phrases"], list):
+        return False
+    return not ("config" not in p and "texts" not in p and "phrases" not in p)
 
 
 def read_app_version():
@@ -632,10 +686,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({
                 "ok": True,
                 "pending": bool(obj),
+                "kind": (obj.get("kind") if obj else None) or "full",
                 "receivedAt": obj.get("receivedAt") if obj else None,
                 "config": obj.get("config") if obj else None,
+                "patch": obj.get("patch") if obj else None,
                 "result": dict(_remote_result),
             })
+        if path == "/api/config/remote/state":
+            # 手机编辑器的底稿：裁剪后的当前配置，没有名册。
+            obj = _remote_state()
+            if obj is None:
+                return self._err("还没有配置备份，请先在大屏上打开一次", 404)
+            return self._json(obj)
         if path == "/api/stream":
             return self._stream()
 
@@ -829,6 +891,38 @@ class Handler(BaseHTTPRequestHandler):
             received_at = int(time.time() * 1000)
             try:
                 _remote_write(payload, received_at)
+            except OSError as e:
+                return self._err("写不进备份目录：%s" % e, 500)
+            return self._json({"ok": True, "receivedAt": received_at})
+
+        if route == "/api/config/remote/patch":
+            # 手机编辑器只送改动的字段；名册不在手机上，合并由大屏完成。
+            try:
+                n = int(self.headers.get("Content-Length") or "")
+            except (TypeError, ValueError):
+                n = -1
+            if n <= 0 or n > BACKUP_MAX_BODY:
+                if n > BACKUP_MAX_BODY:
+                    self._discard_body(n)
+                self.close_connection = True
+                return self._err("请求体太大或为空", 413)
+            try:
+                payload = json.loads(self.rfile.read(n).decode("utf-8"))
+                if not _valid_patch(payload):
+                    raise ValueError("不是节律屏的设置补丁")
+            except Exception as e:
+                return self._err("请求体不是合法补丁：%s" % e, 400)
+            received_at = int(time.time() * 1000)
+            try:
+                body = json.dumps({"pending": True, "kind": "patch",
+                                   "receivedAt": received_at, "patch": payload},
+                                  ensure_ascii=False, sort_keys=True,
+                                  separators=(",", ":")).encode("utf-8")
+                os.makedirs(BACKUP_DIR, exist_ok=True)
+                tmp = _remote_path() + ".tmp"
+                with open(tmp, "wb") as f:
+                    f.write(body)
+                os.replace(tmp, _remote_path())
             except OSError as e:
                 return self._err("写不进备份目录：%s" % e, 500)
             return self._json({"ok": True, "receivedAt": received_at})
