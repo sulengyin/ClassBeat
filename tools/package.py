@@ -88,7 +88,11 @@ APP_FILES = [
     "config.js", "qr.js", "phoneui.js", "setup.js", "templates.js",
     "vendor/qrcode.min.js",
 ]
-SERVER_FILES = ["rhythm_server.py", "run.py", "phone.html", "update_manifest.py", "updater.py"]
+SERVER_FILES = [
+    "rhythm_server.py", "run.py", "phone.html", "update_manifest.py", "updater.py",
+    # 手机页 PWA（ROADMAP 9.4 P2 B1）：清单是动态路由不用带文件，带壳与图标
+    "sw.js", "icons/icon-192.png", "icons/icon-512.png",
+]
 
 # 全屏启动器与自动恢复（ROADMAP 9.3 第一档 + 9.6 + 9.9 逃生门）。
 # 逐个列出，和 APP_FILES 同一个理由：免得把调试残留（*.log、stop.flag）带进包。
