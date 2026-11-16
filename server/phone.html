@@ -71,6 +71,15 @@
   .custom input::-webkit-outer-spin-button,
   .custom input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
+  /* ---------- 安装到主屏幕（PWA，ROADMAP 9.4 P2 B1） ---------- */
+  .pwa{display:none;margin:0 0 12px;align-items:center;gap:10px;
+    font-size:12.5px;color:var(--ink3)}
+  .pwa.show{display:flex}
+  .pwa button{padding:7px 12px;border:2px solid var(--line);border-radius:10px;
+    background:var(--yellow);font-family:inherit;font-weight:700;font-size:13px;color:var(--ink);
+    box-shadow:2px 2px 0 rgba(58,42,30,.18);cursor:pointer}
+  .pwa i{font-style:normal}
+
   /* 现在屏上是什么 */
   .live{display:none;margin-bottom:14px;padding:13px 15px;border-radius:16px 13px 15px 12px;
     background:var(--yellow);border:2px solid var(--line);
@@ -359,15 +368,6 @@
         setTimeout(function () { el.send.disabled = false; }, 900);
       });
   });
-
-  /* ---------- 安装到主屏幕（PWA，ROADMAP 9.4 P2 B1） ---------- */
-  .pwa{display:none;margin:0 0 12px;align-items:center;gap:10px;
-    font-size:12.5px;color:var(--ink3)}
-  .pwa.show{display:flex}
-  .pwa button{padding:7px 12px;border:2px solid var(--line);border-radius:10px;
-    background:var(--yellow);font:700 13px inherit;color:var(--ink);
-    box-shadow:2px 2px 0 rgba(58,42,30,.18);cursor:pointer}
-  .pwa i{font-style:normal}
 
   /* ---------- 历史 ---------- */
 
