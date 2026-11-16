@@ -239,6 +239,21 @@ def main():
         code, _, raw = req(port, "/api/config/remote")
         check(json.loads(raw).get("pending") is False, "③d 补丁应用完清空待办")
 
+        # ③e 文字与话术也能远程改（B3 后续批）
+        code, _, raw = req(port, "/api/config/remote/patch", "POST",
+                           {"format": "rhythm-config-patch/v1",
+                            "texts": {"reminders": {"default": "戴好红领巾，带好水杯"}},
+                            "phrases": ["翻到第 12 页", "现在交作业"]})
+        check(code == 200, "③e 文字/话术补丁收下", code)
+        code, _, raw = req(port, "/api/config/remote")
+        d = json.loads(raw)
+        p = d.get("patch") or {}
+        check(d.get("kind") == "patch"
+              and (p.get("texts") or {}).get("reminders", {}).get("default") == "戴好红领巾，带好水杯"
+              and p.get("phrases") == ["翻到第 12 页", "现在交作业"],
+              "③e 待办里带着文字与话术", d.get("kind"))
+        req(port, "/api/config/remote/ack", "POST", {"ok": True})
+
         # ④ 发一条
         code, _, raw = req(port, "/api/messages", "POST",
                            {"text": "现在到走廊集合", "level": "urgent", "minutes": 10})

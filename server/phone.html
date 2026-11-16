@@ -115,6 +115,23 @@
   .per .day input:focus{outline:none}
   .per .day input + input{border-left:1.5px solid var(--line);padding-left:8px}
 
+  /* 提醒文字 / 话术 */
+  .txtRow{display:flex;align-items:center;gap:8px;margin:0 0 8px;
+    background:#FFFDF6;border:2px solid var(--line);border-radius:10px;padding:7px 10px}
+  .txtRow b{flex:none;max-width:88px;font-size:12px;color:var(--ink3);
+    font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .txtRow input{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);
+    font-family:inherit;font-size:16px;padding:2px 0}
+  .txtRow input:focus{outline:none}
+  .phRow{display:flex;align-items:center;gap:8px;margin:0 0 8px;
+    background:#FFFDF6;border:2px solid var(--line);border-radius:10px;padding:6px 8px 6px 10px}
+  .phRow input{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);
+    font-family:inherit;font-size:16px;padding:3px 0}
+  .phRow input:focus{outline:none}
+  .phRow .del{flex:none;border:2px solid var(--line);background:var(--card);color:#B02A22;
+    border-radius:8px;padding:5px 10px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+  .cfgMini{margin:0 0 14px;padding:10px;background:#FFFDF6;box-shadow:none;font-weight:600}
+
   /* 现在屏上是什么 */
   .live{display:none;margin-bottom:14px;padding:13px 15px;border-radius:16px 13px 15px 12px;
     background:var(--yellow);border:2px solid var(--line);
@@ -230,6 +247,13 @@
     <div class="label">课表（科目 / 任课老师）</div>
     <div id="cfgTable"></div>
 
+    <div class="label">提醒文字</div>
+    <div id="cfgTexts"></div>
+
+    <div class="label">常用话术</div>
+    <div id="cfgPhrases"></div>
+    <button class="cfgbtn cfgMini" id="cfgPhraseAdd">＋ 添加一条话术</button>
+
     <button class="send" id="cfgSave">改完，发到大屏</button>
   </div>
 
@@ -270,7 +294,10 @@
     cfgKlass: document.getElementById("cfgKlass"),
     cfgBlocks: document.getElementById("cfgBlocks"),
     cfgTable: document.getElementById("cfgTable"),
-    cfgSave: document.getElementById("cfgSave")
+    cfgSave: document.getElementById("cfgSave"),
+    cfgTexts: document.getElementById("cfgTexts"),
+    cfgPhrases: document.getElementById("cfgPhrases"),
+    cfgPhraseAdd: document.getElementById("cfgPhraseAdd")
   };
 
   var level = "normal";
@@ -566,6 +593,58 @@
       });
   }
 
+  /* 提醒文字：texts 是嵌套对象，递归摊平成「路径标签 + 输入框」，
+     改哪个字段就写回哪个字段；结构上没有名册，可以放心展示。 */
+  function renderTexts(obj, path, box) {
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k];
+      if (v && typeof v === "object") {
+        renderTexts(v, path ? path + " · " + k : k, box);
+        return;
+      }
+      var row = document.createElement("div");
+      row.className = "txtRow";
+      var b = document.createElement("b");
+      b.textContent = path ? path + " · " + k : k;
+      var inp = document.createElement("input");
+      inp.value = String(v == null ? "" : v);
+      inp.addEventListener("input", function () { obj[k] = inp.value; });
+      row.appendChild(b);
+      row.appendChild(inp);
+      box.appendChild(row);
+    });
+  }
+
+  function renderPhrases() {
+    el.cfgPhrases.textContent = "";
+    (cfgState.phrases || []).forEach(function (ph, i) {
+      var row = document.createElement("div");
+      row.className = "phRow";
+      var inp = document.createElement("input");
+      inp.value = ph;
+      inp.addEventListener("input", function () { cfgState.phrases[i] = inp.value; });
+      var del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "删";
+      del.addEventListener("click", function () {
+        cfgState.phrases.splice(i, 1);
+        renderPhrases();
+      });
+      row.appendChild(inp);
+      row.appendChild(del);
+      el.cfgPhrases.appendChild(row);
+    });
+  }
+
+  el.cfgPhraseAdd.addEventListener("click", function () {
+    if (!cfgState) return;
+    if (!Array.isArray(cfgState.phrases)) cfgState.phrases = [];
+    cfgState.phrases.push("");
+    renderPhrases();
+    var rows = el.cfgPhrases.querySelectorAll("input");
+    if (rows.length) rows[rows.length - 1].focus();
+  });
+
   el.cfgLoad.addEventListener("click", function () {
     el.cfgLoad.disabled = true;
     fetch(API + "/api/config/remote/state", { cache: "no-store" })
@@ -579,6 +658,9 @@
         el.cfgKlass.value = (cfgState.config.meta || {}).klass || "";
         renderBlocks();
         renderTable();
+        el.cfgTexts.textContent = "";
+        renderTexts(cfgState.texts || {}, "", el.cfgTexts);
+        renderPhrases();
         el.cfgEditor.hidden = false;
         toast("已读到大屏当前设置");
       })
@@ -600,7 +682,10 @@
         meta: { klass: klass },
         timetable: cfgState.config.timetable,
         schedule: cfgState.config.schedule
-      }
+      },
+      texts: cfgState.texts || {},
+      phrases: (cfgState.phrases || []).map(function (s) { return String(s).trim(); })
+                                       .filter(function (s) { return s; })
     };
     el.cfgSave.disabled = true;
     fetch(API + "/api/config/remote/patch", {
