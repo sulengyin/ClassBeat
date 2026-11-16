@@ -7,9 +7,10 @@
 产物：dist/<包名>-YYYYMMDD.zip
 
 只装运行需要的东西：
-  · app/      大屏本体（file:// 直接能开，配置已内联在 data.js）
-  · server/   手机发消息（可选，需要电脑装 Python）
-不带 tools / data / out，老师用不到，反而会误改。
+  · app/             大屏本体（file:// 直接能开，配置已内联在 data.js）
+  · server/          手机发消息（可选，需要电脑装 Python）
+  · tools/launcher/  全屏启动器 + 看门狗 + 自启 + 逃生门（2026-11-16 起，学校每天关机，开机自动就绪是稳定性的第一道关）
+不带 data / out，老师用不到，反而会误改。
 """
 
 from __future__ import annotations
@@ -88,6 +89,15 @@ APP_FILES = [
     "vendor/qrcode.min.js",
 ]
 SERVER_FILES = ["rhythm_server.py", "run.py", "phone.html", "update_manifest.py", "updater.py"]
+
+# 全屏启动器与自动恢复（ROADMAP 9.3 第一档 + 9.6 + 9.9 逃生门）。
+# 逐个列出，和 APP_FILES 同一个理由：免得把调试残留（*.log、stop.flag）带进包。
+LAUNCHER = ROOT / "tools" / "launcher"
+LAUNCHER_FILES = [
+    "start-kiosk.ps1", "start-kiosk.cmd",
+    "exit-kiosk.ps1", "exit-kiosk.cmd",
+    "watchdog.ps1", "install-autostart.ps1",
+]
 
 # .bat 内容保持纯 ASCII：cmd 默认 GBK，中文容易花
 # 大屏优先走本机服务：同一个来源，端口顺延也能跟上；没有 Python 才退回 file://。
@@ -193,6 +203,71 @@ BAT_STOP = (
     "echo.\r\n"
     "echo   没有找到正在运行的服务（可能已经停了）。\r\n"
     "timeout /t 4 >nul\r\n"
+)
+
+# 全屏启动（tools/launcher/start-kiosk.cmd）：没有地址栏和关闭按钮，
+# 给教室日常用；普通窗口用「打开大屏.bat」。
+BAT_KIOSK = (
+    "@echo off\r\n"
+    "title 大屏全屏启动\r\n"
+    "cd /d \"%~dp0\"\r\n"
+    "if not exist \"tools\\launcher\\start-kiosk.ps1\" goto missing\r\n"
+    "powershell -NoProfile -ExecutionPolicy Bypass -File \"tools\\launcher\\start-kiosk.ps1\"\r\n"
+    "if errorlevel 1 (\r\n"
+    "  echo.\r\n"
+    "  echo   全屏启动失败，看 tools\\launcher\\launcher.log 最后几行。\r\n"
+    "  echo   常见原因：没找到 Chrome 或 Edge、端口被占用、没找到 Python。\r\n"
+    "  pause\r\n"
+    ")\r\n"
+    "exit /b 0\r\n"
+    "\r\n"
+    ":missing\r\n"
+    "echo   包不完整：缺少 tools\\launcher\\start-kiosk.ps1。\r\n"
+    "echo   先用「打开大屏.bat」也能正常看屏。\r\n"
+    "pause\r\n"
+    "exit /b 1\r\n"
+)
+
+# 逃生门：kiosk 没有关闭按钮，这是唯一固定出口（ROADMAP 9.9）。
+# 它会先让看门狗停手再关窗口，所以不会出现「关了又被拉回来」。
+BAT_EXIT = (
+    "@echo off\r\n"
+    "title 退出大屏\r\n"
+    "cd /d \"%~dp0\"\r\n"
+    "if not exist \"tools\\launcher\\exit-kiosk.ps1\" goto missing\r\n"
+    "powershell -NoProfile -ExecutionPolicy Bypass -File \"tools\\launcher\\exit-kiosk.ps1\"\r\n"
+    "echo.\r\n"
+    "echo   要回大屏：双击「大屏全屏.bat」。\r\n"
+    "echo   想每天开机自动回到大屏：双击「安装开机自启.bat」。\r\n"
+    "timeout /t 6 >nul\r\n"
+    "exit /b 0\r\n"
+    "\r\n"
+    ":missing\r\n"
+    "echo   包不完整：缺少 tools\\launcher\\exit-kiosk.ps1。\r\n"
+    "pause\r\n"
+    "exit /b 1\r\n"
+)
+
+# 开机自启（当前用户启动文件夹放快捷方式，不动注册表、不需要管理员）。
+# 学校每天关机（2026-11-16 确认），每天开机自动回到大屏是硬需求。
+BAT_AUTOSTART = (
+    "@echo off\r\n"
+    "title 安装开机自启\r\n"
+    "cd /d \"%~dp0\"\r\n"
+    "if not exist \"tools\\launcher\\install-autostart.ps1\" goto missing\r\n"
+    "echo.\r\n"
+    "echo   接下来会在当前用户的启动文件夹放一个快捷方式：\r\n"
+    "echo   每天开机登录后，自动启动看门狗并回到大屏，不用人工干预。\r\n"
+    "echo   不动注册表，不需要管理员权限；想撤销再双击一次，按提示选卸载即可。\r\n"
+    "echo.\r\n"
+    "powershell -NoProfile -ExecutionPolicy Bypass -File \"tools\\launcher\\install-autostart.ps1\"\r\n"
+    "pause\r\n"
+    "exit /b 0\r\n"
+    "\r\n"
+    ":missing\r\n"
+    "echo   包不完整：缺少 tools\\launcher\\install-autostart.ps1。\r\n"
+    "pause\r\n"
+    "exit /b 1\r\n"
 )
 
 
@@ -376,7 +451,30 @@ Windows 也可以用文件夹里的：
 不装也可以，大屏单独跑完全没问题。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-六、这次重点看什么（都还没在真机上验证过）
+六、全屏、开机自启与退出（可选，2026-11-16 起随包提供）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+教室日常建议用全屏方式跑（没有地址栏、标签页和关闭按钮，学生点不到）：
+
+  双击「大屏全屏.bat」——自动起服务，再用 Chrome 或 Edge 全屏打开。
+  重复双击也不会开第二个窗口。
+
+页面被误关（比如移动黑板蹭到）：
+  双击「大屏全屏.bat」就能回来；装了开机自启的话，看门狗会自己拉起，
+  不用管。看门狗一分钟最多拉 3 次，防止反复弹窗。
+
+想每天开机自动回到大屏（学校每天关机也能用）：
+  双击「安装开机自启.bat」——只在当前用户的启动文件夹放一个快捷方式，
+  不动注册表、不需要管理员权限。撤销：再双击一次，按提示卸载。
+
+需要临时回到 Windows 桌面（比如要拷课件、操作别的软件）：
+  双击「退出大屏.bat」——它会先让看门狗停手再关全屏窗口，
+  不会出现「关了又被拉回来」。要回大屏，再双击「大屏全屏.bat」。
+
+这些工具在包里的 tools\\launcher\\ 文件夹；日志（launcher.log、
+watchdog.log、exit-kiosk.log）也在那里，排错看最后几行。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+七、这次重点看什么（都还没在真机上验证过）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 □ 最后一排能不能看清主字（75 寸、8 米）
 □ 白天开灯，屏幕反光有没有影响
@@ -390,14 +488,14 @@ Windows 也可以用文件夹里的：
 □ 换一台时区设错的电脑打开，右上角时钟是不是仍然是北京时间
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-七、出问题怎么办
+八、出问题怎么办
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 页面卡住：关掉浏览器重开，改动不会丢。
 想恢复出厂：编辑 → 文字 → 「全部恢复系统默认」。
 想重来一遍今天的改动：编辑 → 「撤销上一步」。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-八、隐私：别把改过的文件夹发给别人
+九、隐私：别把改过的文件夹发给别人
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. 这个包里是示例班级（化名），不是真实学生，可以随便试。
 2. 你改成本班之后，学生姓名、老师姓名就存在这个文件夹里。
@@ -429,6 +527,13 @@ def collect() -> list[tuple[Path, str]]:
             missing.append(str(p))
         else:
             items.append((p, f"server/{name}"))
+
+    for name in LAUNCHER_FILES:
+        p = LAUNCHER / name
+        if not p.exists():
+            missing.append(str(p))
+        else:
+            items.append((p, f"tools/launcher/{name}"))
 
     if missing:
         sys.exit("缺少文件：\n  " + "\n  ".join(missing))
@@ -516,6 +621,9 @@ def main() -> None:
         z.writestr(f"{name}/打开演练版.bat", bat_bytes(BAT_DEMO))
         z.writestr(f"{name}/启动手机服务.bat", bat_bytes(BAT_SERVER))
         z.writestr(f"{name}/停止手机服务.bat", bat_bytes(BAT_STOP))
+        z.writestr(f"{name}/大屏全屏.bat", bat_bytes(BAT_KIOSK))
+        z.writestr(f"{name}/退出大屏.bat", bat_bytes(BAT_EXIT))
+        z.writestr(f"{name}/安装开机自启.bat", bat_bytes(BAT_AUTOSTART))
 
     listed = write_manifest(zip_path, name)
 
