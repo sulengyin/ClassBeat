@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#FBF3DF">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <title>发到教室</title>
 <style>
   /* 和大屏同一套：奶油方格纸、深棕描边、亮黄主色 */
@@ -121,6 +124,11 @@
   <div class="net"><span class="dot"></span><b id="host">连接中</b></div>
 </header>
 
+<div class="pwa" id="pwa">
+  <button id="pwaInstall">安装到主屏幕</button>
+  <i id="pwaIos" hidden>iPhone：分享 → 添加到主屏幕</i>
+</div>
+
 <div class="live" id="live">
   <div class="lv">
     <b id="liveText"></b>
@@ -182,7 +190,10 @@
     liveText: document.getElementById("liveText"),
     liveMeta: document.getElementById("liveMeta"),
     retract: document.getElementById("retract"),
-    mins: document.getElementById("mins")
+    mins: document.getElementById("mins"),
+    pwa: document.getElementById("pwa"),
+    pwaInstall: document.getElementById("pwaInstall"),
+    pwaIos: document.getElementById("pwaIos")
   };
 
   var level = "normal";
@@ -193,6 +204,38 @@
   /* ---------- 连接信息 ---------- */
 
   el.host.textContent = location.host;
+
+  /* ---------- 安装到主屏幕（PWA，ROADMAP 9.4 P2 B1） ----------
+     Chromium 系（安卓/鸿蒙）会给 beforeinstallprompt，一键安装；
+     iPhone 没有这个事件，只能给指引：分享 → 添加到主屏幕。
+     已经装成独立窗口的（display-mode: standalone）不再提示。 */
+  (function () {
+    if (window.matchMedia("(display-mode: standalone)").matches
+        || window.navigator.standalone) return;
+    var deferred = null;
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      deferred = e;
+      el.pwa.classList.add("show");
+    });
+    el.pwaInstall.addEventListener("click", function () {
+      if (!deferred) return;
+      deferred.prompt();
+      deferred.userChoice.then(function () {
+        deferred = null;
+        el.pwa.classList.remove("show");
+      });
+    });
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)
+        && !window.MSStream) {
+      el.pwaIos.hidden = false;
+      el.pwa.classList.add("show");
+    }
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/phone-sw.js", { scope: "/phone" })
+        .catch(function () { });   // 注册不上就当普通页面用，不报错
+    }
+  })();
 
   fetch(API + "/api/ping", { cache: "no-store" })
     .then(function (r) { return r.json(); })
@@ -316,6 +359,15 @@
         setTimeout(function () { el.send.disabled = false; }, 900);
       });
   });
+
+  /* ---------- 安装到主屏幕（PWA，ROADMAP 9.4 P2 B1） ---------- */
+  .pwa{display:none;margin:0 0 12px;align-items:center;gap:10px;
+    font-size:12.5px;color:var(--ink3)}
+  .pwa.show{display:flex}
+  .pwa button{padding:7px 12px;border:2px solid var(--line);border-radius:10px;
+    background:var(--yellow);font:700 13px inherit;color:var(--ink);
+    box-shadow:2px 2px 0 rgba(58,42,30,.18);cursor:pointer}
+  .pwa i{font-style:normal}
 
   /* ---------- 历史 ---------- */
 

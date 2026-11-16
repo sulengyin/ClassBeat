@@ -495,6 +495,12 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ("/", "/index.html", "/phone"):
             return self._phone()
+        if path == "/manifest.json":
+            return self._manifest()
+        if path == "/phone-sw.js":
+            return self._sw()
+        if path.startswith("/icons/"):
+            return self._icon(path[len("/icons/"):])
         if path in ("/version", "/api/version"):
             # 轻量自检：只报版本、构建号、启动时间，不暴露路径和用户名
             ver = app_version()
@@ -614,6 +620,58 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:
             return self._err("phone.html 缺失", 500)
         self._common(200, "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _manifest(self):
+        """PWA 清单：班名跟着数据走（班级差异只进配置），scope 只圈手机页。"""
+        klass = CONF.get("klass") or "班级"
+        body = json.dumps({
+            "name": f"节律屏 · {klass}",
+            "short_name": "节律屏",
+            "description": "教室大屏的随身入口：发消息、看屏上现在是什么",
+            "start_url": "/phone",
+            "scope": "/phone",
+            "display": "standalone",
+            "orientation": "portrait",
+            "background_color": "#FBF3DF",
+            "theme_color": "#FBF3DF",
+            "icons": [
+                {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+                {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+            ],
+        }, ensure_ascii=False, indent=2).encode("utf-8")
+        self._common(200, "application/manifest+json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _sw(self):
+        """手机页的 Service Worker。Service-Worker-Allowed 只放行 /phone，
+        就算有人把它注册到大范围，浏览器也会拒绝。"""
+        try:
+            with open(os.path.join(BASE, "sw.js"), "rb") as f:
+                body = f.read()
+        except OSError:
+            return self._err("sw.js 缺失", 500)
+        self._common(200, "application/javascript; charset=utf-8")
+        self.send_header("Service-Worker-Allowed", "/phone")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _icon(self, name):
+        """图标只认白名单里的两个名字，别的 404——不给读任意文件的机会。"""
+        if name not in ("icon-192.png", "icon-512.png"):
+            return self._err("not found", 404)
+        try:
+            with open(os.path.join(BASE, "icons", name), "rb") as f:
+                body = f.read()
+        except OSError:
+            return self._err("not found", 404)
+        self._common(200, "image/png")
+        self.send_header("Cache-Control", "public, max-age=86400")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

@@ -122,6 +122,31 @@ def main():
         check(code == 200 and "发到教室" in html and "紧急" in html,
               "③ 手机发送页能打开", f"{len(raw)} 字节")
 
+        # ③b 手机页 PWA 化（ROADMAP 9.2 / 9.4 P2 B1）
+        code, head, raw = req(port, "/manifest.json")
+        d = json.loads(raw)
+        check(code == 200 and "节律屏" in d.get("name", "") and d.get("display") == "standalone"
+              and d.get("scope") == "/phone",
+              "③b manifest：班名入名、standalone、scope 只圈手机页", d.get("name"))
+        check(all(i.get("src") and i.get("sizes") for i in d.get("icons", []))
+              and len(d.get("icons", [])) >= 2,
+              "③b manifest 图标齐全", str(len(d.get("icons", []))) + " 个")
+        code, head, raw = req(port, "/phone-sw.js")
+        check(code == 200 and head.get("Service-Worker-Allowed") == "/phone"
+              and "javascript" in head.get("Content-Type", ""),
+              "③b sw.js 可取且 scope 只放行手机页", head.get("Service-Worker-Allowed"))
+        for icon in ("icons/icon-192.png", "icons/icon-512.png"):
+            code, head, raw = req(port, "/" + icon)
+            check(code == 200 and raw[:8] == b"\x89PNG\r\n\x1a\n"
+                  and "image/png" in head.get("Content-Type", ""),
+                  f"③b 图标 {icon}", f"{len(raw)} 字节")
+        code, _, raw = req(port, "/icons/icon-96.png")
+        check(code == 404, "③b 未登记的图标不给读", code)
+        code, head, raw = req(port, "/phone")
+        html = raw.decode("utf-8")
+        check("manifest.json" in html and "phone-sw.js" in html,
+              "③b 手机页挂上 manifest 与 SW 注册")
+
         # ④ 发一条
         code, _, raw = req(port, "/api/messages", "POST",
                            {"text": "现在到走廊集合", "level": "urgent", "minutes": 10})
