@@ -146,6 +146,52 @@ def main():
         html = raw.decode("utf-8")
         check("manifest.json" in html and "phone-sw.js" in html,
               "③b 手机页挂上 manifest 与 SW 注册")
+        check("config/remote" in html and "cfgSend" in html,
+              "③b 手机页挂上「改教室设置」入口（B2）")
+
+        # ③c 远程改配置（ROADMAP 9.4 P2 B2）：手机送配置 → 大屏取走 → ack
+        hub._remote_result.update({"ok": None, "why": "", "at": ""})
+        try:
+            os.remove(hub._remote_path())
+        except OSError:
+            pass
+        code, _, raw = req(port, "/api/config/remote")
+        d = json.loads(raw)
+        check(code == 200 and d.get("pending") is False and d.get("config") is None,
+              "③c 开局没有待应用的远程配置", str(d.get("pending")))
+        cfg = {"format": "rhythm-config/v1", "schemaVersion": 1, "savedAt": "2026-11-16T00:00:00Z",
+               "config": {"meta": {"klass": "远程测试班"},
+                          "schedule": {"entries": []}, "timetable": {"blocks": []}}}
+        code, _, raw = req(port, "/api/config/remote", "POST", cfg)
+        d = json.loads(raw)
+        check(code == 200 and d.get("ok") and isinstance(d.get("receivedAt"), int),
+              "③c 手机送来一份设置", str(d.get("receivedAt")))
+        code, _, raw = req(port, "/api/config/remote")
+        d = json.loads(raw)
+        check(d.get("pending") is True and (d.get("config") or {}).get("format") == "rhythm-config/v1"
+              and ((d.get("config") or {}).get("config") or {}).get("meta", {}).get("klass") == "远程测试班",
+              "③c 大屏能取到待应用配置", str((d.get("config") or {}).get("config", {}).get("meta", {})))
+        code, _, raw = req(port, "/api/config/remote", "POST",
+                           {"format": "not-ours", "x": 1})
+        check(code == 400, "③c 不是节律屏的设置当场拒绝", code)
+        code, _, raw = req(port, "/api/config/remote/ack", "POST", {"ok": True, "why": ""})
+        d = json.loads(raw)
+        check(code == 200 and d.get("ok"), "③c 大屏应用成功后 ack 取走待办", code)
+        code, _, raw = req(port, "/api/config/remote")
+        d = json.loads(raw)
+        check(d.get("pending") is False and (d.get("result") or {}).get("ok") is True,
+              "③c ack 后清空，结果可查", str(d.get("result")))
+        req(port, "/api/config/remote", "POST", cfg)
+        code, _, raw = req(port, "/api/config/remote/ack", "POST",
+                           {"ok": False, "why": "设置里的「课表」格式不对"})
+        check(code == 200, "③c 应用失败也要 ack（大屏配置一个字不动）", code)
+        code, _, raw = req(port, "/api/config/remote")
+        d = json.loads(raw)
+        check(d.get("pending") is False and (d.get("result") or {}).get("ok") is False
+              and "课表" in str((d.get("result") or {}).get("why", "")),
+              "③c 失败原因留在结果里", str(d.get("result")))
+        code, _, raw = req(port, "/api/config/remote/ack", "POST", {"ok": True})
+        check(code == 404, "③c 没有待办时 ack 不重复清", code)
 
         # ④ 发一条
         code, _, raw = req(port, "/api/messages", "POST",

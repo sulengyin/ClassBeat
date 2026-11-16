@@ -234,3 +234,25 @@ test("紧急通知走大字区，而不是角落的小提示条", async ({ page,
   await expect(page.locator("#bandText")).toHaveText("紧急通知");
   await expect(page.locator("#heroMain")).toContainText("现在立刻到走廊排队");
 });
+
+test("手机送来的远程设置，屏上几十秒内生效（P2 B2）", async ({ page, request }) => {
+  // 不传时间点：不装假时钟，页内的 15 秒轮询才能真的跑起来
+  await openScreen(page);
+
+  // 用屏上真实导出的整份设置当底稿，只改班名——这是老师会做的事
+  const cfg = await page.evaluate(() => Store.exportAll());
+  cfg.config.meta.klass = "远程测试班";
+  const resp = await request.post("/api/config/remote", { data: cfg });
+  expect(resp.ok(), "服务应该收下这份设置").toBeTruthy();
+
+  // 大屏轮询取走 → Store.importAll 整份应用 → 渲染刷新，标题跟着换班名
+  await expect(page).toHaveTitle(/远程测试班/, { timeout: 30_000 });
+
+  // 应用完要 ack：服务端清掉待办，结果「成功」可查。
+  // 标题在 importAll 里同步就换掉了，ack 是后一步异步发的，所以这里等它落地。
+  await expect(async () => {
+    const done = await (await request.get("/api/config/remote")).json();
+    expect(done.pending, "应用完就清掉待办，不会反复应用").toBeFalsy();
+    expect(done.result && done.result.ok, "ack 结果是成功").toBeTruthy();
+  }).toPass({ timeout: 15_000 });
+});
