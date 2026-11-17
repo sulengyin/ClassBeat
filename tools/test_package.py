@@ -33,6 +33,7 @@ need = [
     "tools/launcher/exit-kiosk.cmd",
     "tools/launcher/watchdog.ps1",
     "tools/launcher/install-autostart.ps1",
+    "tools/launcher/classbeat.ico",
 ]
 missing = [n for n in need if n not in items]
 check("打包清单包含启动器与逃生门", not missing, "缺：" + ", ".join(missing) if missing else "")

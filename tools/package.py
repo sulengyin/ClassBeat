@@ -101,6 +101,7 @@ LAUNCHER_FILES = [
     "start-kiosk.ps1", "start-kiosk.cmd",
     "exit-kiosk.ps1", "exit-kiosk.cmd",
     "watchdog.ps1", "install-autostart.ps1",
+    "classbeat.ico",
 ]
 
 # .bat 内容保持纯 ASCII：cmd 默认 GBK，中文容易花
@@ -262,6 +263,7 @@ BAT_AUTOSTART = (
     "echo.\r\n"
     "echo   接下来会在当前用户的启动文件夹放一个快捷方式：\r\n"
     "echo   每天开机登录后，自动启动看门狗并回到大屏，不用人工干预。\r\n"
+    "echo   同时会在桌面建一个「班级节律屏」图标，双击直接全屏大屏。\r\n"
     "echo   不动注册表，不需要管理员权限；想撤销再双击一次，按提示选卸载即可。\r\n"
     "echo.\r\n"
     "powershell -NoProfile -ExecutionPolicy Bypass -File \"tools\\launcher\\install-autostart.ps1\"\r\n"
@@ -468,7 +470,9 @@ Windows 也可以用文件夹里的：
 
 想每天开机自动回到大屏（学校每天关机也能用）：
   双击「安装开机自启.bat」——只在当前用户的启动文件夹放一个快捷方式，
-  不动注册表、不需要管理员权限。撤销：再双击一次，按提示卸载。
+  并在桌面建一个「班级节律屏」图标（贴纸时钟图标，双击直接全屏大屏），
+  不动注册表、不需要管理员权限。撤销：再双击一次，按提示卸载
+  （桌面图标也会一并移除）。
 
 需要临时回到 Windows 桌面（比如要拷课件、操作别的软件）：
   双击「退出大屏.bat」——它会先让看门狗停手再关全屏窗口，

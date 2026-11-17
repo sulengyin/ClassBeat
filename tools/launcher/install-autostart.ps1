@@ -27,9 +27,18 @@ if ($TargetScript -eq '') {
 $startupDir = [Environment]::GetFolderPath('Startup')
 $lnkPath = Join-Path $startupDir 'ClassBeat 大屏自动恢复.lnk'
 
+# 桌面图标：老师眼里「桌面上一个图标，双击就开」。包根下有
+# 「大屏全屏.bat」才建（仓库源码里没有，安静跳过不影响自启）。
+$pkgRoot = Split-Path -Parent $scriptDir
+$kioskBat = Join-Path $pkgRoot '大屏全屏.bat'
+$icoPath = Join-Path $scriptDir 'classbeat.ico'
+$desktop = [Environment]::GetFolderPath('Desktop')
+$deskLnk = Join-Path $desktop '班级节律屏.lnk'
+
 Write-Output '本次要操作的路径：'
 Write-Output ('  启动文件夹：' + $startupDir)
 Write-Output ('  快捷方式：  ' + $lnkPath)
+Write-Output ('  桌面图标：  ' + $deskLnk)
 
 if (-not $Remove) {
   Write-Output ('  目标程序：  powershell.exe')
@@ -39,9 +48,9 @@ if (-not $Remove) {
 
 if ($DryRun) {
   if ($Remove) {
-    Write-Output '[DRYRUN] 会删除上面的快捷方式（如果存在）。'
+    Write-Output '[DRYRUN] 会删除上面的快捷方式与桌面图标（如果存在）。'
   } else {
-    Write-Output '[DRYRUN] 会写入上面的快捷方式，内容就是上面打印的目标程序与参数。'
+    Write-Output '[DRYRUN] 会写入上面的快捷方式与桌面图标，内容就是上面打印的目标程序与参数。'
   }
   exit 0
 }
@@ -57,6 +66,10 @@ if ($Remove) {
     }
   } else {
     Write-Output '没有找到该快捷方式，可能从未安装。'
+  }
+  if (Test-Path $deskLnk) {
+    Remove-Item -Path $deskLnk -Force -ErrorAction SilentlyContinue
+    Write-Output '已删除桌面图标。'
   }
   exit 0
 }
@@ -92,4 +105,21 @@ try {
 } catch {
   Write-Output ('写入失败：' + $_.Exception.Message)
   exit 1
+}
+
+# 桌面图标：双击直接全屏大屏；缺文件就跳过，不影响自启
+try {
+  if (Test-Path $kioskBat) {
+    $dsc = $wsh.CreateShortcut($deskLnk)
+    $dsc.TargetPath = $kioskBat
+    $dsc.WorkingDirectory = $pkgRoot
+    $dsc.Description = '打开班级节律屏（全屏）'
+    if (Test-Path $icoPath) { $dsc.IconLocation = $icoPath }
+    $dsc.Save()
+    Write-Output ('已写入桌面图标：' + $deskLnk)
+  } else {
+    Write-Output '没有找到「大屏全屏.bat」，跳过桌面图标（不影响开机自启）。'
+  }
+} catch {
+  Write-Output ('桌面图标写入失败（不影响开机自启）：' + $_.Exception.Message)
 }
