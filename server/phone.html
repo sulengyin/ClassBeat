@@ -341,6 +341,25 @@
     }
   })();
 
+  /* ---------- 容器「复活」兜底（2026-11-17 钉钉真机发现） ----------
+     钉钉把页面留在容器里，第二次点进来有时只剩一块白屏。
+     bfcache 恢复（pageshow.persisted）直接整页刷新；
+     从后台回到前台时探一次活，探不通也整页刷新。
+     页面本来 15 秒轮询，刷新代价可接受。 */
+  window.addEventListener("pageshow", function (e) {
+    if (e.persisted) location.reload();
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    if (!document.body || document.body.childElementCount === 0) {
+      location.reload();
+      return;
+    }
+    fetch(API + "/api/ping", { cache: "no-store" }).catch(function () {
+      location.reload();
+    });
+  });
+
   fetch(API + "/api/ping", { cache: "no-store" })
     .then(function (r) { return r.json(); })
     .then(function (d) {
