@@ -101,7 +101,11 @@
   .blk input:focus{outline:none}
   .blk time{font-family:var(--mono);font-size:12px;color:var(--ink3);
     display:flex;flex-direction:column;gap:4px;flex:none}
-  .blk time input{width:74px;font-size:15px;border:1.5px solid var(--line);
+  /* 时间输入不给固定宽度：安卓/钉钉内置浏览器的 type=time 控件比
+     预设宽（2026-11-17 真机：74px 把 08:10 裁成 08:1），改成自适应
+     + 最小宽度，值永远完整可见。字号 16px：iOS 对 <16px 的输入框
+     聚焦时会把整页放大（与 #text 同一条守则）。 */
+  .blk time input{width:auto;min-width:5.6em;font-size:16px;border:1.5px solid var(--line);
     border-radius:7px;padding:4px 5px;background:#FFF;color:var(--ink);text-align:center}
   .per{margin:0 0 10px;border:2px solid var(--line);border-radius:10px;
     background:#FFFDF6;overflow:hidden}

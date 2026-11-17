@@ -280,6 +280,14 @@ test("手机上改班名，屏上几十秒内生效（P2 B3）", async ({ page, 
   await page.goto("/");
   await page.locator("#cfgLoad").click();
   await expect(page.locator("#cfgEditor")).toBeVisible();
+  // 时间框不许裁字：宽度要装得下 08:10（真机 2026-11-17 裁成 08:1）
+  const phoneTimeOk = await page.evaluate(() =>
+    [...document.querySelectorAll(".blk time input")].every((i) => {
+      const fs = parseFloat(getComputedStyle(i).fontSize);
+      return i.clientWidth >= fs * 5.2;  // clientWidth 不含边框，阈值别贴着 min-width
+    })
+  );
+  expect(phoneTimeOk, "手机端时间框太窄会把 08:10 裁成 08:1").toBeTruthy();
   await expect(page.locator("#cfgKlass")).toHaveValue("五（1）班");
   await expect(page.locator("#cfgBlocks input[type=time]").first()).toHaveValue("08:20");
   await page.locator("#cfgKlass").fill("手机改的班");
@@ -337,4 +345,35 @@ test("手机上改提醒文字和话术，屏上生效（P2 B3）", async ({ pag
     expect(got.text, "提醒文字要换").toBe("戴好红领巾，带好水杯");
     expect(got.phrases, "话术要换").toEqual(["翻到第 20 页"]);
   }).toPass({ timeout: 30_000 });
+});
+
+test("大屏编辑态的作息时间框不裁字（真机 2026-11-17）", async ({ page, request }) => {
+  await openScreen(page, ARRIVE);
+  const ping = await (await request.get("/api/ping")).json();
+
+  await openTools(page);
+  await page.locator("#btn-edit").click();
+  await expect(page.locator(".gate")).toBeVisible();
+  const q = await page.locator("#gateQ").innerText();
+  const m = q.match(/([0-9]+\.[0-9]+)\s*÷\s*([0-9]+)/);
+  const answer = (Number(m[1]) / Number(m[2])).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  const tap = async (text) => {
+    for (const ch of text) {
+      await page.locator(".gk", { hasText: new RegExp(`^${ch === "." ? "\\." : ch}$`) }).click();
+    }
+  };
+  await tap(answer);
+  await page.locator(".gk.primary").click();
+  await expect(page.locator("#epTitle")).toContainText(ping.class);
+
+  await page.locator(".ep-tab", { hasText: "作息" }).click();
+  await expect(page.locator(".tt-row").first()).toBeVisible();
+  // 每个时间框都要装得下 08:10：宽度至少 5.5 个字（值 5 字符 + 余量）
+  const ok = await page.evaluate(() =>
+    [...document.querySelectorAll(".tt-time")].every((i) => {
+      const fs = parseFloat(getComputedStyle(i).fontSize);
+      return i.clientWidth >= fs * 5.2;  // clientWidth 不含边框，阈值别贴着 min-width
+    })
+  );
+  expect(ok, "大屏时间框太窄会把 08:10 裁成 08:1").toBeTruthy();
 });
