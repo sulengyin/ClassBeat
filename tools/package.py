@@ -276,6 +276,19 @@ BAT_AUTOSTART = (
     "exit /b 1\r\n"
 )
 
+# 程序内更新的更新源（2026-11-17 P2 9.5）。服务启动时读这一行的
+# 第一个非注释 URL（rhythm_server.default_update_url）。默认走 Gitee
+# ——老师环境直连 GitHub 不方便（2026-11-17 用户确认）；换源只改这个
+# 文件，升级不会覆盖它（更新器只替换 app/、server/ 和 .bat）。
+UPDATE_SOURCE = """\
+# 班级节律屏 · 程序内更新源
+# 服务每次启动会读下面第一个不以 # 开头的网址；一行一个，多余的忽略。
+# 默认是 Gitee 静态源（国内直连快）。换源：把这一行改成你的地址即可，
+# 例如校内静态站 http://192.168.1.10:8000/update.json。
+# 改完重启服务（退出大屏再双击「大屏全屏.bat」）就生效。
+https://gitee.com/sulengyin/ClassBeat/raw/master/update.json
+"""
+
 
 # 官方免安装运行时：解压即用，不需要安装、不需要管理员权限、不碰 PATH。
 # 一体机通常是学校统一管的，装软件要审批——这 11 MB 换掉一次审批。
@@ -482,6 +495,17 @@ Windows 也可以用文件夹里的：
 watchdog.log、exit-kiosk.log）也在那里，排错看最后几行。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+六之一、程序内更新（可选，2026-11-17 起随包提供）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+不用重新下载安装包，屏上就能升级：大屏右下角「⋯」菜单里的
+「检查更新」，有新版就点「应用」，服务会自动备份、替换、重启生效。
+
+更新源写在包根目录的 update-source.txt 里（一行网址，# 开头的是
+说明行）。本包默认走 Gitee，国内直连快；学校若有内网静态服务器，
+把那一行换成自己的地址也一样用。没配更新源时，「检查更新」只提示
+还没配置，绝不会去猜任何地址。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 七、这次重点看什么（都还没在真机上验证过）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 □ 最后一排能不能看清主字（75 寸、8 米）
@@ -634,6 +658,7 @@ def main() -> None:
         z.writestr(f"{name}/大屏全屏.bat", bat_bytes(BAT_KIOSK))
         z.writestr(f"{name}/退出大屏.bat", bat_bytes(BAT_EXIT))
         z.writestr(f"{name}/安装开机自启.bat", bat_bytes(BAT_AUTOSTART))
+        z.writestr(f"{name}/update-source.txt", UPDATE_SOURCE.encode("utf-8"))
 
     listed = write_manifest(zip_path, name)
 

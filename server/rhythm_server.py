@@ -1089,6 +1089,33 @@ def bind_server(host, port, span=PORT_SPAN):
     raise last or OSError(f"{port}–{port + span - 1} 都没有可用端口")
 
 
+UPDATE_SOURCE_FILE = "update-source.txt"
+
+
+def default_update_url(root):
+    """包根目录 update-source.txt 里的第一行有效 URL（2026-11-17 P2 9.5）。
+
+    启动链（大屏全屏.bat / 看门狗 / 开机自启 / 手机服务）都不会传
+    --update-url，所以包内默认更新源只能靠这个文件：一行 URL，#
+    开头的行是说明，空行跳过。文件不存在或没写 URL 就返回空串——
+    和「还没配置更新源」同一个结局，绝不猜一个默认地址。
+    优先级：命令行 --update-url > 环境变量 > 这个文件。
+    """
+    try:
+        with open(os.path.join(root, UPDATE_SOURCE_FILE),
+                  "r", encoding="utf-8-sig") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith(("http://", "https://")):
+                    return line
+                return ""  # 第一行有效内容不是 URL，宁可不查也别乱指
+    except OSError:
+        pass
+    return ""
+
+
 def main():
     ensure_stdio()
     ap = argparse.ArgumentParser()
@@ -1101,7 +1128,8 @@ def main():
                     help="多久查一次更新，秒；默认 30 分钟")
     a = ap.parse_args()
 
-    UPDATE["url"] = a.update_url or os.environ.get("CLASSBEAT_UPDATE_URL", "")
+    UPDATE["url"] = (a.update_url or os.environ.get("CLASSBEAT_UPDATE_URL", "")
+                     or default_update_url(INSTALL_ROOT))
     UPDATE["interval"] = a.update_interval
     if UPDATE["url"]:
         app_version()
