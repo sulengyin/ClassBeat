@@ -1388,6 +1388,12 @@ size = Math.min(cap, Math.max(one, area));
   `GetFolderPath('Desktop')`，OneDrive 重定向的机器也正确。
 - 打包清单与说明文案同步；`test_package.py` 钉住 ico 进包。
 
+**图标换成品牌 logo（2026-11-17）**：用户提供 CB 时钟板书 logo，
+`tools/make_ico.py --png` 管线生成——PNG 纯标准库解码（unfilter）、
+JPEG 借系统 gdiplus.dll（ctypes，不装东西）、四边泛洪白底转透明、
+预乘 alpha 几何面积平均缩到 7 档。源图入库
+（tools/launcher/logo-source.png），ico 可随时复现。
+
 **升级到真 exe（NOT_RUN，待验收决策）**：9.3 第二档 PyInstaller
 （托盘/防休眠/崩溃重启，杀软误报是主要风险）与安装器方案，
 19 号验收后按 9.3 既定节奏比选。
