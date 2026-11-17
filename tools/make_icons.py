@@ -31,9 +31,24 @@ def png_write(path, w, h, px):
         return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
 
     ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)
+    data = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+            + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
     with open(path, "wb") as f:
-        f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
-                + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
+        f.write(data)
+    return data          # make_ico.py 直接拿字节装进 ICO 容器，不再读盘
+
+
+def png_bytes(w, h, px):
+    """与 png_write 相同的编码，只返回字节不落盘（桌面图标用）。"""
+    rows = b"".join(b"\x00" + bytes(v for p in px[y] for v in p) for y in range(h))
+
+    def chunk(t, data):
+        c = t + data
+        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+            + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
 
 
 def in_round(x, y, w, h, r):
