@@ -178,7 +178,7 @@ python3 tools/backup.py
 （完整提交历史，`git clone xxx.bundle ClassBeat` 就能离线还原）。
 
 大屏自己也会留底，不用点按钮：从本机服务打开（`打开大屏.bat`）时，配置改动后
-一分钟内写到 `backups/config/rhythm-YYYY-MM-DD.json`，一天一份，留最近 14 天。
+十几秒内写到 `backups/config/rhythm-YYYY-MM-DD.json`，一天一份，留最近 14 天。
 换电脑或换地址后，进编辑页「带走这些修改 → 本机自动备份」，按日期点「恢复」。
 这个目录里有真实班名和名册，**不要单独转发**；给别人发原始安装包即可。
 双击 `app/index.html`（`file://`）时没有服务可写盘，只会在浏览器里留一份副本；
