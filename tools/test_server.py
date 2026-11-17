@@ -635,6 +635,25 @@ def main():
               "㉗ 写不进备份目录只回 500，服务照常", f"{code} / ping {alive}")
         hub.BACKUP_DIR = os.path.join(tmp, "backups", "config")
 
+        # ㉘ 包内默认更新源：只认 update-source.txt 里第一个非注释 URL，
+        # 没有文件 / 只有注释 / 首行不是 URL 都返回空——绝不猜地址。
+        # （2026-11-17 P2 9.5；默认源走 Gitee，启动链不传 --update-url）
+        check(hub.default_update_url(os.path.join(tmp, "没有这个目录")) == "",
+              "㉘ 没有 update-source.txt 时更新源为空")
+        src_file = os.path.join(tmp, "update-source.txt")
+        with open(src_file, "w", encoding="utf-8") as f:
+            f.write("# 说明行\n\n   \n# 再一行注释\n")
+        check(hub.default_update_url(tmp) == "", "㉘a 只有注释和空行时为空")
+        with open(src_file, "w", encoding="utf-8-sig") as f:
+            f.write("# 班级节律屏更新源\nhttps://gitee.com/x/y/raw/master/update.json\n"
+                    "https://example.com/other.json\n")
+        check(hub.default_update_url(tmp) ==
+              "https://gitee.com/x/y/raw/master/update.json",
+              "㉘b 取第一个非注释 URL（带 BOM 也认）")
+        with open(src_file, "w", encoding="utf-8") as f:
+            f.write("写错了的一行\nhttps://gitee.com/x/y/raw/master/update.json\n")
+        check(hub.default_update_url(tmp) == "", "㉘c 首个有效行不是 URL 时宁空勿猜")
+
     finally:
         srv.shutdown()
         srv.server_close()

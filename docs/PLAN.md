@@ -1398,6 +1398,40 @@ JPEG 借系统 gdiplus.dll（ctypes，不装东西）、四边泛洪白底转透
 （托盘/防休眠/崩溃重启，杀软误报是主要风险）与安装器方案，
 19 号验收后按 9.3 既定节奏比选。
 
+### 2.41 程序内更新源默认走 Gitee：国内直连不用 GitHub（DONE，2026-11-17）
+
+**诉求（2026-11-17）**：9.5 的程序内更新早已随包（v0.2.2 起），但启动链
+不传 `--update-url`，面板一直说「还没有配置更新源」。曾提议默认指向
+GitHub latest，用户否决：**国内直连 GitHub 不方便**。选型问答后定为
+**Gitee 静态源**：`https://gitee.com/<owner>/<repo>/raw/<branch>/update.json`
+永远指向最新版，整包 zip 走 Gitee Release 附件，全部可匿名直连。
+
+**实现**：
+- `tools/push_gitee.py`：把 dist 包同步到 Gitee——按 tag 建/复用
+  Release，multipart 上传附件（纯标准库 urllib），从附件响应里抠
+  匿名下载地址并对每个候选做 Range 探活（302 到 CDN 也算可达），
+  复用 make_update 同一套口径生成 update.json（地址换成 Gitee 附件）
+  并过 verify_package，最后 contents API 提交回默认分支。token 只从
+  `--token`/`GITEE_TOKEN` 取，`--dry-run` 只验 token/仓库/清单不发布。
+- 更新源落点：包根 `update-source.txt`（一行 URL，`#` 是说明），
+  `rhythm_server.default_update_url()` 启动时兜底读取——只认第一个
+  非注释的 http(s) URL，没有文件/只有注释/首行不是 URL 都返回空，
+  宁空勿猜。优先级：`--update-url` > 环境变量 > 该文件。所有启动
+  路径（大屏全屏.bat / 看门狗 / 开机自启 / 手机服务）因此统一生效，
+  不用逐个改脚本；更新器只替换 app/、server/ 和 .bat，老师换的源
+  不会被升级覆盖。
+- `package.py`：随包写 `update-source.txt`（默认 Gitee 源），使用说明
+  加「六之一、程序内更新」；CI release.yml 加「同步到 Gitee 更新源」
+  步骤，未配 `GITEE_REPO`/`GITEE_TOKEN` secrets 时静默跳过。
+- 测试：`test_server.py` ㉘×4（无文件/纯注释/取首 URL 含 BOM/首行
+  非 URL 宁空勿猜）；`test_package.py` 钉住模板存在、默认源走 Gitee
+  不走 GitHub、说明提到入口。
+
+**待办（依赖用户）**：在 Gitee 建仓库（建议同名 `sulengyin/ClassBeat`）
++ 发私人令牌；配 GitHub secrets 后 tag 发布自动同步。首次同步前
+`update-source.txt` 里指向的 raw 地址是 404，更新器按「没查到」静默
+降级，不报错。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。

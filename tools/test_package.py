@@ -57,6 +57,21 @@ for needle in ("大屏全屏.bat", "退出大屏.bat", "安装开机自启.bat")
 # 四、kiosk 没有关闭按钮，使用说明必须写清唯一出口
 check("使用说明写明退出大屏的入口", "退出大屏.bat" in package.README and "看门狗" in package.README)
 
+# 五、程序内更新的更新源文件（2026-11-17 P2 9.5）：必须有，且默认源
+# 不能是 GitHub——老师环境直连不方便（2026-11-17 用户确认）
+src = getattr(package, "UPDATE_SOURCE", None)
+check("UPDATE_SOURCE 模板存在", src is not None)
+if src:
+    urls = [ln.strip() for ln in src.splitlines()
+            if ln.strip() and not ln.strip().startswith("#")]
+    check("update-source.txt 至少有一个默认源", len(urls) >= 1, str(urls))
+    check("默认更新源走 Gitee 不走 GitHub",
+          bool(urls) and all("github.com" not in u for u in urls)
+          and any("gitee.com" in u and u.endswith("/update.json") for u in urls),
+          urls[0] if urls else "")
+    check("使用说明提到程序内更新", "检查更新" in package.README
+          and "update-source.txt" in package.README)
+
 if failures:
     print(f"\n{len(failures)} 项没过：" + "、".join(failures))
     sys.exit(1)
