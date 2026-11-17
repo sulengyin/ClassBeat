@@ -128,7 +128,9 @@
   .phRow input{flex:1;min-width:0;border:none;background:transparent;color:var(--ink);
     font-family:inherit;font-size:16px;padding:3px 0}
   .phRow input:focus{outline:none}
-  .phRow .del{flex:none;border:2px solid var(--line);background:var(--card);color:#B02A22;
+  .phRow h4{display:flex;align-items:center;gap:8px}
+  h4 .del{margin-left:auto}
+  .del{flex:none;border:2px solid var(--line);background:var(--card);color:#B02A22;
     border-radius:8px;padding:5px 10px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
   .cfgMini{margin:0 0 14px;padding:10px;background:#FFFDF6;box-shadow:none;font-weight:600}
 
@@ -243,9 +245,13 @@
 
     <div class="label">作息时间</div>
     <div id="cfgBlocks"></div>
+    <button class="cfgbtn cfgMini" id="cfgBlockAdd">＋ 在最后加一段</button>
+    <div class="cfgHint">删某一段会把它的时长并给前一段，保持全天首尾相接；
+    删「第 N 节」会同时清掉课表里那一节，后面的节次自动往前排。</div>
 
     <div class="label">课表（科目 / 任课老师）</div>
     <div id="cfgTable"></div>
+    <button class="cfgbtn cfgMini" id="cfgPeriodAdd">＋ 在最后加一节</button>
 
     <div class="label">提醒文字</div>
     <div id="cfgTexts"></div>
@@ -257,7 +263,7 @@
     <button class="send" id="cfgSave">改完，发到大屏</button>
   </div>
 
-  <div class="cfgHint">改更大规模的（换课程包、增删时段、名册修正），还是在大屏上最稳妥；
+  <div class="cfgHint">改更大规模的（换课程包、名册修正、调中间的时段），还是在大屏上最稳妥；
   或者把导出的设置文件发过去：</div>
   <input id="cfgFile" type="file" accept=".json,application/json" hidden>
   <button class="cfgbtn" id="cfgSend">选择设置文件发送</button>
@@ -297,7 +303,9 @@
     cfgSave: document.getElementById("cfgSave"),
     cfgTexts: document.getElementById("cfgTexts"),
     cfgPhrases: document.getElementById("cfgPhrases"),
-    cfgPhraseAdd: document.getElementById("cfgPhraseAdd")
+    cfgPhraseAdd: document.getElementById("cfgPhraseAdd"),
+    cfgBlockAdd: document.getElementById("cfgBlockAdd"),
+    cfgPeriodAdd: document.getElementById("cfgPeriodAdd")
   };
 
   var level = "normal";
@@ -541,10 +549,90 @@
     return "第 " + no + " 节";
   }
 
+  /* ---------- 手机端增删时段 / 课表加删节次（ROADMAP 9.4 P2 后续项） ----------
+     删除任意时段：它的时长并入前一段（首段则并入后一段），保持全天首尾相接，
+     否则整表会被大屏的原子校验整份拒收；class 块删掉后节次按开始时间
+     自动重排，课表条目跟着换号。加时段 / 加节次：只在一天最后追加，
+     起点接着上一段结尾，不制造断档。引擎认 type 不认 seq，seq 一律不动。 */
+  function addMin(hm, n) {
+    var p = String(hm || "08:00").split(":");
+    var t = Math.max(0, Math.min(23 * 60 + 59, (+p[0]) * 60 + (+p[1]) + n));
+    return ("0" + Math.floor(t / 60)).slice(-2) + ":" + ("0" + (t % 60)).slice(-2);
+  }
+
+  function renumber() {
+    var classes = (cfgState.config.timetable.blocks || [])
+      .filter(function (b) { return b.type === "class"; })
+      .sort(function (x, y) {
+        return String(x.start || "").localeCompare(String(y.start || ""));
+      });
+    var map = {};
+    classes.forEach(function (b, i) {
+      if (b.periodNo != null) map[b.periodNo] = i + 1;
+      b.periodNo = i + 1;
+    });
+    (cfgState.config.schedule.entries || []).forEach(function (en) {
+      if (map[en.periodNo] != null) en.periodNo = map[en.periodNo];
+    });
+  }
+
+  function dropBlockAt(i) {
+    var blocks = cfgState.config.timetable.blocks;
+    var b = blocks[i];
+    if (!b) return;
+    if (i > 0) blocks[i - 1].end = b.end;
+    else if (blocks.length > 1) blocks[1].start = b.start;
+    blocks.splice(i, 1);
+    renumber();
+    renderBlocks();
+    renderTable();
+  }
+
+  function appendBlock(type) {
+    var blocks = cfgState.config.timetable.blocks || [];
+    if (!blocks.length) return;
+    var last = blocks[blocks.length - 1];
+    var start = last.end || last.start || "08:00";
+    var dur = 10;
+    if (type === "class") {
+      var lastClass = null;
+      blocks.forEach(function (b) { if (b.type === "class") lastClass = b; });
+      if (lastClass) {
+        var m = String(lastClass.start || "08:00").split(":");
+        var n = String(lastClass.end || "08:40").split(":");
+        dur = Math.max(20, (+n[0]) * 60 + (+n[1]) - ((+m[0]) * 60 + (+m[1])));
+      }
+    }
+    var b = { start: start, end: addMin(start, dur), type: type };
+    if (type === "class") {
+      var no = 0;
+      blocks.forEach(function (x) {
+        if (x.type === "class" && +x.periodNo > no) no = +x.periodNo;
+      });
+      b.periodNo = no + 1;
+    } else {
+      b.name = "课间";
+    }
+    blocks.push(b);
+    renumber();
+    renderBlocks();
+    renderTable();
+  }
+
+  function removePeriod(no) {
+    var blocks = cfgState.config.timetable.blocks || [];
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i].type === "class" && +blocks[i].periodNo === +no) {
+        dropBlockAt(i);
+        return;
+      }
+    }
+  }
+
   function renderBlocks() {
     el.cfgBlocks.textContent = "";
     var blocks = cfgState.config.timetable.blocks;
-    blocks.forEach(function (b) {
+    blocks.forEach(function (b, i) {
       var row = document.createElement("div");
       row.className = "blk";
       var nm = document.createElement("div");
@@ -572,44 +660,82 @@
       tm.appendChild(e);
       row.appendChild(nm);
       row.appendChild(tm);
+      var del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "删";
+      del.setAttribute("aria-label", "删除这一段");
+      del.addEventListener("click", function () { dropBlockAt(i); });
+      row.appendChild(del);
       el.cfgBlocks.appendChild(row);
     });
   }
 
   function renderTable() {
     el.cfgTable.textContent = "";
+    var blocks = cfgState.config.timetable.blocks || [];
     var entries = cfgState.config.schedule.entries || [];
-    var byPeriod = {};
-    entries.forEach(function (en) {
-      (byPeriod[en.periodNo] = byPeriod[en.periodNo] || []).push(en);
+    var nos = [];
+    blocks.forEach(function (b) {
+      if (b.type === "class" && nos.indexOf(+b.periodNo) < 0) nos.push(+b.periodNo);
     });
-    Object.keys(byPeriod).map(Number).sort(function (a, b) { return a - b; })
-      .forEach(function (no) {
-        var box = document.createElement("div");
-        box.className = "per";
-        var h = document.createElement("h4");
-        h.textContent = periodLabel(no);
-        box.appendChild(h);
-        byPeriod[no].slice().sort(function (a, b) { return a.weekday - b.weekday; })
-          .forEach(function (en) {
-            var row = document.createElement("div");
-            row.className = "day";
-            var d = document.createElement("b");
-            d.textContent = WD[en.weekday - 1] || "周" + en.weekday;
-            var sub = document.createElement("input");
-            var tea = document.createElement("input");
-            sub.value = en.subject || "";
-            tea.value = en.teacher || "";
-            tea.placeholder = "老师";
-            sub.addEventListener("input", function () { en.subject = sub.value; });
-            tea.addEventListener("input", function () { en.teacher = tea.value; });
-            row.appendChild(d);
-            row.appendChild(sub);
-            row.appendChild(tea);
-            box.appendChild(row);
-          });
-        el.cfgTable.appendChild(box);
+    entries.forEach(function (en) {
+      if (nos.indexOf(+en.periodNo) < 0) nos.push(+en.periodNo);
+    });
+    nos.sort(function (a, b) { return a - b; });
+    nos.forEach(function (no) {
+      var box = document.createElement("div");
+      box.className = "per";
+      var h = document.createElement("h4");
+      var cap = document.createElement("span");
+      cap.textContent = periodLabel(no);
+      h.appendChild(cap);
+      var del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "删节次";
+      del.setAttribute("aria-label", "删除第 " + no + " 节");
+      del.addEventListener("click", function () { removePeriod(no); });
+      h.appendChild(del);
+      box.appendChild(h);
+      var days = [1, 2, 3, 4, 5];
+      entries.forEach(function (en) {
+        if (+en.periodNo === no && days.indexOf(+en.weekday) < 0) days.push(+en.weekday);
       });
+      days.sort(function (a, b) { return a - b; });
+      days.forEach(function (wd) {
+        var en = null;
+        entries.forEach(function (x) {
+          if (+x.periodNo === no && +x.weekday === wd) en = x;
+        });
+        var row = document.createElement("div");
+        row.className = "day";
+        var d = document.createElement("b");
+        d.textContent = WD[wd - 1] || "周" + wd;
+        var sub = document.createElement("input");
+        var tea = document.createElement("input");
+        tea.placeholder = "老师";
+        sub.value = en ? (en.subject || "") : "";
+        tea.value = en ? (en.teacher || "") : "";
+        sub.addEventListener("input", function () {
+          if (!en) {
+            en = { weekday: wd, periodNo: no, subject: "", teacher: "" };
+            entries.push(en);
+          }
+          en.subject = sub.value;
+        });
+        tea.addEventListener("input", function () {
+          if (!en) {
+            en = { weekday: wd, periodNo: no, subject: "", teacher: "" };
+            entries.push(en);
+          }
+          en.teacher = tea.value;
+        });
+        row.appendChild(d);
+        row.appendChild(sub);
+        row.appendChild(tea);
+        box.appendChild(row);
+      });
+      el.cfgTable.appendChild(box);
+    });
   }
 
   /* 提醒文字：texts 是嵌套对象，递归摊平成「路径标签 + 输入框」，
@@ -662,6 +788,16 @@
     renderPhrases();
     var rows = el.cfgPhrases.querySelectorAll("input");
     if (rows.length) rows[rows.length - 1].focus();
+  });
+
+  el.cfgBlockAdd.addEventListener("click", function () {
+    if (!cfgState) return;
+    appendBlock("break");
+  });
+
+  el.cfgPeriodAdd.addEventListener("click", function () {
+    if (!cfgState) return;
+    appendBlock("class");
   });
 
   el.cfgLoad.addEventListener("click", function () {
