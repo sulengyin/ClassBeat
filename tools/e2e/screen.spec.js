@@ -284,7 +284,7 @@ test("手机上改班名，屏上几十秒内生效（P2 B3）", async ({ page, 
   const phoneTimeOk = await page.evaluate(() =>
     [...document.querySelectorAll(".blk time input")].every((i) => {
       const fs = parseFloat(getComputedStyle(i).fontSize);
-      return i.clientWidth >= fs * 5.5;
+      return i.clientWidth >= fs * 5.2;  // clientWidth 不含边框，阈值别贴着 min-width
     })
   );
   expect(phoneTimeOk, "手机端时间框太窄会把 08:10 裁成 08:1").toBeTruthy();
@@ -372,7 +372,7 @@ test("大屏编辑态的作息时间框不裁字（真机 2026-11-17）", async 
   const ok = await page.evaluate(() =>
     [...document.querySelectorAll(".tt-time")].every((i) => {
       const fs = parseFloat(getComputedStyle(i).fontSize);
-      return i.clientWidth >= fs * 5.5;
+      return i.clientWidth >= fs * 5.2;  // clientWidth 不含边框，阈值别贴着 min-width
     })
   );
   expect(ok, "大屏时间框太窄会把 08:10 裁成 08:1").toBeTruthy();
