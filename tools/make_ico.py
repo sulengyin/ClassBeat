@@ -7,7 +7,9 @@
 
 --png 模式：PNG 直接解；JPEG 在 Windows 上借系统 gdiplus.dll 转一手
 （ctypes 调用，不装任何东西）。白底转透明（从四边泛洪）、按几何面积
-平均缩到 7 档，PNG 负载装进 ICO 容器。品牌图换新时：
+平均缩到 7 档，PNG 负载装进 ICO 容器；同时重生成手机 PWA 图标
+（server/icons/icon-192.png 与 icon-512.png，2026-11-17 起与大屏
+桌面图标同一套品牌 logo）。品牌图换新时：
     python3 tools/make_ico.py --png tools/launcher/logo-source.png
 logo 源图与 ico 都入库，CI 打包只读 ico，不重生成。
 """
@@ -23,6 +25,8 @@ from make_icons import build, png_bytes
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "tools", "launcher", "classbeat.ico")
+PWA_OUT = os.path.join(ROOT, "server", "icons")
+PWA_SIZES = (192, 512)
 
 SIZES = (16, 24, 32, 48, 64, 128, 256)
 
@@ -208,10 +212,16 @@ def main():
         assert len(args) == 2, "用法：make_ico.py --png <图片路径>"
         w, h, px = load_image(args[1])
         px = flatten_white(px, w, h)
-        pngs = [(s, png_bytes(s, s, resize(px, w, h, s))) for s in SIZES]
+        pack_ico([(s, png_bytes(s, s, resize(px, w, h, s))) for s in SIZES], OUT)
+        # 手机 PWA 图标同步换新：同一套品牌 logo， manifest 不用动
+        for s in PWA_SIZES:
+            data = png_bytes(s, s, resize(px, w, h, s))
+            path = os.path.join(PWA_OUT, f"icon-{s}.png")
+            with open(path, "wb") as f:
+                f.write(data)
+            print(f"已生成 {path}（{len(data)} 字节）")
     else:
-        pngs = [(s, png_bytes(s, s, build(s))) for s in SIZES]
-    pack_ico(pngs, OUT)
+        pack_ico([(s, png_bytes(s, s, build(s))) for s in SIZES], OUT)
 
 
 if __name__ == "__main__":
