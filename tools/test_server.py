@@ -654,6 +654,29 @@ def main():
             f.write("写错了的一行\nhttps://gitee.com/x/y/raw/master/update.json\n")
         check(hub.default_update_url(tmp) == "", "㉘c 首个有效行不是 URL 时宁空勿猜")
 
+        # ㉘d 加速前缀推导：源是「前缀 + GitHub raw」拼接式就能推出前缀，
+        # 源是自建静态站（没有 GitHub 域名）就不改写，返回空
+        check(hub.accel_prefix(
+            "https://ghfast.top/https://raw.githubusercontent.com/o/r/main/update.json")
+            == "https://ghfast.top/", "㉘d 拼接式源能推出加速前缀")
+        check(hub.accel_prefix("https://raw.githubusercontent.com/o/r/main/update.json") == "",
+              "㉘d-a 裸 GitHub raw 无前缀")
+        check(hub.accel_prefix("http://192.168.1.10:8000/update.json") == "",
+              "㉘d-b 校内静态站无前缀")
+
+        # ㉘e 包地址改写：只动 GitHub 域名，自建地址原样放行
+        rw = hub.make_accel_rewrite("https://ghfast.top/")
+        check(rw("https://github.com/o/r/releases/download/v1/x.zip") ==
+              "https://ghfast.top/https://github.com/o/r/releases/download/v1/x.zip",
+              "㉘e Release 附件地址套上前缀")
+        check(rw("https://raw.githubusercontent.com/o/r/main/f.json") ==
+              "https://ghfast.top/https://raw.githubusercontent.com/o/r/main/f.json",
+              "㉘e-a raw 地址也套前缀")
+        check(rw("http://192.168.1.10:8000/p.zip") == "http://192.168.1.10:8000/p.zip",
+              "㉘e-b 非 GitHub 地址原样放行")
+        check(hub.make_accel_rewrite("") is None and rw(None) == "",
+              "㉘e-c 空前缀不挂钩子，空地址安全返回")
+
     finally:
         srv.shutdown()
         srv.server_close()

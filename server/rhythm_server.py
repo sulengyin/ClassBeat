@@ -287,13 +287,14 @@ def refresh_app_version():
 
 
 def updater_manager():
-    """懒建更新器；每次调用都同步最新的更新源、版本和本机端口。"""
+    """懒建更新器；每次调用都同步最新的更新源、版本、本机端口和加速前缀。"""
     global UPDATER
     if UPDATER is None:
         UPDATER = updater.UpdateManager(INSTALL_ROOT)
     UPDATER.manifest_url = UPDATE.get("url") or ""
     UPDATER.current_version = app_version()["version"]
     UPDATER.base_url = "http://127.0.0.1:%d" % CONF["port"]
+    UPDATER.url_rewrite = make_accel_rewrite(accel_prefix(UPDATER.manifest_url))
     return UPDATER
 
 
@@ -1090,6 +1091,55 @@ def bind_server(host, port, span=PORT_SPAN):
 
 
 UPDATE_SOURCE_FILE = "update-source.txt"
+
+# 清单里的包地址是 GitHub Release 链接；加速前缀把它套上代理域名。
+# 这些都是拼接式加速服务的特征域名（2026-11 实测可用：ghfast.top /
+# gh-proxy.com / ghproxy.net），命中才改写，别的地址一律不动。
+GH_HOSTS = ("github.com", "raw.githubusercontent.com", "objects.githubusercontent.com",
+            "codeload.github.com", "api.github.com")
+
+# 源 URL 里识别「原 GitHub 地址」的完整模式（带 scheme，避免把
+# raw.githubusercontent.com 里的 github.com 子串认错位）。
+GH_URL_PATTERNS = ("https://raw.githubusercontent.com/", "https://github.com/")
+
+
+def accel_prefix(source_url):
+    """从更新源 URL 推导加速前缀（2026-11-18 用户选定加速域名方案）。
+
+    源本身就是「前缀 + GitHub raw 地址」的拼接形式，例如
+      https://ghfast.top/https://raw.githubusercontent.com/owner/repo/main/update.json
+    前缀就是原 GitHub 地址出现之前的全部内容。rfind 取最后一次出现
+    ——前缀里万一也带着 GitHub 字样也不出错。源里没有 GitHub 地址
+    （自建静态站、裸 raw 直连）说明不需要改写，返回空串。
+    """
+    u = (source_url or "").strip()
+    best = -1
+    for pat in GH_URL_PATTERNS:
+        idx = u.rfind(pat)
+        if idx > best:
+            best = idx
+    if best > 0:
+        return u[:best]
+    return ""
+
+
+def make_accel_rewrite(prefix):
+    """给清单里的包地址套加速前缀；只改写 GitHub 域名，别的原样放行。"""
+    if not prefix:
+        return None
+
+    def rewrite(url):
+        u = (url or "").strip()
+        try:
+            scheme, rest = u.split("://", 1)
+            host = rest.split("/", 1)[0]
+        except ValueError:
+            return u
+        if scheme == "https" and host in GH_HOSTS:
+            return prefix + u
+        return u
+
+    return rewrite
 
 
 def default_update_url(root):

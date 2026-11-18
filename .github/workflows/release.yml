@@ -77,28 +77,30 @@ jobs:
           fi
           echo "已确认：$zip 自带运行时、手机服务、配置向导、MANIFEST"
 
-      # Gitee 同步（2026-11-17 P2 9.5）：程序内更新源默认走 Gitee，
-      # 国内直连 GitHub 不方便。仓库没配 GITEE_REPO / GITEE_TOKEN
-      # 这两个 secrets 时静默跳过，不影响 GitHub 这边的发布。
-      - name: 同步到 Gitee 更新源
+      # update.json 提交回仓库 main 分支（2026-11-18 加速域名方案）：
+      # 包内更新源 = 加速前缀 + raw.githubusercontent.com/.../main/update.json，
+      # 这个 raw 地址永远指向最新版。直连 GitHub 不稳，加速前缀由
+      # update-source.txt 配置，程序自动推导；仓库里这份清单本身不用改。
+      - name: 更新清单提交回仓库
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          GITEE_REPO: ${{ secrets.GITEE_REPO }}
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "$GITEE_REPO" ] || [ -z "$GITEE_TOKEN" ]; then
-            echo "未配置 GITEE_REPO / GITEE_TOKEN，跳过 Gitee 同步。"
-            echo "要启用：仓库 Settings → Secrets → actions 里加这两个 secret，"
-            echo "GITEE_REPO 形如 owner/repo，GITEE_TOKEN 是 Gitee 私人令牌。"
-            exit 0
-          fi
           set -e
-          zip=$(ls dist/*.zip | head -1)
-          python3 tools/push_gitee.py \
-            --zip "$zip" \
-            --tag "$GITHUB_REF_NAME" \
-            --repo "$GITEE_REPO" \
-            --token "$GITEE_TOKEN"
+          content=$(base64 -w0 dist/update.json)
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/update.json?ref=main" \
+            --jq '.sha' 2>/dev/null || echo "")
+          if [ -n "$sha" ]; then
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/update.json" \
+              -f message="update.json: $GITHUB_REF_NAME（by release.yml）" \
+              -f content="$content" -f branch=main -f sha="$sha" --jq '.commit.sha'
+          else
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/update.json" \
+              -f message="update.json: $GITHUB_REF_NAME（by release.yml）" \
+              -f content="$content" -f branch=main --jq '.commit.sha'
+          fi
+          echo "update.json 已提交到 main；raw 地址："
+          echo "  https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/update.json"
 
       - name: 上传产物
         uses: actions/upload-artifact@v7
