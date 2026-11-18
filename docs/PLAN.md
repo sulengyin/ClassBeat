@@ -1476,6 +1476,38 @@ JPEG 借系统 gdiplus.dll（ctypes，不装东西）、四边泛洪白底转透
 实现仍按 9.9 排期待机（验收 + 7 教学日长跑之后）。已钉进
 ROADMAP 9.9「三个实现形态问题」一节。
 
+### 2.44 Windows 冒烟工作流：真机前在 Actions 虚拟机多轮排雷（DONE，2026-11-18）
+
+**诉求（2026-11-18）**：用户要求 19 号正式验收前「用 GitHub Actions
+虚拟机测试几轮，把能排除的问题排除掉」。⑰ 已经证明 Linux-only CI
+有盲区，冒烟层专补 Windows。
+
+**实现（PR #32 已合并）**：
+- `.github/workflows/smoke.yml`（触发：main 更新 + 手动）：
+  - **windows-smoke**（windows-latest）：构建发布包 → 解包当真实
+    安装 → 用包内自带 python.exe 起服务 → ping/大屏页/更新状态 →
+    「检查更新」真实走「包内 update-source.txt → ghfast.top 加速 →
+    GitHub raw 清单」整链 → 第二个实例请求同端口必须被挤到下一个
+    （在真 Windows 上验证 2.42 修复）→ 启动器两件套 DryRun。
+    runner 境外走不通 ghfast.top 时自动降级直连 raw（预期内）。
+  - **regress-rounds**（Linux）：`test_server.py` 连跑 3 轮 +
+    e2e 连跑 2 轮抓偶发。
+- `tools/smoke_windows.py`：冒烟脚本，本地真 Windows 先跑通
+  （9 项 PASS，端口顺延 8765→8766 实测），再上 runner。
+
+**冒烟当场抓到并修掉的问题**：
+1. **Windows runner 控制台 cp1252 崩中文 print**：`bundle.py` 一句
+   中文输出直接 UnicodeEncodeError，构建就挂——Linux CI 永远碰不到。
+   修法：工作流 `PYTHONUTF8=1` + 冒烟脚本自身编码自愈
+   （`sys.stdout.reconfigure`）。
+2. **CI 浏览器依赖安装 8 分钟超时**：一天卡 3 次，ci.yml 与 smoke.yml
+   的该步均放宽到 15 分钟。
+
+**运行记录（2026-11-18）**：第 1 轮失败（抓到问题 1）→ 修复后第 2、
+3 轮 windows-smoke success；regress-rounds 两轮完成（第 3 轮 apt
+超时属 GitHub 基础设施抖动，重跑即过）。程序内更新整链在 Windows
+runner 上验证「已是最新 v0.3.4」通过。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。
