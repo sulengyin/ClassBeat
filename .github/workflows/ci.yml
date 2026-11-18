@@ -125,8 +125,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      # 2026-11-18 一天里这步卡 8 分钟超时 3 次（apt 偶尔真就慢），
+      # 放宽到 15：宁可这步多等，也别让整个 e2e 白跑。
       - name: 安装浏览器系统依赖
-        timeout-minutes: 8
+        timeout-minutes: 15
         run: npx playwright install-deps chromium webkit
 
       - name: 安装浏览器
