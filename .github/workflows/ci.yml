@@ -125,18 +125,19 @@ jobs:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      # 2026-11-18 一天里这步卡 8 分钟超时 3 次（apt 偶尔真就慢），
-      # 放宽到 15：宁可这步多等，也别让整个 e2e 白跑。
-      # apt 源抽风是时段性的，把下载归档缓存住，命中时不再碰网络。
-      - name: 缓存 apt 归档
-        uses: actions/cache@v6
-        with:
-          path: /var/cache/apt/archives
-          key: apt-deps-${{ runner.os }}-pw1
-
+      # 2026-11-18 晚 apt 源持续抽风：8 分钟超时挂 3 次、15 分钟还挂。
+      # 抽风是时段性的，改成最多试 3 次、每次间隔 2 分钟，跨过抽风窗口。
       - name: 安装浏览器系统依赖
-        timeout-minutes: 15
-        run: npx playwright install-deps chromium webkit
+        timeout-minutes: 30
+        run: |
+          for i in 1 2 3; do
+            echo "===== 第 $i 次尝试 ====="
+            npx playwright install-deps chromium webkit && exit 0
+            echo "第 $i 次失败（apt 源抖动？），等 2 分钟再试"
+            sleep 120
+          done
+          echo "::error::浏览器系统依赖 3 次都没装上，apt 源持续不可用"
+          exit 1
 
       - name: 安装浏览器
         if: steps.pw-cache.outputs.cache-hit != 'true'

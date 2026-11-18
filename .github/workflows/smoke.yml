@@ -108,10 +108,18 @@ jobs:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      # 今天（2026-11-18）这步在 CI 上卡过一次 8 分钟超时，这里放宽到 15
+      # apt 源时段性抽风（2026-11-18 晚持续 1 小时+）：最多试 3 次
       - name: 安装浏览器系统依赖
-        timeout-minutes: 15
-        run: npx playwright install-deps chromium webkit
+        timeout-minutes: 30
+        run: |
+          for i in 1 2 3; do
+            echo "===== 第 $i 次尝试 ====="
+            npx playwright install-deps chromium webkit && exit 0
+            echo "第 $i 次失败（apt 源抖动？），等 2 分钟再试"
+            sleep 120
+          done
+          echo "::error::浏览器系统依赖 3 次都没装上，apt 源持续不可用"
+          exit 1
 
       - name: 安装浏览器
         if: steps.pw-cache.outputs.cache-hit != 'true'
