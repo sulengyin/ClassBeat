@@ -118,6 +118,7 @@ class UpdateManager:
 
         self.backup_root = self.root / "backups" / "program"
         self.manifest = None
+        self.url_rewrite = None   # 可选钩子：下载前改写包地址（加速域名用）
         self._lock = threading.Lock()
         self._busy = False
         self.state = "idle"
@@ -271,8 +272,11 @@ class UpdateManager:
         target = tmpdir / "package.zip"
         try:
             try:
+                url = manifest["url"]
+                if self.url_rewrite:
+                    url = self.url_rewrite(url)
                 req = urllib.request.Request(
-                    manifest["url"], headers={"User-Agent": "classbeat-updater"})
+                    url, headers={"User-Agent": "classbeat-updater"})
                 with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as r:
                     size = r.headers.get("Content-Length")
                     if size and int(size) > MAX_PACKAGE_BYTES:

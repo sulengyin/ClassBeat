@@ -281,12 +281,20 @@ BAT_AUTOSTART = (
 # ——老师环境直连 GitHub 不方便（2026-11-17 用户确认）；换源只改这个
 # 文件，升级不会覆盖它（更新器只替换 app/、server/ 和 .bat）。
 UPDATE_SOURCE = """\
-# 班级节律屏 · 程序内更新源
-# 服务每次启动会读下面第一个不以 # 开头的网址；一行一个，多余的忽略。
-# 默认是 Gitee 静态源（国内直连快）。换源：把这一行改成你的地址即可，
-# 例如校内静态站 http://192.168.1.10:8000/update.json。
+# 班级节律屏 · 程序内更新源（2026-11-18 起默认走「加速域名 + GitHub」）
+# 服务每次启动读下面第一个不以 # 开头的网址；一行一个，多余的忽略。
+#
+# 原理：更新清单和安装包都在 GitHub 仓库/Release 里，但通过国内加速
+# 前缀访问，程序会自动识别前缀并把清单里的安装包地址也套上同一个
+# 前缀——一个域名管到底。GitHub 直连在国内不稳定，所以默认带前缀。
+#
+# 下面这行就是默认源。如果哪天它失效（下载超时/报错），换一个前缀：
+#   https://gh-proxy.com/https://raw.githubusercontent.com/sulengyin/ClassBeat/main/update.json
+#   https://ghproxy.net/https://raw.githubusercontent.com/sulengyin/ClassBeat/main/update.json
+# 有校内静态站的话也可以整行换成自己的地址，例如：
+#   http://192.168.1.10:8000/update.json
 # 改完重启服务（退出大屏再双击「大屏全屏.bat」）就生效。
-https://gitee.com/sulengyin/ClassBeat/raw/master/update.json
+https://ghfast.top/https://raw.githubusercontent.com/sulengyin/ClassBeat/main/update.json
 """
 
 
@@ -500,10 +508,12 @@ watchdog.log、exit-kiosk.log）也在那里，排错看最后几行。
 不用重新下载安装包，屏上就能升级：大屏右下角「⋯」菜单里的
 「检查更新」，有新版就点「应用」，服务会自动备份、替换、重启生效。
 
-更新源写在包根目录的 update-source.txt 里（一行网址，# 开头的是
-说明行）。本包默认走 Gitee，国内直连快；学校若有内网静态服务器，
-把那一行换成自己的地址也一样用。没配更新源时，「检查更新」只提示
-还没配置，绝不会去猜任何地址。
+更新清单和安装包都放在 GitHub 仓库里，通过国内加速域名访问（直连
+GitHub 在国内不稳定）。默认前缀写在包根目录的 update-source.txt 里；
+哪天下载超时，按文件里的说明把前缀换成备选地址（gh-proxy.com、
+ghproxy.net）再重启服务即可。有校内静态站的话，整行换成自己的
+地址也一样用。没配更新源时，「检查更新」只提示还没配置，绝不会
+去猜任何地址。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 七、这次重点看什么（都还没在真机上验证过）
