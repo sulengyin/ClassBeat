@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "version": "0.3.4",
+  "build": "5bf609a",
+  "publishedAt": "2026-11-18T21:02:52+08:00",
+  "minVersion": "0.2.0",
+  "notes": "- **屏上可以直接升级了**：大屏右下角「⋯」菜单的「检查更新」真正\n  可用——有新版点「应用」，服务自动备份、替换、重启生效，不用再\n  重新下载安装包。更新走国内加速域名（GitHub 内容 + 加速前缀），\n  直连 GitHub 不稳定也不影响；前缀失效时改包根 update-source.txt\n  一行换备用地址即可。\n- 升级不会覆盖老师的设置和数据（名册、作息、话术都原样保留），\n  每次升级前自动备份到 backups\\program\\（保留最近两份），更新后\n  自检不过会自动回滚。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.4/classbeat-0.3.4.zip",
+  "sha256": "c289bcd9f14ef642f0164f76e81138693acadcb9b7a8ec7159d5cfb6f6444680",
+  "bytes": 11755451,
+  "files": [
+    {
+      "path": "app/backup.js",
+      "sha256": "a964d674cc6f6b501caa77faaee5e2bcf1da3384a65cdf0246bfaa567fca1bbb",
+      "bytes": 7399
+    },
+    {
+      "path": "app/clock.js",
+      "sha256": "cd589a217f9f3003a4eb160da13f4a9430e8f540b2371621c2a616e1bb6a4282",
+      "bytes": 3328
+    },
+    {
+      "path": "app/config.js",
+      "sha256": "8f71da4c24fbfa5d1ae6004492404fb2fe8e15ef463dab8c41f1b13f16fa4781",
+      "bytes": 2038
+    },
+    {
+      "path": "app/data.js",
+      "sha256": "5a522e165ced5608eb759eeb4f4abcde601a67a94ba06088f8732d800f7a0a54",
+      "bytes": 17039
+    },
+    {
+      "path": "app/demo.js",
+      "sha256": "68ca688d82e0485dfdedd3faa0f97cb40624421f1dc1e3855db1be2d04de08db",
+      "bytes": 5726
+    },
+    {
+      "path": "app/edit.css",
+      "sha256": "8ac9bc5bd604d7f0ba9f26a2370bb41f46e14beffe30c5ea542e52eccb804be2",
+      "bytes": 15256
+    },
+    {
+      "path": "app/edit.js",
+      "sha256": "a7b5005057e71fdbdb2caa920be9e0f45745e11ce28e9ac797f307ad1eec092d",
+      "bytes": 59005
+    },
+    {
+      "path": "app/engine/schedule.js",
+      "sha256": "01f52dae80a82006e6e5c65af3c06cf6c365293df4b941a7f65ce1db10d910dc",
+      "bytes": 14606
+    },
+    {
+      "path": "app/index.html",
+      "sha256": "3cc525dc97dfa38a3e80572c1fe95f0f2e32d229a741f0225caafe211298108f",
+      "bytes": 45088
+    },
+    {
+      "path": "app/phoneui.js",
+      "sha256": "f665a1bb08fd4642469a406f595c7586932d54cf5066d5ff8a21079d80f029a7",
+      "bytes": 4219
+    },
+    {
+      "path": "app/preview.html",
+      "sha256": "1e5c6673682e3303f7a23806048a7d74b3c55aeea064e602371058f79a5704c5",
+      "bytes": 702
+    },
+    {
+      "path": "app/qr.js",
+      "sha256": "1a46f70d31fad922f6201caa511ca5aced4b7521740235913115d22a5ad9ac35",
+      "bytes": 1535
+    },
+    {
+      "path": "app/remote.js",
+      "sha256": "1a4ecee42e3a46792d912a924e867e3d093c6e51e6f15c79a5ab53b5103d207a",
+      "bytes": 11861
+    },
+    {
+      "path": "app/rhythm.js",
+      "sha256": "d39365c2b513a0fe6517f64798fe3b95ca7d5eebd8731274dc127d87a8d07286",
+      "bytes": 18961
+    },
+    {
+      "path": "app/runtime.js",
+      "sha256": "289ce6e45ba348052767684f636caa2fef88c13ed91c68a6021c9950e70e7e9d",
+      "bytes": 4137
+    },
+    {
+      "path": "app/screen.js",
+      "sha256": "d31790124fa617bc24f9fee248a05af78f4d44278c7ecfbf657938f7461486cd",
+      "bytes": 33371
+    },
+    {
+      "path": "app/setup.css",
+      "sha256": "4265e54371c085c953db3189d3510c8aadfc92867e9d6c2dcc1c583774a1e7e0",
+      "bytes": 16691
+    },
+    {
+      "path": "app/setup.js",
+      "sha256": "135204337daade1b114c597d47ec509eb6e9352679504c41b9bade5c79ee2019",
+      "bytes": 111083
+    },
+    {
+      "path": "app/store.js",
+      "sha256": "f6205378c42734298bafb5db13687395af1fcf16e418e46137a41e0a99af654e",
+      "bytes": 26233
+    },
+    {
+      "path": "app/templates.js",
+      "sha256": "08bd29ddc6b829b6ab982ee23d1542022995c1311a8948637b3eecf1ad555a21",
+      "bytes": 3457
+    },
+    {
+      "path": "app/update.js",
+      "sha256": "67e2c8f764e594c1edae5da675d151e7e333935c606d60a0d4f60f92bec60faa",
+      "bytes": 15769
+    },
+    {
+      "path": "app/vendor/qrcode.min.js",
+      "sha256": "247a66aba72b78fd46bc03de2602c238e72ff72508328af7d4cef36ed907f33a",
+      "bytes": 20737
+    },
+    {
+      "path": "app/version.js",
+      "sha256": "4fbfdd4171bd0eead045d4c29134b5e0b467f181eeb4a8089a65a612a7e590e9",
+      "bytes": 593
+    },
+    {
+      "path": "server/icons/icon-192.png",
+      "sha256": "03c3be6e408a4498c9baab27b400824c7d6681e3a6f77519ccf7f742f524bb9b",
+      "bytes": 33256
+    },
+    {
+      "path": "server/icons/icon-512.png",
+      "sha256": "37b67836222ad77b7b8e63bcc3cfae1f5edc23249a0faf4a8a1e780f9608d6c3",
+      "bytes": 146478
+    },
+    {
+      "path": "server/phone.html",
+      "sha256": "5ceb4482b7fe6bbb555923b3ddd4da0059931c6bed0b8b8a1a7a7d306cf2a027",
+      "bytes": 37910
+    },
+    {
+      "path": "server/rhythm_server.py",
+      "sha256": "5340442728257064781aa4081163cf1375bd76aca9636c2fd07a902723fa55de",
+      "bytes": 48280
+    },
+    {
+      "path": "server/run.py",
+      "sha256": "6890eb1ee89b20da63bf1f1b39879b9665d945a49a2e2e6f9466e70fc72bcbda",
+      "bytes": 7944
+    },
+    {
+      "path": "server/sw.js",
+      "sha256": "fd89b6fb7bd26cab40ede9f6f57aba3ac4ba5290f866de736c09356ea5c66544",
+      "bytes": 2359
+    },
+    {
+      "path": "server/update_manifest.py",
+      "sha256": "3f9916159a2bd8c9b6de16631fbf6092673212d969767ded6fe92db28ad40408",
+      "bytes": 9857
+    },
+    {
+      "path": "server/updater.py",
+      "sha256": "65afbf8646a645b2905bc41c1f1953da1b562c12c2315c0fa95109e63de37768",
+      "bytes": 26109
+    },
+    {
+      "path": "停止手机服务.bat",
+      "sha256": "9f2d560238cbf4c764d2c632070e2231eadd19b5b453f5a6aed642b3e8517e3d",
+      "bytes": 403
+    },
+    {
+      "path": "启动手机服务.bat",
+      "sha256": "d598502c333788a36185df770aa80926fa31595b9441801b672be0aa3334b40f",
+      "bytes": 1046
+    },
+    {
+      "path": "大屏全屏.bat",
+      "sha256": "50dace17e38964846f4b22e05e24d046999206b7dba11ad879be14af2b09f17b",
+      "bytes": 509
+    },
+    {
+      "path": "安装开机自启.bat",
+      "sha256": "cfcb4eb54db26e99085da60073d4466228009850eb43a43473cf389d1b40655b",
+      "bytes": 588
+    },
+    {
+      "path": "打开大屏.bat",
+      "sha256": "aa93c5a94bf6506707ec027c0f643696819ff7ba02fcdbc72ca527e164ddb281",
+      "bytes": 527
+    },
+    {
+      "path": "打开演练版.bat",
+      "sha256": "802e68ba1b622a1688699389c0b5cc8cd0495dc9a3671978a295c72c3e26bfcb",
+      "bytes": 45
+    },
+    {
+      "path": "退出大屏.bat",
+      "sha256": "e5ca5ccd7200d35e8ce94fa7b3739433293ec99b201d7c66a7f6fe9188c5ab1c",
+      "bytes": 408
+    }
+  ]
+}
