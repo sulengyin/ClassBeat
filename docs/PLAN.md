@@ -1436,6 +1436,32 @@ JPEG 借系统 gdiplus.dll（ctypes，不装东西）、四边泛洪白底转透
 **迁移成本**：任一加速域名失效，老师改 update-source.txt 一行换前缀
 （或换校内静态站），重启服务即可；程序不用动。
 
+### 2.42 端口占用顺延在 Windows 上根本没生效：SO_REUSEADDR 劫持（FIXED，2026-11-18）
+
+**发现**：`test_server.py` ⑰（端口被占时顺延）在本地 Windows 上每次
+必现失败，CI（Linux）通过——不是测试偶发，是**真 bug**：
+`ThreadingHTTPServer` 默认 `allow_reuse_address=1`，Windows 的
+`SO_REUSEADDR` 语义允许「强行绑住别人正在监听的端口」（劫持式绑定），
+于是 `bind_server` 对被占端口 bind 成功、两个服务叠在同一端口上，
+「被占就 +1 顺延」完全失效。教室电脑 8765 被教学软件占用是设计时就
+点名要兜的场景，这条路一坏等于没兜。
+
+**修复**：`rhythm_server.py` 新增 `_Server` 子类，
+`allow_reuse_address = os.name != "nt"`——Windows 上关掉，占用检测
+真实生效；Linux 上 SO_REUSEADDR 本就不允许重绑 LISTEN 中的端口，
+关掉无碍。快速重启撞 TIME_WAIT 的场景由 run.py 的 ping 预检兜住
+（预检发现活服务就不起第二个）。
+
+**验收**：本地 test_server.py 90/90（⑰ 通过：54873 → 54874）。
+
+**钉住**：⑰ 本身就是回归测试；Windows 与 Linux 的语义差异写进了
+`_Server` 注释。
+
+**附带准备（19 号前）**：现场操作卡升级到 v0.3.4（安装包版本、
+程序内更新验收节、加速链路判定标准）；内存曲线脚本落成
+`tools/diag/mem-curve.ps1`（参数化路径与间隔，PowerShell 语法校验过），
+现场不用手敲循环。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。

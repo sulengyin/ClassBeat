@@ -1069,6 +1069,16 @@ def _addr_in_use(e):
     return getattr(e, "winerror", None) == 10048 or e.errno in (errno.EADDRINUSE, 10048)
 
 
+class _Server(ThreadingHTTPServer):
+    # Windows 上 SO_REUSEADDR 允许强行绑住别人正在监听的端口（劫持式
+    # 绑定），「端口被占就顺延」会完全失效——第二个服务直接和第一个
+    # 叠在同一端口上（2026-11-18 ⑰ 在 Windows 上每次必现才发现）。
+    # 关掉它占用检测才真实生效。Linux 上 SO_REUSEADDR 本就不允许重绑
+    # LISTEN 中的端口，关掉无碍；快速重启撞 TIME_WAIT 的场景由
+    # run.py 的 ping 预检兜住。
+    allow_reuse_address = os.name != "nt"
+
+
 def bind_server(host, port, span=PORT_SPAN):
     """从 port 起找一个能绑的端口，返回 (server, 实际端口)。
 
@@ -1079,7 +1089,7 @@ def bind_server(host, port, span=PORT_SPAN):
     last = None
     for p in range(port, port + max(1, span)):
         try:
-            srv = ThreadingHTTPServer((host, p), Handler)
+            srv = _Server((host, p), Handler)
             srv.daemon_threads = True
             # 传 0 时由系统分配，回报真实端口而不是 0
             return srv, srv.server_address[1]
