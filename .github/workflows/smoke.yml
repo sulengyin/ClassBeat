@@ -19,6 +19,9 @@ on:
 
 env:
   TZ: Asia/Shanghai
+  # runner 的 Windows 控制台是 cp1252，中文 print 直接 UnicodeEncodeError
+  # （2026-11-18 第一轮冒烟抓到的：unit/e2e 在 Linux 上永远碰不到）
+  PYTHONUTF8: "1"
 
 jobs:
   # 真实 Windows 环境 + 真实发布包 + 真实更新链路

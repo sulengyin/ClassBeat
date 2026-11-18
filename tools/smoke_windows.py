@@ -29,6 +29,14 @@ import time
 import urllib.error
 import urllib.request
 
+# 中文环境的脚本跑在 cp1252/cp936 之外的控制台上会直接崩，先自愈
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 PASS = 0
 FAIL = 0
 
