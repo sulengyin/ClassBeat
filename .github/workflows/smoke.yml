@@ -1,0 +1,152 @@
+name: Smoke
+
+# 真机前的「能排除的都排除」（2026-11-18，19 号教室验收前加跑几轮）。
+#
+# 为什么有这个工作流：CI 的 unit/e2e 全在 Linux 上，⑰（Windows 上
+# SO_REUSEADDR 劫持让端口顺延失效）就是「虚拟机全绿、真机才炸」的
+# 漏网之鱼。这里用 windows-latest runner 把发布包解包当真实安装跑：
+# 服务就绪、大屏页面、程序内更新整链（包内 update-source.txt →
+# 加速域名 → GitHub raw 清单）、第二个实例请求同端口必须被挤到下一
+# 个端口。再配一个 Linux 多轮回归找偶发。
+#
+# 触发：main 更新 + 手动（Actions 页面 Run workflow）。普通 PR 不跑，
+# 避免把 CI 的等待时间再拉长一截。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  # 真实 Windows 环境 + 真实发布包 + 真实更新链路
+  windows-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: 缓存免安装 Python
+        uses: actions/cache@v6
+        with:
+          path: tools/vendor
+          key: python-embed-3.12.10
+
+      - name: 构建发布包
+        run: |
+          python tools/bundle.py --data sample
+          python tools/package.py
+
+      - name: 解包（当作老师拿到手的安装）
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path smoketest -Force | Out-Null
+          $zip = Get-ChildItem dist\classbeat-*.zip | Where-Object { $_.Name -notmatch 'single' } | Select-Object -First 1
+          Expand-Archive -Path $zip.FullName -DestinationPath smoketest -Force
+          $top = Get-ChildItem smoketest | Select-Object -First 1
+          "PKG=$($top.FullName)" >> $env:GITHUB_ENV
+          Write-Output "解包到 $($top.FullName)"
+
+      # 用包内自带的 python.exe 跑服务——和教室一体机上的形态完全一致
+      - name: 冒烟（服务/页面/更新链路/端口顺延）
+        shell: pwsh
+        run: |
+          $pkgPy = Join-Path $env:PKG 'server\python\python.exe'
+          if (Test-Path $pkgPy) {
+            python tools\smoke_windows.py --pkg "$env:PKG" --python "$pkgPy"
+          } else {
+            Write-Output "包内没有自带 Python 运行时，用 runner 的 Python 跑"
+            python tools\smoke_windows.py --pkg "$env:PKG"
+          }
+
+      # 启动器脚本在真 Windows PowerShell 里走一遍推演（不真开窗口）
+      - name: 启动器 DryRun
+        shell: pwsh
+        run: |
+          & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:PKG 'tools\launcher\start-kiosk.ps1') -DryRun
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:PKG 'tools\launcher\install-autostart.ps1') -DryRun
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Output "启动器两件套 DryRun 通过"
+
+      - name: 冒烟结果汇总
+        if: always()
+        run: echo "Windows 冒烟结束。"
+
+  # Linux 多轮回归：同一套套件连跑几轮，抓偶发
+  regress-rounds:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 缓存浏览器
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # 今天（2026-11-18）这步在 CI 上卡过一次 8 分钟超时，这里放宽到 15
+      - name: 安装浏览器系统依赖
+        timeout-minutes: 15
+        run: npx playwright install-deps chromium webkit
+
+      - name: 安装浏览器
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 12
+        run: npx playwright install chromium webkit
+
+      - name: 生成示例数据
+        run: python3 tools/bundle.py --data sample
+
+      # 服务端套件连跑 3 轮（⑰ 曾经就是本地必现、CI 才漏掉的类型）
+      - name: 服务端回归 ×3
+        run: |
+          for i in 1 2 3; do
+            echo "===== 第 $i 轮 ====="
+            python3 tools/test_server.py || exit 1
+          done
+
+      # 真浏览器 e2e 连跑 2 轮
+      - name: e2e ×2
+        timeout-minutes: 30
+        run: |
+          for i in 1 2; do
+            echo "===== e2e 第 $i 轮 ====="
+            npx playwright test || exit 1
+          done
+
+      - name: 报告摘要
+        if: always()
+        run: node tools/e2e/summary.js
+
+      - name: 上传报告
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            e2e-results.json
+          if-no-files-found: warn
+          retention-days: 7
