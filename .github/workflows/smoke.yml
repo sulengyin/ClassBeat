@@ -134,7 +134,7 @@ jobs:
             Write-Output "::error::老师数据 marker.txt 被覆盖"; exit 1 }
           if ((Get-Content (Join-Path $t 'update-source.txt')) -ne 'my own source') {
             Write-Output "::error::自定义更新源被覆盖"; exit 1 }
-          foreach ($f in @('server\python\python.exe', 'app\screen.html',
+          foreach ($f in @('server\python\python.exe', 'app\index.html',
                            'tools\launcher\install-autostart.ps1',
                            '安装开机自启.bat', '启动手机服务.bat', 'install.ps1')) {
             if (-not (Test-Path (Join-Path $t $f))) {

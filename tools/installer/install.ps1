@@ -33,7 +33,7 @@ try { Start-Transcript -Path $transcript -Force -ErrorAction SilentlyContinue | 
 $src = $PSScriptRoot
 if (-not $src) { $src = Split-Path -Parent $MyInvocation.MyCommand.Path }
 if (-not $TargetDir) { $TargetDir = Join-Path $env:LOCALAPPDATA 'ClassBeat' }
-if (-not (Test-Path (Join-Path $src 'app\screen.html'))) {
+if (-not (Test-Path (Join-Path $src 'app\index.html'))) {
   Write-Output "安装包不完整：解压内容里没有程序文件。"
   if (-not $NoPause) { Read-Host '按回车退出' | Out-Null }
   exit 1
