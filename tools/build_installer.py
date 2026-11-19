@@ -35,15 +35,23 @@ SFX = ROOT / "tools" / "installer" / "7zSD.sfx"
 INSTALL_PS1 = ROOT / "tools" / "installer" / "install.ps1"
 
 # 7zSD 安装壳配置：解压完直接跑 install.ps1（UTF-8 变体要求本段
-# 以 UTF-8 无 BOM 编码、紧跟在 sfx 模块字节之后）。GUIMode=2 全静默：
-# 默认模式会在解压时弹进度窗、出错时弹没人点的错误框把流程挂死
-# （2026-11-19 第二轮冒烟 20 分钟超时踩到）；静默模式下 install.ps1
-# 自己的控制台窗口照常显示安装进度。
+# 以 UTF-8 无 BOM 编码、紧跟在 sfx 模块字节之后）。
+#
+# 为什么用 ExecuteFile/ExecuteParameters 而不是 RunProgram（源码
+# CPP/7zip/Bundles/SFXSetup/SfxSetup.cpp 的坑，2026-11-19 三轮冒烟
+# 才定位到）：RunProgram 的整条命令行会被加上 ".\" 前缀去
+# CreateProcess，"powershell" 变成 ".\powershell"，只查当前目录
+# 不走 PATH → 找不到 → 弹错误框（标题 7-Zip）→ 无人点击挂死。
+# ExecuteFile 走 ShellExecuteEx，powershell.exe 经 App Paths 注册表
+# 解析，无此坑；解压工作目录已被 SetCurrentDir 成临时解压目录，
+# install.ps1 相对路径直接可用。Progress=no 让解压同步执行，
+# 不弹进度窗；出错时配合启动参数 -y 可拿到退出码而不是挂死。
 CONFIG_TMPL = (
     ";!@Install@!UTF-8!\n"
     'Title="ClassBeat"\n'
-    'GUIMode="2"\n'
-    'RunProgram="{runprogram}"\n'
+    'Progress="no"\n'
+    'ExecuteFile="powershell.exe"\n'
+    'ExecuteParameters="{execparams}"\n'
     ";!@InstallEnd@!\n"
 )
 
@@ -116,10 +124,10 @@ def main() -> int:
                 z.writeall(p, arcname=p.name)
 
         # 3) 三段拼接：sfx 模块 + 配置 + 压缩包
-        runprogram = "powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoPause"
+        execparams = "-NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoPause"
         if a.install_args:
-            runprogram += " " + a.install_args.strip()
-        config = CONFIG_TMPL.format(runprogram=runprogram).encode("utf-8")
+            execparams += " " + a.install_args.strip()
+        config = CONFIG_TMPL.format(execparams=execparams).encode("utf-8")
         exe = dist / setup_name
         with open(exe, "wb") as out:
             out.write(SFX.read_bytes())
