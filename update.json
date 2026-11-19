@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.9",
-  "build": "e049250",
-  "publishedAt": "2026-11-19T19:21:18+08:00",
+  "version": "0.3.10",
+  "build": "d5e4187",
+  "publishedAt": "2026-11-19T21:35:11+08:00",
   "minVersion": "0.2.0",
-  "notes": "- **大屏只在课间和眼保健操开始那一瞬间出现**：之前页面被关掉后，\n  看门狗隔几秒就拉一次，上课期间也在抢屏幕。现在的规矩是——开机\n  时出现一次；**课间、眼保健操/大课间开始那一刻**，大屏在就带到\n  前台、不在就拉起；其余时间（上课、午间、放学后）不管老师在不在\n  用浏览器，都不打扰、不抢屏。关掉的大屏下一个课间开始才回来，\n  想立刻回来双击「打开大屏.bat」。\n- **桌面上有图标了**：如果桌面上缺 ClassBeat 图标，每次打开大屏时\n  会自动补一个（指向「大屏全屏.bat」），不用再跑「安装开机自启.bat」。\n- 周末与节假日不弹屏（按大屏里的校历判断）。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.9/classbeat-0.3.9.zip",
-  "sha256": "92b0647da117f568ca48573f9b6e304e11acdc3fe2a98da4df500a474b5ea92a",
-  "bytes": 11767104,
+  "notes": "- **提醒规则细化**：课间、眼保健操/大课间时段内，页面不在就拉起、\n  最小化就带到前台——**每个时段只提醒这一次**；提醒后你再关闭或\n  最小化，该时段内不再打扰，下个时段另算。其余时间照旧完全不扰。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.10/classbeat-0.3.10.zip",
+  "sha256": "2236cc171a63a9e7ffea2da7189665a500bb06693a9f8bc480217ba32077c76d",
+  "bytes": 11767257,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "5ba529e1f7555f59af1d26217dba38652c202e8df925d1b2afaad22660ca5917",
+      "sha256": "503d6157730824c35e9adacde8c04ef2df0b7e95d9c2c168cca6eba64e2fe51b",
       "bytes": 17039
     },
     {
@@ -121,8 +121,8 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "69de7704c327a75c219e05680dca14f54448e5183c4c034b291ed1a50d93f38b",
-      "bytes": 593
+      "sha256": "8122c44a424971c6d68aa1f13ef7d760aa59da4f87e8c9a723b83bd4f6ddaf5d",
+      "bytes": 594
     },
     {
       "path": "server/phone.html",
