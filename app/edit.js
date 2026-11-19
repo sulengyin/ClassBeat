@@ -530,11 +530,15 @@
     { n: 4, label: "周四" }, { n: 5, label: "周五" }
   ];
 
-  /* 提醒事项：单独一条，按天覆盖「每天」。留空 = 用每天那条。 */
-  function setReminder(key, v) {
+  /* 提醒事项：一句文字 + 选哪几天显示（都选 = 每天）。
+   存储仍写 reminders：default 存文字、days 存选中的星期（缺 days = 每天），
+   旧版本按星期单独填的覆盖条目原样保留、照旧生效。 */
+  function setReminderConfig(text, days) {
     var r = Object.assign({}, S.texts().reminders);
-    v = (v || "").trim();
-    if (v) r[key] = v; else delete r[key];
+    text = (text || "").trim();
+    if (text) r["default"] = text; else delete r["default"];
+    if (days && days.length && days.length < WEEKDAYS.length) r.days = days;
+    else delete r.days;
     S.patchTexts({ reminders: Object.keys(r).length ? r : null });
   }
 
@@ -630,33 +634,6 @@
     });
     bodyEl.appendChild(sec0);
 
-    /* 提醒事项：黄色贴纸，单独一块。每天一条，某天要换就单独填。 */
-    var secM = h("section", "ep-sec wide");
-    secM.appendChild(h("h3", null, "晨间自主管理 · 提醒事项"));
-    secM.appendChild(h("p", "ep-note",
-      "这块会用黄色贴纸单独显示，适合放今天必须记住的事"
-      + "（带回执、穿校服、带水杯）。留空的星期就用「每天」这一条。"));
-    var rems = T.reminders || {};
-
-    var mhead = h("div", "ep-read ep-rem head");
-    mhead.appendChild(h("span", "ep-read-day", ""));
-    mhead.appendChild(h("span", "ep-read-tag", "提醒文字（留空 = 不显示）"));
-    secM.appendChild(mhead);
-
-    var mrows = [{ key: "default", label: "每天", ph: "带齐今天要用的书和作业，课前摆好。" }]
-      .concat(WEEKDAYS.map(function (w) {
-        return { key: String(w.n), label: w.label, ph: rems["default"] || "" };
-      }));
-
-    mrows.forEach(function (m) {
-      var row = h("div", "ep-read ep-rem");
-      row.appendChild(h("span", "ep-read-day", m.label));
-      row.appendChild(readInput(m.ph, rems[m.key] || "",
-        function (v) { setReminder(m.key, v); }));
-      secM.appendChild(row);
-    });
-    bodyEl.appendChild(secM);
-
     var sec1 = h("section", "ep-sec wide");
     sec1.appendChild(h("h3", null, "课间这一屏"));
     sec1.appendChild(h("p", "ep-note",
@@ -687,6 +664,38 @@
           S.patchTexts({ tips: tips });
         }));
     });
+
+    /* 提醒事项（真机反馈 2026-11-20 ②）：它本来就是各时段提示的一部分，
+       从单独一块并入这里；保留黄色贴纸样式，加「哪几天显示」多选。 */
+    var rems = T.reminders || {};
+    var daysSel = (rems.days && rems.days.length) ? rems.days.slice()
+      : WEEKDAYS.map(function (w) { return w.n; });
+
+    sec2.appendChild(h("p", "ep-note", "—— 晨间自主管理 · 提醒事项 ——"));
+    sec2.appendChild(field("提醒文字（黄色贴纸，留空 = 不显示）",
+      "带齐今天要用的书和作业，课前摆好。", rems["default"] || "",
+      function (v) { setReminderConfig(v, daysSel); }));
+
+    var daysRow = h("div", "ep-rem-days");
+    daysRow.appendChild(h("span", "ep-flabel", "哪几天显示"));
+    var dayBtns = {};
+    WEEKDAYS.forEach(function (w) {
+      var b = h("button", "ep-daybtn" + (daysSel.indexOf(w.n) >= 0 ? " on" : ""), w.label);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        var i = daysSel.indexOf(w.n);
+        if (i >= 0) daysSel.splice(i, 1); else daysSel.push(w.n);
+        b.classList.toggle("on", daysSel.indexOf(w.n) >= 0);
+        setReminderConfig((rems["default"] || ""), daysSel);
+        flash("已保存，大屏已经换了");
+        if (root.Screen) root.Screen.render();
+      });
+      dayBtns[w.n] = b;
+      daysRow.appendChild(b);
+    });
+    sec2.appendChild(daysRow);
+    sec2.appendChild(h("p", "ep-note",
+      "都选着 = 每天显示；哪天有特别安排就把它点掉。大屏样式不变，仍是黄色贴纸。"));
     bodyEl.appendChild(sec2);
 
     var sec3 = h("section", "ep-sec wide");

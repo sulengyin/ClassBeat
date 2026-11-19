@@ -137,15 +137,28 @@
   function reminderFor(opts, day) {
     var R = opts && opts.texts && opts.texts.reminders;
     if (!R) return "";
+    /* 老师选了「每周几」就只在那几天显示（0.3.14）；没选（缺 days）
+       等于每天。旧的按星期单独填的条目照旧生效。 */
+    var days = R.days;
+    if (days && days.length && days.indexOf(day.weekday) < 0) return "";
     var v = R[String(day.weekday)];
     if (v == null || String(v).trim() === "") v = R["default"];
     return (v == null ? "" : String(v)).trim();
   }
 
-  function countdownFor(kind, remainMin, mode) {
+  /* picks：老师逐段勾选（prefs.cdPicks，null = 跟随推荐/旧的三档模式）。
+     勾选优先级高于 mode：勾了就显示、去勾就隐藏；勾选一个推荐里没有的段
+     （如上课）时给它 untilEnd/10 分钟的默认窗口，别让数字一闪而过。 */
+  function countdownFor(kind, remainMin, mode, picks) {
     var conf = CD[kind] || { mode: "off" };
-    if (mode === "off") return { visible: false };
-    if (mode === "all") conf = { mode: conf.mode === "off" ? "untilEnd" : conf.mode, showFrom: Infinity };
+    var has = picks && Object.prototype.hasOwnProperty.call(picks, kind);
+    if (has) {
+      if (!picks[kind]) return { visible: false };
+      if (conf.mode === "off") conf = { mode: "untilEnd", showFrom: 10 };
+    } else {
+      if (mode === "off") return { visible: false };
+      if (mode === "all") conf = { mode: conf.mode === "off" ? "untilEnd" : conf.mode, showFrom: Infinity };
+    }
     if (conf.mode === "off") return { visible: false };
     var visible = remainMin <= (conf.showFrom || 0) && remainMin > -0.5;
     return {
@@ -177,6 +190,7 @@
   function coreStateAt(day, minutes, opts) {
     opts = opts || {};
     var mode = opts.countdownMode || "auto";
+    var picks = opts.cdPicks || null;
 
     if (!day || day.inSchool === false) {
       return {
@@ -218,7 +232,7 @@
           lines: remEarly
             ? [{ kind: "reminder", label: "提醒事项", items: [remEarly] }]
             : [],
-          countdown: countdownFor("reading", first - minutes, mode),
+          countdown: countdownFor("reading", first - minutes, mode, picks),
           clock: m2t(minutes),
           _ctx: { type: "reading", remain: first - minutes, dur: Math.max(first - earlyStart, 1) }
         };
@@ -237,7 +251,7 @@
     var remain = t2m(b.end) - minutes;
     var lead = prepLeadOf(opts);
     var card = { kind: b.type, title: blockName(b), sub: "", note: b.tip || "",
-                 meta: [], items: b.items || [], countdown: countdownFor(b.type, remain, mode),
+                 meta: [], items: b.items || [], countdown: countdownFor(b.type, remain, mode, picks),
                  clock: m2t(minutes), range: b.start + "–" + b.end,
                  _ctx: { type: b.type, remain: remain, dur: t2m(b.end) - t2m(b.start),
                          start: b.start, end: b.end, index: i,

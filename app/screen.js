@@ -476,7 +476,7 @@
     var p = S.prefs();
     var mode = p.cdMode || "auto";
     var texts = S.texts ? S.texts() : {};
-    var s = R.stateAt(day, minutes, { countdownMode: mode, texts: texts, prepLead: p.prepLead });
+    var s = R.stateAt(day, minutes, { countdownMode: mode, texts: texts, prepLead: p.prepLead, cdPicks: cdPicks() });
 
     /* 老师发的临时通知分两级：普通提示只占一条，紧急占整个主区 */
     var notice = activeNotice(ov);
@@ -820,13 +820,59 @@
   var MODES = ["auto", "all", "off"];
   var MODE_LABEL = { auto: "按推荐", all: "全部显示", off: "全部关闭" };
 
+  /* 倒计时逐段选择：真机反馈 2026-11-20 ①——老师不懂「按推荐/全部显示/
+     全部关闭」三档是什么意思，改成点图标弹窗：解释 + 直接勾选。 */
+  var CD_KINDS = [
+    { kind: "break",   label: "课间",           rec: true },
+    { kind: "meal",    label: "午餐",           rec: true },
+    { kind: "noon",    label: "午间",           rec: true },
+    { kind: "action",  label: "活动",           rec: true },
+    { kind: "reading", label: "晨间自主管理",   rec: false },
+    { kind: "class",   label: "上课",           rec: false },
+    { kind: "ritual",  label: "集会 / 眼保健操", rec: false },
+    { kind: "after",   label: "课后服务",       rec: false }
+  ];
+
+  function cdPicks() {
+    var p = S.prefs().cdPicks;
+    return (p && typeof p === "object") ? p : null;
+  }
+
+  function openCdDialog() {
+    if (!el.cdModal || !el.cdList) return;
+    var picks = cdPicks();
+    el.cdList.innerHTML = "";
+    CD_KINDS.forEach(function (k) {
+      var lab = document.createElement("label");
+      if (k.rec) lab.className = "rec";
+      var box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = picks ? !!picks[k.kind] : k.rec;
+      box.addEventListener("change", function () {
+        var next = Object.assign({}, cdPicks() || {});
+        next[k.kind] = box.checked;
+        S.setPref("cdPicks", next);
+        paintControls();
+        lastSig = "";
+        render();
+      });
+      lab.appendChild(box);
+      lab.appendChild(document.createTextNode(k.label));
+      el.cdList.appendChild(lab);
+    });
+    el.cdModal.hidden = false;
+  }
+  function closeCdDialog() { if (el.cdModal) el.cdModal.hidden = true; }
+
   function paintControls() {
     var p = S.prefs();
     /* 2026-11-20 图标化：倒计时按钮不再占文字，状态写进悬停提示 */
-    var cdTip = "倒计时 · " + MODE_LABEL[p.cdMode || "auto"];
+    /* 2026-11-20：倒计时改弹窗选择，不再三档循环；旧 cdMode 保留兼容 */
+    var picks = cdPicks();
+    var cdTip = picks ? "倒计时 · 已自定义" : "倒计时 · " + MODE_LABEL[p.cdMode || "auto"];
     el.btnCd.dataset.tip = cdTip;
     el.btnCd.setAttribute("aria-label", cdTip);
-    el.btnCd.classList.toggle("on", (p.cdMode || "auto") !== "auto");
+    el.btnCd.classList.toggle("on", !!picks || (p.cdMode || "auto") !== "auto");
     /* 2026-11-19 真机反馈③：默认无动效。亮起表示「动效开着」；
      文案跟着状态走，点一下就是切到另一边。 */
     el.btnReduce.textContent = p.reduce ? "增加动效" : "关闭动效";
@@ -851,6 +897,7 @@
       exitText: $("exitText"),
       guideModal: $("guideModal"), guideTitle: $("guideTitle"), guideText: $("guideText"),
       guideDots: $("guideDots"), guideSkip: $("guideSkip"), guideNext: $("guideNext"),
+      cdModal: $("cdModal"), cdList: $("cdList"), cdAuto: $("cdAuto"), cdDone: $("cdDone"),
       helpModal: $("helpModal"), helpClose: $("helpClose"), helpCloseBtn: $("helpCloseBtn"),
       helpPhone: $("helpPhone"), btnHelp: $("btn-help"),
       msgModal: $("msgModal"), msgCard: $("msgCard"), msgContent: $("msgContent"),
@@ -939,11 +986,19 @@
     });
 
     el.btnCd.addEventListener("click", function () {
-      var cur = S.prefs().cdMode || "auto";
-      S.setPref("cdMode", MODES[(MODES.indexOf(cur) + 1) % MODES.length]);
+      openCdDialog();
+    });
+
+    if (el.cdAuto) el.cdAuto.addEventListener("click", function () {
+      S.setPref("cdPicks", null);
       paintControls();
+      closeCdDialog();
       lastSig = "";
       render();
+    });
+    if (el.cdDone) el.cdDone.addEventListener("click", closeCdDialog);
+    if (el.cdModal) el.cdModal.addEventListener("click", function (e) {
+      if (e.target === el.cdModal) closeCdDialog();
     });
 
     el.btnReduce.addEventListener("click", function () {
@@ -969,6 +1024,7 @@
       if (el.exitModal && !el.exitModal.hidden) { closeExit(); return; }
       if (el.helpModal && !el.helpModal.hidden) { closeHelp(); return; }
       if (el.guideModal && !el.guideModal.hidden) { closeGuide(true); return; }
+      if (el.cdModal && !el.cdModal.hidden) { closeCdDialog(); return; }
       if (menuIsOpen()) { closeMenu(); return; }
       if (el.msgModal && el.msgModal.classList.contains("open")) hideMessage(true);
     });

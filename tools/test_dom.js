@@ -125,13 +125,15 @@ const document = {
 
 /* 主屏骨架：与 index.html 的 id 对齐 */
 const BTN_IDS = new Set(["warn-title", "btn-help", "btn-min", "btn-exit",
-  "exitCancel", "exitGo", "guideSkip", "guideNext", "helpClose", "helpCloseBtn", "helpPhone"]);
+  "exitCancel", "exitGo", "guideSkip", "guideNext", "helpClose", "helpCloseBtn", "helpPhone",
+  "cdAuto", "cdDone"]);
 ["cls", "date", "clock", "sec", "main", "band", "bandText", "spine", "heroMain", "heroSub", "heroTask", "after", "chips",
  "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner", "menu",
  "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
  "btn-update", "update-dot", "btn-help", "btn-min", "btn-exit",
  "exitModal", "exitCancel", "exitGo", "exitText",
  "guideModal", "guideTitle", "guideText", "guideDots", "guideSkip", "guideNext",
+ "cdModal", "cdList", "cdAuto", "cdDone",
  "helpModal", "helpClose", "helpCloseBtn", "helpPhone",
  "qr-panel", "qr-url", "qr-empty", "qr-close",
  "qr-copy-row", "qr-copy", "qr-copied", "qr-change",
@@ -1575,6 +1577,47 @@ global.Remote.info.phone = "";
     "没有本地服务时提示用退出大屏.bat", document.getElementById("exitText").textContent);
   document.getElementById("exitCancel")._h.click();
   check(exitModal.hidden === true, "确认框能取消");
+
+  /* ---------- 2026-11-20 反馈：倒计时弹窗选择 + 提醒事项并入提示语 ---------- */
+
+  /* 倒计时：点图标弹选择框（解释 + 逐段勾选），不再「三档循环」让人猜 */
+  const cdModal = document.getElementById("cdModal");
+  const cdList = document.getElementById("cdList");
+  document.getElementById("btn-cd")._h.click();
+  check(cdModal.hidden === false && cdList.children.length === 8,
+    "点倒计时图标弹出逐段选择框", cdList.children.length + " 段");
+  const cdChecked = cdList.children.filter(l => l.children[0].checked).length;
+  check(cdChecked === 4, "默认勾选推荐的 4 段", cdChecked + " 段");
+  const firstBox = cdList.children[0].children[0];
+  firstBox.checked = false;
+  firstBox._h.change();
+  check(global.Store.prefs().cdPicks && global.Store.prefs().cdPicks.break === false,
+    "去勾一段立即写进偏好", JSON.stringify(global.Store.prefs().cdPicks));
+  document.getElementById("cdAuto")._h.click();
+  check(cdModal.hidden === true && !global.Store.prefs().cdPicks,
+    "「恢复按推荐」清掉逐段选择并关闭弹窗");
+
+  /* 提醒事项按星期显示：days 缺省 = 每天；days 只含 4 → 周四显示、其他天不显示 */
+  global.Store.patchTexts({ reminders: { "default": "带齐回执", days: [4] } });
+  global.__rhythmDate = "2026-11-05";
+  global.__rhythmTime = 7 * 60 + 30;
+  Screen.render();
+  check(!!document.querySelector(".reminder-line"),
+    "选中的星期四贴纸照常显示");
+  global.Store.patchTexts({ reminders: { "default": "带齐回执", days: [1] } });
+  Screen.render();
+  check(!document.querySelector(".reminder-line"),
+    "没选中的星期四不显示提醒");
+  global.Store.patchTexts({ reminders: { "default": "带齐回执" } });
+
+  /* 文字页签：提醒事项不再是独立板块，并入「各时段的提示语」并带星期多选 */
+  const editSrc = fs.readFileSync(path.join(ROOT, "app/edit.js"), "utf8");
+  check(!editSrc.includes("secM")
+        && editSrc.includes("哪几天显示")
+        && editSrc.includes("ep-daybtn"),
+    "编辑面板：提醒事项并入提示语并带星期多选");
+  const editCssSrc = fs.readFileSync(path.join(ROOT, "app/edit.css"), "utf8");
+  check(editCssSrc.includes(".ep-daybtn.on"), "星期按钮有选中态样式");
 
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
