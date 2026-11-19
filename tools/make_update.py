@@ -46,12 +46,15 @@ def read_version(entries):
 
 def is_program_file(rel):
     """只列会被替换的程序文件；运行时、说明和单文件版不进清单。"""
-    if rel in ("MANIFEST.txt", "使用说明.txt"):
+    if rel in ("MANIFEST.txt", "使用说明.txt", "update-source.txt"):
         return False
     if rel.endswith("-单文件版.html") or rel.endswith("-single.html"):
         return False
     if rel.startswith("server/python/"):
         return False
+    # 启动器脚本随版本走（2026-11-19），与 updater.is_program_path 同口径
+    if rel.startswith("tools/launcher/") and rel.endswith((".ps1", ".cmd")):
+        return True
     return rel.startswith("app/") or rel.startswith("server/") or rel.endswith(".bat")
 
 

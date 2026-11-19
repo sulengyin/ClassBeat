@@ -291,7 +291,7 @@ def updater_manager():
     global UPDATER
     if UPDATER is None:
         UPDATER = updater.UpdateManager(INSTALL_ROOT)
-    UPDATER.manifest_url = UPDATE.get("url") or ""
+    UPDATER.manifest_url = bust_cache(UPDATE.get("url") or "")
     UPDATER.current_version = app_version()["version"]
     UPDATER.base_url = "http://127.0.0.1:%d" % CONF["port"]
     UPDATER.url_rewrite = make_accel_rewrite(accel_prefix(UPDATER.manifest_url))
@@ -310,6 +310,16 @@ def version_key(v):
     return tuple(out)
 
 
+def bust_cache(url):
+    """加速域名对 raw 文件有 CDN 缓存，发版后旧清单可能滞后几小时
+    （2026-11-19 实测：v0.3.5 已发布，ghfast.top 仍回 v0.3.4）。给
+    请求加 10 分钟粒度的时间戳参数绕缓存——认 query 的缓存被绕开，
+    不认 query 的代理原样透传，两种都没副作用。"""
+    if not url or "?" in url:
+        return url
+    return url + "?t=" + dt.datetime.now(BEIJING).strftime("%Y%m%d%H%M")
+
+
 def check_update_once():
     """问一次更新源（校内共享盘/静态站的 JSON）。任何异常都只表示「没查到」。"""
     url = UPDATE.get("url")
@@ -317,7 +327,8 @@ def check_update_once():
         return
     latest = ""
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "classbeat-update-check"})
+        req = urllib.request.Request(bust_cache(url),
+                                     headers={"User-Agent": "classbeat-update-check"})
         with urllib.request.urlopen(req, timeout=5) as r:
             raw = r.read(65536).decode("utf-8", "replace")
         data = json.loads(raw)

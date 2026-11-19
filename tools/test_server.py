@@ -386,13 +386,14 @@ def main():
               "㉒ 版本比较规则稳定")
 
         # ㉓ 更新源报更高版本：/api/update 说「有新版」，但不回传更新源地址
-        online = {"text": json.dumps({"version": "9.9.9"})}
+        online = {"text": json.dumps({"version": "9.9.9"}), "paths": []}
 
         class UpdateSource(hub.BaseHTTPRequestHandler):
             def log_message(self, *args):
                 pass
 
             def do_GET(self):
+                online["paths"].append(self.path)
                 body = online["text"].encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -405,6 +406,7 @@ def main():
         threading.Thread(target=usrv.serve_forever, daemon=True).start()
         try:
             hub.UPDATE["url"] = f"http://127.0.0.1:{usrv.server_address[1]}/latest.json"
+            hub.UPDATE["latest"] = ""
             hub.check_update_once()
             _, _, raw = req(port, "/api/update")
             u = json.loads(raw)
@@ -413,6 +415,9 @@ def main():
             check(u.get("version") == src_version and bool(u.get("startedAt"))
                   and "url" not in raw.decode("utf-8"),
                   "㉓a /api/update 只说本机版本，不泄露更新源")
+            check(any("?t=" in p for p in online["paths"]),
+                  "㉓b 清单请求带缓存绕过参数（发版后 CDN 不吐旧清单）",
+                  online["paths"][:1])
             online["text"] = "这不是 JSON"
             hub.check_update_once()
             bad_ok = hub.UPDATE["available"]

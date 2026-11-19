@@ -80,6 +80,11 @@ def is_program_path(rel):
     if rel.startswith("server/") and rel.endswith(".py") \
             and not rel.startswith("server/python/"):
         return True
+    # 启动器脚本也随版本走（2026-11-19）：图标改名这类修复要能
+    # 到达已装的机器，否则老师升级后桌面图标还是旧名字。日志文件
+    # 不在清单里，天然不会被换。
+    if rel.startswith("tools/launcher/") and rel.endswith((".ps1", ".cmd")):
+        return True
     return "/" not in rel and rel.endswith(".bat")
 
 
