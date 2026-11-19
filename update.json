@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.6",
-  "build": "b11a700",
-  "publishedAt": "2026-11-19T13:58:49+08:00",
+  "version": "0.3.7",
+  "build": "47caa2f",
+  "publishedAt": "2026-11-19T16:06:17+08:00",
   "minVersion": "0.2.0",
-  "notes": "- **简易安装器上线**：不用再解压文件夹了。下载\n  `classbeat-setup-版本号.exe` 双击即可——自动装到本机用户目录、\n  保留已导入的班级数据和自己改过的更新源、写开机自启、桌面建\n  ClassBeat 图标。老安装方式（zip 解压）继续可用。\n- 安装器在 Windows 冒烟工作流里真机化验证：真实安装一遍，\n  确认旧数据保留、程序文件齐全。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.6/classbeat-0.3.6.zip",
-  "sha256": "8eb5a9673d7d4a9c19c14547989e2431991deb44cacfb4384056ddc5b9836b41",
-  "bytes": 11757646,
+  "notes": "- **大屏不再反复抢屏幕了**：老师在同一台电脑上用浏览器干别的时，\n  看门狗会把 kiosk 窗口误判成\"没开\"，隔几秒拉一次，大屏不断跳\n  出来。现在改成枚举所有窗口标题判断，误判消除；另外如果你主动\n  关了大屏（要用电脑），10 分钟内不再自动拉起，暂停时间逐次加长。\n  要用电脑时双击「退出大屏.bat」，恢复双击「打开大屏.bat」。\n- **改作息不再误报\"时段重叠或空缺\"**：11:40-11:50、11:50-12:20\n  这种首尾相接的时段曾被误判。现在改某一段的起止，相邻段的边界\n  自动跟着补齐，报错信息也会把两段时间明明白白写出来。\n- **改完作息，文字页签即时跟上**：之前保存被误报拦住、改时段名\n  时提示语没跟着搬，都会让文字页签看着是旧的。两处都修了。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.7/classbeat-0.3.7.zip",
+  "sha256": "d880c122762e21873b84096587000108f3e4fab3ac4b5f4bfad88ca50dc4c572",
+  "bytes": 11762329,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "84a9fe5bab0465efb0b4dfa5d527558a27527c44f297b3db61178794b25f726b",
+      "sha256": "c1621589f4b320b6dc636bf5a9a9d6337ab4e2942e1a85d3e487ec5e9aacc00b",
       "bytes": 17039
     },
     {
@@ -41,8 +41,8 @@
     },
     {
       "path": "app/edit.js",
-      "sha256": "a7b5005057e71fdbdb2caa920be9e0f45745e11ce28e9ac797f307ad1eec092d",
-      "bytes": 59005
+      "sha256": "ee10aa405ab52c056e49736b6f9e6a804e38d244fc47c83939f4c873ec1d7716",
+      "bytes": 61844
     },
     {
       "path": "app/engine/schedule.js",
@@ -96,8 +96,8 @@
     },
     {
       "path": "app/setup.js",
-      "sha256": "135204337daade1b114c597d47ec509eb6e9352679504c41b9bade5c79ee2019",
-      "bytes": 111083
+      "sha256": "bf301688870bb613d50526a2d4f013dd6ea26e89e82ba65c88df5b17e00f03e0",
+      "bytes": 111356
     },
     {
       "path": "app/store.js",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "5fd22f14106bb4e25f61a4855f7a0deb9382f809633eb03cbe21bdaf23caf8cb",
+      "sha256": "0804c0d82108828c026e091d2eb99ddaa68acdf692cc38b83bda4647951eacee",
       "bytes": 593
     },
     {
@@ -186,13 +186,18 @@
     },
     {
       "path": "tools/launcher/start-kiosk.ps1",
-      "sha256": "56d51ee76160893277511ef1c2e74e7385977030698ccb97bb574e0a5a6fb4ef",
-      "bytes": 16734
+      "sha256": "28a7a79d441c4b7a01262f42a7be0508f6a239f439371eb00c8edbcf3d43fb07",
+      "bytes": 17301
     },
     {
       "path": "tools/launcher/watchdog.ps1",
-      "sha256": "305513ffc190cef4bd1b94d7b42ab46f0ab78cde3fe333841d123732d337dd39",
-      "bytes": 8523
+      "sha256": "c2d44733939d480ea9ffb4bbfc52e2b80940e89bfd9c54934354f50f2aa8342e",
+      "bytes": 10861
+    },
+    {
+      "path": "tools/launcher/win-titles.ps1",
+      "sha256": "bbf4319240abb2d7aacc287cad1c46a617bf476eecbae405ebc5f79d360a7241",
+      "bytes": 1952
     },
     {
       "path": "停止手机服务.bat",
