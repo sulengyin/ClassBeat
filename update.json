@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.11",
-  "build": "5219c72",
-  "publishedAt": "2026-11-19T21:44:46+08:00",
+  "version": "0.3.12",
+  "build": "d0ce046",
+  "publishedAt": "2026-11-19T22:08:11+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **启动器（看门狗）修复随「检查更新」自动到达**：之前启动器脚本\n  只随安装包走，弹屏规则的调整要装一次安装器才能生效。现在恢复\n  随版本更新。0.3.8 之前的老版本会得到\"请下载完整安装包\"的提示，\n  装一次安装器即可；0.3.8 及以后都能直接在线升。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.11/classbeat-0.3.11.zip",
-  "sha256": "6be6adf3b6fc0fd66d043fa18090a9e3db2060afe85d2dca21d3a22200cee2ac",
-  "bytes": 11767250,
+  "notes": "- **装完即生效，不用再重启电脑**：安装器现在会自动让旧看门狗退出、\n  新看门狗立即在后台接管（旧版本装完要重启一次电脑，看门狗的新\n  规则才生效）。装完大屏会自动打开，桌面上就是 ClassBeat 图标。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.12/classbeat-0.3.12.zip",
+  "sha256": "06ec4a4a96b7fa535a3fefd39a850610eed1d55f462a3b0a90ab3ab6291a3544",
+  "bytes": 11767251,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "1e70c0590c52630d85fe0cb1153c3a37d5ae5e257e6b7b95e8d189ab4c4a3519",
+      "sha256": "ba1ba769a1078fcae24a68a088b49b69ad06e50993deaad723632e4a6256c049",
       "bytes": 17039
     },
     {
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "911cb99f91e8c1d79e332f0ebe94a6925d36506fe3f6d23444661c661d41d431",
+      "sha256": "706d00d86f20c69204a5647dcf9e26b895eede54a0b76f8a78ac1f193ed979d9",
       "bytes": 594
     },
     {
