@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.10",
-  "build": "d5e4187",
-  "publishedAt": "2026-11-19T21:35:11+08:00",
-  "minVersion": "0.2.0",
-  "notes": "- **提醒规则细化**：课间、眼保健操/大课间时段内，页面不在就拉起、\n  最小化就带到前台——**每个时段只提醒这一次**；提醒后你再关闭或\n  最小化，该时段内不再打扰，下个时段另算。其余时间照旧完全不扰。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.10/classbeat-0.3.10.zip",
-  "sha256": "2236cc171a63a9e7ffea2da7189665a500bb06693a9f8bc480217ba32077c76d",
-  "bytes": 11767257,
+  "version": "0.3.11",
+  "build": "5219c72",
+  "publishedAt": "2026-11-19T21:44:46+08:00",
+  "minVersion": "0.3.8",
+  "notes": "- **启动器（看门狗）修复随「检查更新」自动到达**：之前启动器脚本\n  只随安装包走，弹屏规则的调整要装一次安装器才能生效。现在恢复\n  随版本更新。0.3.8 之前的老版本会得到\"请下载完整安装包\"的提示，\n  装一次安装器即可；0.3.8 及以后都能直接在线升。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.11/classbeat-0.3.11.zip",
+  "sha256": "6be6adf3b6fc0fd66d043fa18090a9e3db2060afe85d2dca21d3a22200cee2ac",
+  "bytes": 11767250,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "503d6157730824c35e9adacde8c04ef2df0b7e95d9c2c168cca6eba64e2fe51b",
+      "sha256": "1e70c0590c52630d85fe0cb1153c3a37d5ae5e257e6b7b95e8d189ab4c4a3519",
       "bytes": 17039
     },
     {
@@ -121,8 +121,18 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "8122c44a424971c6d68aa1f13ef7d760aa59da4f87e8c9a723b83bd4f6ddaf5d",
+      "sha256": "911cb99f91e8c1d79e332f0ebe94a6925d36506fe3f6d23444661c661d41d431",
       "bytes": 594
+    },
+    {
+      "path": "server/icons/icon-192.png",
+      "sha256": "03c3be6e408a4498c9baab27b400824c7d6681e3a6f77519ccf7f742f524bb9b",
+      "bytes": 33256
+    },
+    {
+      "path": "server/icons/icon-512.png",
+      "sha256": "37b67836222ad77b7b8e63bcc3cfae1f5edc23249a0faf4a8a1e780f9608d6c3",
+      "bytes": 146478
     },
     {
       "path": "server/phone.html",
@@ -140,6 +150,11 @@
       "bytes": 7944
     },
     {
+      "path": "server/sw.js",
+      "sha256": "fd89b6fb7bd26cab40ede9f6f57aba3ac4ba5290f866de736c09356ea5c66544",
+      "bytes": 2359
+    },
+    {
       "path": "server/update_manifest.py",
       "sha256": "3f9916159a2bd8c9b6de16631fbf6092673212d969767ded6fe92db28ad40408",
       "bytes": 9857
@@ -148,6 +163,41 @@
       "path": "server/updater.py",
       "sha256": "e03c2920c64e2d07f0e3b7560d1961ac0b8b9ef8ed84dd1b4f6465d1ac46dfb4",
       "bytes": 27019
+    },
+    {
+      "path": "tools/launcher/exit-kiosk.cmd",
+      "sha256": "e48203d86c146581a82efa4d636824295962a6c691695d79efc6c70210b739a8",
+      "bytes": 258
+    },
+    {
+      "path": "tools/launcher/exit-kiosk.ps1",
+      "sha256": "efefa1514a8ccb0071cd2f9909b1621f0256d18830e33e16389afe12466b47b0",
+      "bytes": 6024
+    },
+    {
+      "path": "tools/launcher/install-autostart.ps1",
+      "sha256": "1d63f6ae67b5003c90472fc401f03e5996bf092691f6d9713aa221c943e42f0d",
+      "bytes": 4968
+    },
+    {
+      "path": "tools/launcher/start-kiosk.cmd",
+      "sha256": "875de55c4e5971297efd5bd40ad4804694de3b1e3d4b7dca9d28306347838870",
+      "bytes": 270
+    },
+    {
+      "path": "tools/launcher/start-kiosk.ps1",
+      "sha256": "7eb11f278fa08868cf80a3c21ba8790a455b84fcc2c49e581dc8b1a4a2b8f892",
+      "bytes": 18491
+    },
+    {
+      "path": "tools/launcher/watchdog.ps1",
+      "sha256": "e9a155faa40e1e9b0e9372b655b7d9b092e5c3994bf5332bd284ab53c51b36f7",
+      "bytes": 15626
+    },
+    {
+      "path": "tools/launcher/win-titles.ps1",
+      "sha256": "ecce5fb67a566313b00cf326bc00229f70241f628547dc1bf6172a2e3b8745d1",
+      "bytes": 4177
     },
     {
       "path": "停止手机服务.bat",
