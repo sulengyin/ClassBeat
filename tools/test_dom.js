@@ -1431,6 +1431,37 @@ global.Remote.info.phone = "";
   check(global.Backup.mode() === "local" && !lanFetched,
     "非本机地址打开时退回浏览器副本，不发写盘请求", global.Backup.mode());
 
+  /* 作息校验（真机反馈 2026-11-19 ②）：相邻时段首尾相接不能误报；
+     比较按分钟数——"9:50" 和 "09:50" 是同一个时间；报错要带上两段的时间 */
+  const hp = global.Edit && global.Edit._hoursProblem;
+  check(!!hp, "edit.js 暴露 _hoursProblem 测试钩子");
+  if (hp) {
+    const okPair = [
+      { start: "11:40", end: "11:50", name: "课间" },
+      { start: "11:50", end: "12:20", name: "午餐" }
+    ];
+    check(hp(okPair) === "", "相邻时段（11:40-11:50 / 11:50-12:20）不再误报", hp(okPair));
+    const zeroPad = [
+      { start: "08:00", end: "9:50", name: "课间" },
+      { start: "09:50", end: "10:20", name: "午餐" }
+    ];
+    check(hp(zeroPad) === "", "上段结束不补零（9:50）和下段开始补零（09:50）也算接上了", hp(zeroPad));
+    const gap = [
+      { start: "08:00", end: "09:00", name: "课间" },
+      { start: "09:10", end: "10:00", name: "午餐" }
+    ];
+    const gapMsg = hp(gap);
+    check(gapMsg !== "" && gapMsg.includes("09:00") && gapMsg.includes("09:10"),
+      "真有空档时报错并带上两段时间", gapMsg);
+    const overlap = [
+      { start: "08:00", end: "09:30", name: "课间" },
+      { start: "09:00", end: "10:00", name: "午餐" }
+    ];
+    check(hp(overlap).includes("没接上"), "真有重叠时报错");
+    check(hp([{ start: "", end: "09:00" }]).includes("还没填时间"), "缺时间单独提示");
+    check(hp([{ start: "10:00", end: "09:00" }]).includes("早于结束"), "倒挂单独提示");
+  }
+
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
 })();

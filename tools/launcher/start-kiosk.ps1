@@ -210,12 +210,22 @@ function Get-PortOwner([int]$p) {
 }
 
 function Test-KioskWindow([int]$p) {
-  # 与 watchdog.ps1 同一套判据：窗口标题带「班级节律屏」，
+  # 与 watchdog.ps1 同一套判据：任意可见窗口的标题带「班级节律屏」，
   # 或命令行同时含 --kiosk 与 127.0.0.1:<端口>。
   # 用途：单实例——窗口已经在了就不开第二个（重复双击、看门狗误拉都到此为止）。
-  foreach ($name in @('chrome', 'msedge')) {
-    foreach ($proc in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
-      if ($proc.MainWindowTitle -and $proc.MainWindowTitle -match '班级节律屏') { return $true }
+  # 标题判据用共享助手 win-titles.ps1 枚举全部窗口（真机反馈 2026-11-19 ①）：
+  # 老师用同一个浏览器开别的网页时，进程的「主窗口」往往不是 kiosk，
+  # 只看 MainWindowTitle 会漏判，看门狗就会反复拉起第二个窗口抢屏。
+  . (Join-Path $PSScriptRoot 'win-titles.ps1')
+  $byTitle = Test-CBWindowTitle '班级节律屏'
+  if ($byTitle -ne $null) {
+    if ($byTitle) { return $true }
+  } else {
+    # 兑底：枚举不可用时退回进程主窗口标题（老行为）
+    foreach ($name in @('chrome', 'msedge')) {
+      foreach ($proc in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
+        if ($proc.MainWindowTitle -and $proc.MainWindowTitle -match '班级节律屏') { return $true }
+      }
     }
   }
   $needle = '127.0.0.1:' + $p

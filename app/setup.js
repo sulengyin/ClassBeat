@@ -1254,13 +1254,17 @@
 
   /* ---------- 校验 ---------- */
   /* 首尾必须相接：留缝会在屏上变成"没有安排的时段"，
-     引擎只能跳过，老师却以为那段时间还在上课。 */
+     引擎只能跳过，老师却以为那段时间还在上课。
+     比较分钟数而不是字符串——"9:50" 和 "09:50" 是同一个时间；
+     报错把两段的时间带上，老师一眼看到差在哪（真机反馈 2026-11-19 ②）。 */
   function blockErrors(blocks) {
     var bad = {};
     var prev = null;
     (blocks || state.blocks || []).forEach(function (b, i) {
       if (!b.start || !b.end || b.start >= b.end) bad[i] = "结束要晚于开始";
-      else if (prev && b.start !== prev) bad[i] = "和上一段之间有空隙或重叠";
+      else if (prev && hmMin(b.start) !== hmMin(prev)) {
+        bad[i] = "和上一段没接上（上一段到 " + prev + "，这一段从 " + b.start + " 开始）";
+      }
       prev = b.end;
     });
     return bad;

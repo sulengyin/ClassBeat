@@ -745,14 +745,19 @@
     return c.timetable ? JSON.parse(JSON.stringify(c.timetable)) : null;
   }
 
-  /* 首尾相接才算一张完整的作息表：中间留空，屏上那段时间就没有状态。 */
+  /* 首尾相接才算一张完整的作息表：中间留空，屏上那段时间就没有状态。
+     比较「分钟数」而不是字符串——"9:50" 和 "09:50" 是同一个时间，
+     字符串比会误报接不上（2026-11-19 真机反馈 ②）。报错把两段的
+     时间都带上，老师一眼看到差在哪。 */
   function hoursProblem(blocks) {
     for (var i = 0; i < blocks.length; i += 1) {
       var b = blocks[i];
       if (!b.start || !b.end) return "第 " + (i + 1) + " 段还没填时间";
       if (toMin(b.start) >= toMin(b.end)) return "第 " + (i + 1) + " 段：开始时间要早于结束时间";
-      if (i && blocks[i - 1].end !== b.start) {
-        return "第 " + i + " 段和第 " + (i + 1) + " 段之间有断档或重叠";
+      if (i && toMin(blocks[i - 1].end) !== toMin(b.start)) {
+        return "第 " + i + " 段（" + blocks[i - 1].start + "—" + blocks[i - 1].end +
+          "）和第 " + (i + 1) + " 段（" + b.start + "—" + b.end + "）没接上：上一段到 " +
+          blocks[i - 1].end + "，这一段从 " + b.start + " 开始";
       }
     }
     return "";
@@ -881,14 +886,32 @@
       }
       row.appendChild(name);
 
-      /* 只改时间时不重绘整块，否则输入框会失焦 */
+      /* 只改时间时不重绘整块，否则输入框会失焦。
+         边界联动：老师改某段的开始时间，上一段的结束自动跟过来；
+         改结束时间，下一段的开始自动跟过来。老师的意图就是挪边界，
+         以前要两段各改一次、中间还会弹一次"断档或重叠"的报错
+         （2026-11-19 真机反馈 ②③），现在一步到位。 */
       function commit() {
         row.classList.remove("bad");
+        var cur = blocks[idx] || {};
+        var stChanged = !!(st.value && st.value !== cur.start);
+        var enChanged = !!(en.value && en.value !== cur.end);
+        var oldName = cur.name || "";
+        var typed = name.value.trim();
+        var newName = (typed && typed !== shownName) ? typed : (cur.name || "");
         var next = blocks.map(function (x, i) {
-          if (i !== idx) return x;
+          if (i !== idx) {
+            if (stChanged && i === idx - 1 && x.end !== st.value) {
+              return Object.assign({}, x, { end: st.value });
+            }
+            if (enChanged && i === idx + 1 && x.start !== en.value) {
+              return Object.assign({}, x, { start: en.value });
+            }
+            return x;
+          }
           return Object.assign({}, x, {
             start: st.value, end: en.value,
-            name: name.value.trim() === shownName ? x.name : (name.value.trim() || x.name),
+            name: newName || x.name,
             type: curType
           });
         });
@@ -896,6 +919,29 @@
         if (bad) { row.classList.add("bad"); flash(bad); return; }
         blocks = next;
         saveHours(blocks);
+        /* 联动改了相邻段的边界，把它们的输入框就地同步（不重绘整块，
+           免得老师正在用的输入框失焦），否则数据新了、显示还是旧的。 */
+        if (stChanged || enChanged) {
+          Array.prototype.forEach.call(rows.children, function (r, i) {
+            var ins = r.querySelectorAll(".tt-time");
+            if (ins.length === 2 && blocks[i]) {
+              if (ins[0].value !== blocks[i].start) ins[0].value = blocks[i].start;
+              if (ins[1].value !== blocks[i].end) ins[1].value = blocks[i].end;
+            }
+          });
+        }
+        /* 时段改名后，旧时段名下的提示语复制给新名：文字页的新时段
+           一出来就带着原来的提示语（真机反馈 2026-11-19 ③），屏上也
+           不断档。旧名保留原提示语——同名段（两张课间）和别的课还
+           在用，不动它；老师不想要就到文字页清空。 */
+        if (oldName && newName && oldName !== newName) {
+          var tips = S.texts().tips || {};
+          if (tips[oldName] && !tips[newName]) {
+            var moved = Object.assign({}, tips);
+            moved[newName] = moved[oldName];
+            S.patchTexts({ tips: moved });
+          }
+        }
         flash("已保存，大屏已经换了");
       }
       st.addEventListener("change", commit);
@@ -1529,5 +1575,10 @@
     fr.readAsText(f, "utf-8");
   }
 
-  root.Edit = { open: open, close: close };
+  root.Edit = {
+    open: open, close: close,
+    /* 测试钩子（同 setup.js 的 _parseTimeRows 先例）：作息校验是纯函数，
+       单测直接喂块数组，不用真开面板 */
+    _hoursProblem: hoursProblem
+  };
 })(window);

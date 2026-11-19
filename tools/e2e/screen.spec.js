@@ -377,3 +377,75 @@ test("大屏编辑态的作息时间框不裁字（真机 2026-11-17）", async 
   );
   expect(ok, "大屏时间框太窄会把 08:10 裁成 08:1").toBeTruthy();
 });
+
+async function unlockEdit(page, klass) {
+  await page.locator("#btn-edit").click();
+  await expect(page.locator(".gate")).toBeVisible();
+  const q = await page.locator("#gateQ").innerText();
+  const m = q.match(/([0-9]+\.[0-9]+)\s*÷\s*([0-9]+)/);
+  expect(m, `验证码应是小数除法，实际「${q}」`).not.toBeNull();
+  const answer = (Number(m[1]) / Number(m[2])).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  for (const ch of answer) {
+    await page.locator(".gk", { hasText: new RegExp(`^${ch === "." ? "\\." : ch}$`) }).click();
+  }
+  await page.locator(".gk.primary").click();
+  await expect(page.locator("#epTitle")).toContainText(klass);
+}
+
+test("作息边界联动 + 时段改名后文字同步（真机 2026-11-19 ②③）", async ({ page, request }) => {
+  await openScreen(page, ARRIVE);
+  const ping = await (await request.get("/api/ping")).json();
+  await openTools(page);
+  await unlockEdit(page, ping.class);
+
+  await page.locator(".ep-tab", { hasText: "作息" }).click();
+  await expect(page.locator(".tt-row").first()).toBeVisible();
+
+  // 找一个非锁定（类型/名称可改）又不是第一行的段来操作
+  const rows = page.locator(".tt-row");
+  const total = await rows.count();
+  let target = -1;
+  for (let i = 1; i < total; i++) {
+    if ((await rows.nth(i).locator("select.tt-type").count()) > 0) { target = i; break; }
+  }
+  expect(target, "作息里要有一段可编辑的非锁定时段").toBeGreaterThan(0);
+
+  // ① 边界联动：改这一段的开始，上一段的结束自动跟过来，不报「没接上」
+  const row = rows.nth(target);
+  const startVal = await row.locator(".tt-time").first().inputValue();
+  const parts = startVal.split(":").map(Number);
+  const nm = parts[0] * 60 + parts[1] + 7;
+  const newStart =
+    String(Math.floor(nm / 60)).padStart(2, "0") + ":" + String(nm % 60).padStart(2, "0");
+  await row.locator(".tt-time").first().fill(newStart);
+  // time 输入框的 change 在失焦时才触发（commit 挂在 change 上）
+  await row.locator(".tt-time").first().press("Tab");
+  await expect(rows.nth(target - 1).locator(".tt-time").nth(1)).toHaveValue(newStart);
+  expect(await page.locator(".tt-row.bad").count(), "联动后不应有报错行").toBe(0);
+  await expect(page.locator("#epFlash")).toContainText("已保存");
+
+  // ② 给旧时段名写一条提示语，然后改名：提示语应跟到新名下（文字页同步）
+  const oldName = (await rows.nth(target).locator(".tt-name").inputValue()).trim();
+  await page.locator(".ep-tab", { hasText: "文字" }).click();
+  // 「各时段的提示语」区块里、标签恰好等于时段名的那个输入框
+  // （「课间 · 大字」等别的字段也含「课间」，不能拿 .first() 撞运气）
+  const tipsSec = page.locator(".ep-sec", { hasText: "各时段的提示语" });
+  const tipInput = tipsSec.locator(".ep-field").filter({
+    has: page.locator(".ep-flabel", { hasText: new RegExp(`^${oldName}$`) }),
+  }).locator("input.ep-input");
+  await tipInput.fill("先热身，再活动");
+  await tipInput.press("Tab");
+  await expect(page.locator("#epFlash")).toContainText("已保存");
+
+  const newName = oldName + "乙";
+  await page.locator(".ep-tab", { hasText: "作息" }).click();
+  const nameInput = page.locator(".tt-row").nth(target).locator(".tt-name");
+  await nameInput.fill(newName);
+  await nameInput.press("Tab");
+  await expect(page.locator("#epFlash")).toContainText("已保存");
+
+  await page.locator(".ep-tab", { hasText: "文字" }).click();
+  const renamed = page.locator(".ep-field", { hasText: newName }).first();
+  await expect(renamed).toBeVisible();
+  await expect(renamed.locator("input.ep-input")).toHaveValue("先热身，再活动");
+});

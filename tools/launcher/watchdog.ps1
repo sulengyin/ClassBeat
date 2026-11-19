@@ -49,13 +49,31 @@ function Write-Log([string]$msg) {
   } catch { }
 }
 
+function Find-AppWindowTitles {
+  # 枚举所有可见顶层窗口标题（共享助手 win-titles.ps1，见其头部说明：
+  # 2026-11-19 真机反馈 ① 的「大屏不断跳出来」就是主窗口误判导致的）。
+  . (Join-Path $PSScriptRoot 'win-titles.ps1')
+  return Get-CBWinTitles
+}
+
 function Test-AppWindow {
-  foreach ($name in $BrowserNames) {
-    $procs = @(Get-Process -Name $name -ErrorAction SilentlyContinue)
-    foreach ($p in $procs) {
-      if ($p.MainWindowTitle -and $p.MainWindowTitle -match $TitlePattern) { return $true }
+  # 主判据：任意可见窗口的标题带「班级节律屏」（不依赖谁是主窗口）。
+  $titles = Find-AppWindowTitles
+  if ($titles -ne $null) {
+    foreach ($t in $titles) {
+      if ($t -and $t -match $TitlePattern) { return $true }
+    }
+  } else {
+    # 兑底：Add-Type 不可用时退回进程主窗口标题（老行为）
+    foreach ($name in $BrowserNames) {
+      $procs = @(Get-Process -Name $name -ErrorAction SilentlyContinue)
+      foreach ($p in $procs) {
+        if ($p.MainWindowTitle -and $p.MainWindowTitle -match $TitlePattern) { return $true }
+      }
     }
   }
+  # 兑底判据：浏览器进程命令行里同时含 --kiosk 和 127.0.0.1:<端口>。
+  # （Chrome 已开时新进程可能转发给旧实例后退出，所以命令行只作兑底。）
   $needle = '127.0.0.1:' + $Port
   foreach ($name in $BrowserNames) {
     $filter = "Name='" + $name + ".exe'"
@@ -85,6 +103,15 @@ $miss = 0
 $round = 0
 $wasPresent = $null
 $lastSkipReason = ''
+
+# 老师主动关窗的退避（真机反馈 2026-11-19 ①：老师要用电脑，大屏不断
+# 跳出来）。拉起后 90 秒内窗口又没了，多半是老师自己关的，不是误关：
+# 暂停检测一段时间再试，逐次翻倍（上限 30 分钟）；期间老师随时双击
+# 「打开大屏.bat」就能回来，窗口一出现就清零。误关（窗口稳定存在过
+# 一段时间后没了）不受影响，立即恢复。
+$userCloseStreak = 0
+$pauseUntil = $null
+$lastStartAt = $null
 
 Write-Log ('看门狗启动：端口 ' + $Port + '，间隔 ' + $IntervalSeconds + 's，判据标题「' + $TitlePattern + '」')
 Write-Log ('重启命令：powershell -ExecutionPolicy Bypass -File "' + $LauncherPath + '"')
@@ -173,33 +200,49 @@ while ($true) {
       if ($wasPresent -ne $true) { Write-Log '页面存在。' }
       $wasPresent = $true
       $miss = 0
+      if ($pauseUntil -ne $null) { Write-Log '窗口回来了，清除主动关窗退避。' }
+      $pauseUntil = $null
+      $userCloseStreak = 0
+      $lastStartAt = $null
     } else {
       $wasPresent = $false
-      $miss = $miss + 1
-      Write-Log ('未检测到页面（第 ' + $miss + ' 次，阈值 ' + $MissThreshold + '）。')
-      if ($miss -ge $MissThreshold) {
-        $now = Get-Date
-        $recent = @($restarts | Where-Object { ($now - $_).TotalSeconds -lt 60 })
-        if ($recent.Count -ge $MaxRestartsPerMinute) {
-          Write-Log ('一分钟内已重启 ' + $recent.Count + ' 次，达到上限 ' + $MaxRestartsPerMinute + '，暂停 ' + $CooldownSeconds + ' 秒。')
-          Start-Sleep -Seconds $CooldownSeconds
-          $restarts.Clear()
-          $miss = 0
-        } else {
-          if ($DryRun) {
-            Write-Log ('DRYRUN：如果真跑，这里会执行：powershell -ExecutionPolicy Bypass -File "' + $LauncherPath + '"')
+      if ($pauseUntil -ne $null -and (Get-Date) -lt $pauseUntil) {
+        # 退避中：不检测不拉起，让老师安心用电脑
+        $miss = 0
+      } else {
+        $miss = $miss + 1
+        Write-Log ('未检测到页面（第 ' + $miss + ' 次，阈值 ' + $MissThreshold + '）。')
+        if ($miss -ge $MissThreshold) {
+          $now = Get-Date
+          $recent = @($restarts | Where-Object { ($now - $_).TotalSeconds -lt 60 })
+          if ($recent.Count -ge $MaxRestartsPerMinute) {
+            Write-Log ('一分钟内已重启 ' + $recent.Count + ' 次，达到上限 ' + $MaxRestartsPerMinute + '，暂停 ' + $CooldownSeconds + ' 秒。')
+            Start-Sleep -Seconds $CooldownSeconds
+            $restarts.Clear()
+            $miss = 0
+          } elseif ($lastStartAt -ne $null -and ($now - $lastStartAt).TotalSeconds -lt 90) {
+            $userCloseStreak = $userCloseStreak + 1
+            $pauseSec = [Math]::Min(1800, 600 * [Math]::Pow(2, $userCloseStreak - 1))
+            $pauseUntil = $now.AddSeconds($pauseSec)
+            $miss = 0
+            Write-Log ('拉起后 90 秒内窗口又没了，疑似老师主动关闭要用电脑：暂停 ' + $pauseSec + ' 秒再试。要用电脑请双击「退出大屏.bat」，恢复大屏双击「打开大屏.bat」。')
           } else {
-            Write-Log ('执行重启：powershell -ExecutionPolicy Bypass -File "' + $LauncherPath + '"')
-            try {
-              Start-Process -FilePath 'powershell.exe' `
-                -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $LauncherPath) `
-                -WindowStyle Hidden | Out-Null
-            } catch {
-              Write-Log ('重启失败：' + $_.Exception.Message)
+            if ($DryRun) {
+              Write-Log ('DRYRUN：如果真跑，这里会执行：powershell -ExecutionPolicy Bypass -File "' + $LauncherPath + '"')
+            } else {
+              Write-Log ('执行重启：powershell -ExecutionPolicy Bypass -File "' + $LauncherPath + '"')
+              try {
+                Start-Process -FilePath 'powershell.exe' `
+                  -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $LauncherPath) `
+                  -WindowStyle Hidden | Out-Null
+              } catch {
+                Write-Log ('重启失败：' + $_.Exception.Message)
+              }
             }
+            [void]$restarts.Add($now)
+            $lastStartAt = $now
+            $miss = 0
           }
-          [void]$restarts.Add($now)
-          $miss = 0
         }
       }
     }

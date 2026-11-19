@@ -101,6 +101,7 @@ LAUNCHER_FILES = [
     "start-kiosk.ps1", "start-kiosk.cmd",
     "exit-kiosk.ps1", "exit-kiosk.cmd",
     "watchdog.ps1", "install-autostart.ps1",
+    "win-titles.ps1",
     "classbeat.ico",
 ]
 

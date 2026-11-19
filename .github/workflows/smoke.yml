@@ -78,6 +78,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Output "启动器两件套 DryRun 通过"
 
+      # 窗口枚举助手（2026-11-19 真机反馈 ①：主窗口误判让大屏不断跳出）：
+      # DryRun 路径碰不到单实例判据，这里直接点源助手验证能编译、能枚举
+      - name: 窗口枚举助手验证
+        shell: pwsh
+        run: |
+          . (Join-Path $env:PKG 'tools\launcher\win-titles.ps1')
+          $titles = Get-CBWinTitles
+          if ($null -eq $titles) { Write-Output "::error::窗口枚举不可用"; exit 1 }
+          Write-Output ("枚举到 " + $titles.Count + " 个可见窗口标题")
+          if ($titles.Count -lt 1) { Write-Output "::error::一个窗口都没枚举到"; exit 1 }
+          $hit = Test-CBWindowTitle '不存在的标题字符串'
+          if ($hit -ne $false) { Write-Output "::error::按标题匹配应返回 false，实际 $hit"; exit 1 }
+          Write-Output "窗口枚举助手验证通过"
+
       # 简易安装器（PLAN 2.45 ③）：真 Windows 上构建 + 真实跑一遍。
       # 本地开发机沙箱会拦截「未签名 exe 派生 powershell」，只能在这里验。
       - name: 构建简易安装器
