@@ -652,15 +652,26 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
         align-items:flex-end;gap:.7vmin;z-index:60;pointer-events:none}
 .corner .tools{display:flex;gap:.6vmin;opacity:0;pointer-events:none;
                transform:translateY(.6vmin);transition:all var(--d-in) var(--e-out)}
-.corner.open .tools{opacity:1;pointer-events:auto;transform:none}
+/* 展开（点⋯）或悬停角落时露出常驻图标；触屏设备靠点⋯也能拿到 */
+.corner.open .tools,.corner:hover .tools{opacity:1;pointer-events:auto;transform:none}
 .corner button{
   pointer-events:auto;
   font:700 1.9vmin/1 inherit;padding:.9vmin 1.4vmin;border-radius:1vmin;
   border:.24vmin solid var(--line);background:var(--cream);color:var(--ink-2);cursor:pointer;
   transition:transform var(--d-in) var(--e-out),color var(--d-fast) var(--e-soft);
 }
-.corner .tools button{pointer-events:none}
-.corner.open .tools button{pointer-events:auto}
+/* 常驻图标按钮：无文字，含义靠悬停提示（1 秒延迟，避免误读） */
+.corner .tools button{pointer-events:none;width:5.4vmin;height:5.4vmin;padding:0;
+  display:flex;align-items:center;justify-content:center;position:relative}
+.corner.open .tools button,.corner:hover .tools button{pointer-events:auto}
+.corner .tools button svg{width:2.7vmin;height:2.7vmin;pointer-events:none}
+.corner .tools button::after{
+  content:attr(data-tip);position:absolute;bottom:115%;right:0;white-space:nowrap;
+  font:500 1.5vmin/1 inherit;color:var(--ink-2);background:var(--cream);
+  border:.2vmin solid var(--line);border-radius:.8vmin;padding:.7vmin 1vmin;
+  opacity:0;pointer-events:none;transition:opacity .25s;transition-delay:0s;
+}
+.corner .tools button:hover::after{opacity:1;transition-delay:.7s}
 .corner button:hover{color:var(--ink);transform:translateY(-.2vmin)}
 .corner button.on{background:var(--accent);color:var(--band-ink)}
 .corner .gear{
@@ -670,11 +681,89 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
   transition:opacity var(--d-in) var(--e-soft);
 }
 .corner:hover .gear,.corner.open .gear{opacity:.95}
-/* 版本号：只在展开设置时露出来，不占主信息区 */
-.corner .ver{
-  align-self:center;padding:0 .6vmin;
-  font:500 1.4vmin/1 var(--mono);color:var(--ink-2);opacity:.6;
-  white-space:nowrap;
+/* ⋯菜单：低频收纳 + 窗口动作。版本号挂在「更新」一项的右侧 */
+.corner .menu{
+  display:none;flex-direction:column;min-width:24vmin;
+  padding:.8vmin;border-radius:1.2vmin;background:var(--cream);
+  border:.24vmin solid var(--line);box-shadow:0 .6vmin 2vmin rgba(0,0,0,.14);
+}
+.corner.open .menu{display:flex}
+.corner .menu button{
+  display:flex;align-items:center;gap:1vmin;text-align:left;
+  font:700 1.9vmin/1 inherit;color:var(--ink-2);
+  padding:1vmin 1.2vmin;border-radius:.8vmin;border:0;background:transparent;cursor:pointer;
+}
+.corner .menu button:hover{background:rgba(107,86,65,.08);color:var(--ink)}
+.corner .menu .mi-hint{margin-left:auto;font:500 1.4vmin/1 var(--mono);opacity:.55}
+.corner .menu .dot{width:1.2vmin;height:1.2vmin;border-radius:50%;background:#c4402f;flex:none}
+.corner .menu .mi-sep{height:.2vmin;background:var(--line);margin:.6vmin .4vmin;border-radius:1vmin}
+.corner .menu .mi-danger{color:#a23425}
+.corner .menu .mi-danger:hover{background:rgba(164,52,37,.09)}
+
+/* ---------- 退出确认：kiosk 会压掉系统 confirm 弹窗，必须用页面自己的 ---------- */
+.exit-modal{
+  position:fixed;inset:0;z-index:95;display:flex;align-items:center;justify-content:center;
+  background:rgba(30,20,12,.58);padding:4vmin;
+}
+.exit-modal[hidden]{display:none}
+.exit-card{
+  background:var(--cream);border:.24vmin solid var(--line);border-radius:1.6vmin;
+  padding:3vmin 4vmin;max-width:64vmin;text-align:center;
+}
+.exit-card h3{margin:0 0 1.4vmin;font:900 2.6vmin/1.3 inherit;color:var(--ink)}
+.exit-card p{margin:0 0 2.4vmin;font:500 1.8vmin/1.6 inherit;color:var(--ink-2)}
+.exit-actions{display:flex;gap:1.6vmin;justify-content:center}
+.exit-actions button{
+  font:700 1.9vmin/1 inherit;padding:1.2vmin 2.8vmin;border-radius:1vmin;
+  border:.24vmin solid var(--line);background:transparent;color:var(--ink-2);cursor:pointer;
+}
+.exit-actions button:hover{color:var(--ink)}
+.exit-actions button.danger{background:#c4402f;border-color:#c4402f;color:#fff7ec}
+
+/* ---------- 首次引导：只在第一次见到这块屏时出现一次 ---------- */
+.guide-modal{
+  position:fixed;inset:0;z-index:96;display:flex;align-items:center;justify-content:center;
+  background:rgba(30,20,12,.58);padding:4vmin;
+}
+.guide-modal[hidden]{display:none}
+.guide-card{
+  background:var(--cream);border:.24vmin solid var(--line);border-radius:1.6vmin;
+  padding:3.4vmin 4vmin;max-width:72vmin;text-align:center;
+}
+.guide-card h3{margin:0 0 1.6vmin;font:900 2.8vmin/1.3 inherit;color:var(--ink)}
+.guide-card p{margin:0 0 2.6vmin;font:500 2vmin/1.7 inherit;color:var(--ink-2)}
+.guide-dots{display:flex;gap:1vmin;justify-content:center;margin-bottom:2.4vmin}
+.guide-dots i{width:1.2vmin;height:1.2vmin;border-radius:50%;background:var(--line)}
+.guide-dots i.on{background:var(--accent)}
+.guide-actions{display:flex;gap:1.6vmin;justify-content:center}
+.guide-actions button{
+  font:700 1.9vmin/1 inherit;padding:1.2vmin 2.8vmin;border-radius:1vmin;
+  border:.24vmin solid var(--line);background:transparent;color:var(--ink-2);cursor:pointer;
+}
+.guide-actions button.primary{background:var(--accent);border-color:var(--accent);color:var(--band-ink)}
+
+/* ---------- 使用帮助：⋯菜单随时打开，讲清楚这块屏怎么用 ---------- */
+.help-modal{
+  position:fixed;inset:0;z-index:96;display:flex;align-items:flex-start;justify-content:center;
+  background:rgba(30,20,12,.58);padding:4vmin;overflow:auto;
+}
+.help-modal[hidden]{display:none}
+.help-card{
+  background:var(--cream);border:.24vmin solid var(--line);border-radius:1.6vmin;
+  padding:3vmin 4vmin;max-width:96vmin;width:100%;text-align:left;
+}
+.help-card h2{
+  margin:0 0 1.6vmin;font:900 2.8vmin/1.3 inherit;color:var(--ink);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.help-card h4{margin:2.4vmin 0 .8vmin;font:900 2.1vmin/1.4 inherit;color:var(--ink)}
+.help-card p{margin:0 0 1.2vmin;font:500 1.8vmin/1.7 inherit;color:var(--ink-2)}
+.help-card .help-x{font:700 2.4vmin/1 inherit;border:0;background:transparent;color:var(--ink-2);cursor:pointer;padding:0 .6vmin}
+.help-card .help-x:hover{color:var(--ink)}
+.help-actions{display:flex;gap:1.6vmin;margin-top:2vmin}
+.help-actions button{
+  font:700 1.9vmin/1 inherit;padding:1.2vmin 2.8vmin;border-radius:1vmin;
+  border:.24vmin solid var(--line);background:var(--cream);color:var(--ink-2);cursor:pointer;
 }
 
 /* ---------- 底部提示条：更新 / 迁移，可关闭、不挡内容 ---------- */
@@ -898,19 +987,24 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 <div class="alert-frame" id="alertFrame"></div>
 
 <div class="corner" id="corner">
-  <div class="tools">
-    <button id="btn-theme">深色</button>
-    <button id="btn-full">全屏</button>
-    <button id="btn-demo">演练</button>
-    <button id="btn-cd">倒计时 · 按推荐</button>
-    <button id="btn-reduce">增加动效</button>
-    <button id="btn-phone">手机</button>
-    <button id="btn-update">更新</button>
-    <button id="btn-setup">配置班级</button>
-    <button id="btn-edit">编辑</button>
-    <span class="ver" id="ver"></span>
+  <div class="menu" id="menu" role="menu">
+    <button id="btn-phone" role="menuitem">手机<span class="mi-hint">二维码</span></button>
+    <button id="btn-demo" role="menuitem">演练<span class="mi-hint">试播</span></button>
+    <button id="btn-reduce" role="menuitem">增加动效</button>
+    <button id="btn-update" role="menuitem">更新<span class="dot" id="update-dot" hidden></span><span class="mi-hint" id="ver"></span></button>
+    <button id="btn-setup" role="menuitem">配置班级</button>
+    <button id="btn-help" role="menuitem">使用帮助</button>
+    <div class="mi-sep"></div>
+    <button id="btn-min" role="menuitem">最小化<span class="mi-hint">收到任务栏</span></button>
+    <button id="btn-exit" role="menuitem" class="mi-danger">退出程序</button>
   </div>
-  <button class="gear" id="btn-gear" aria-label="设置">⋯</button>
+  <div class="tools">
+    <button id="btn-theme" data-tip="深色 / 浅色" aria-label="切换深色或浅色"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <button id="btn-full" data-tip="全屏" aria-label="全屏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <button id="btn-cd" data-tip="倒计时" aria-label="倒计时模式"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+    <button id="btn-edit" data-tip="编辑" aria-label="编辑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+  </div>
+  <button class="gear" id="btn-gear" aria-label="菜单">⋯</button>
 </div>
 
 <div class="setup" id="setup" aria-hidden="true"></div>
@@ -927,6 +1021,51 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
       <button class="up-x" id="upClose" type="button" aria-label="关闭">×</button>
     </div>
     <div id="updateBody"></div>
+  </section>
+</div>
+
+<div class="exit-modal" id="exitModal" hidden>
+  <section class="exit-card" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
+    <h3 id="exitTitle">退出班级节律屏？</h3>
+    <p id="exitText">大屏窗口会关闭，看门狗一起停；手机发消息的服务不受影响。<br>要再打开，双击桌面上的 ClassBeat 图标就行。</p>
+    <div class="exit-actions">
+      <button id="exitCancel" type="button">先不退</button>
+      <button id="exitGo" type="button" class="danger">退出</button>
+    </div>
+  </section>
+</div>
+
+<div class="guide-modal" id="guideModal" hidden>
+  <section class="guide-card" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <h3 id="guideTitle"></h3>
+    <p id="guideText"></p>
+    <div class="guide-dots" id="guideDots"></div>
+    <div class="guide-actions">
+      <button id="guideSkip" type="button">跳过</button>
+      <button id="guideNext" type="button" class="primary">下一步</button>
+    </div>
+  </section>
+</div>
+
+<div class="help-modal" id="helpModal" hidden>
+  <section class="help-card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle">使用帮助<button class="help-x" id="helpClose" type="button" aria-label="关闭">×</button></h2>
+    <h4>这块屏是什么</h4>
+    <p>班级节律屏按班里的作息表自动走：上课、课间、眼保健操、值日、倒计时都是自己切的，平时不用管它。</p>
+    <h4>右下角四个图标</h4>
+    <p>深色（晚上护眼切换）、全屏（补一下全屏）、倒计时（选哪些时刻显示倒计时）、编辑（改课表、值日、名单）。把鼠标停在图标上会显示名字。</p>
+    <h4>⋯菜单里有什么</h4>
+    <p>手机（扫码发消息上屏）、演练（试播某一天的状态）、动效开关、更新（有新版时旁边会亮红点）、配置班级（录入名单和岗位）、使用帮助。</p>
+    <h4>最小化与退出</h4>
+    <p>「最小化」把大屏收到任务栏，点任务栏图标或双击桌面 ClassBeat 图标就回来；「退出程序」关掉大屏窗口，手机发消息不受影响。</p>
+    <h4>全屏怎么开</h4>
+    <p>平时双击桌面图标打开就是全屏（没有地址栏）。如果是在浏览器里输地址打开的，点右下角的全屏图标补一下。</p>
+    <h4>手机发消息</h4>
+    <p>⋯菜单 →「手机」，用手机相机扫二维码，打开的页面里写的字会直接上大屏。</p>
+    <div class="help-actions">
+      <button id="helpPhone" type="button">打开手机二维码</button>
+      <button id="helpCloseBtn" type="button">关闭</button>
+    </div>
   </section>
 </div>
 

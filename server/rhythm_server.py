@@ -84,6 +84,105 @@ BACKUP_DRAIN_MAX = 8 * 1024 * 1024
 BACKUP_DRAIN_SEC = 1.0
 BACKUP_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+# ---------- 大屏窗口管理：最小化 / 退出 ----------
+# kiosk 窗口没有关闭按钮，网页在 kiosk 里也关不掉自己（系统 confirm 弹窗
+# 会被压掉），所以这两个动作由本地服务出面。
+# 窗口判据与 tools/launcher/watchdog.ps1、exit-kiosk.ps1 的标题半边一致：
+# 可见顶层窗口的标题带「班级节律屏」（kiosk 窗口的标题就是页面 <title>）。
+LAUNCHER_DIR = os.path.abspath(os.path.join(BASE, "..", "tools", "launcher"))
+KIOSK_TITLE_MARK = "班级节律屏"
+
+
+def _visible_windows():
+    """枚举所有可见顶层窗口，返回 [(hwnd, title)]；非 Windows 或失败返回 []。"""
+    if os.name != "nt":
+        return []
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        out = []
+        proto = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        def on_window(hwnd, lparam):
+            if user32.IsWindowVisible(hwnd):
+                n = user32.GetWindowTextLengthW(hwnd)
+                if n > 0:
+                    buf = ctypes.create_unicode_buffer(n + 1)
+                    if user32.GetWindowTextW(hwnd, buf, n + 1) > 0:
+                        out.append((int(hwnd), buf.value))
+            return True
+
+        user32.EnumWindows(proto(on_window), 0)
+        return out
+    except Exception:
+        return []
+
+
+def find_kiosk_windows():
+    return [(h, t) for (h, t) in _visible_windows() if KIOSK_TITLE_MARK in (t or "")]
+
+
+def screen_minimize():
+    """把大屏窗口最小化到任务栏。返回 (找到几个, 最小化几个)。"""
+    if os.name != "nt":
+        return (0, 0)
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        wins = find_kiosk_windows()
+        done = 0
+        for hwnd, _t in wins:
+            if user32.ShowWindow(hwnd, 6):        # SW_MINIMIZE
+                done += 1
+        return (len(wins), done)
+    except Exception:
+        return (0, 0)
+
+
+def screen_exit():
+    """退出大屏：先让看门狗退场（stop.flag），再温和关窗、超时硬停。
+    服务自己继续跑——手机通知与后台更新不受影响。
+    顺序与 exit-kiosk.ps1 一致：flag 被看门狗消费掉才关窗，否则课间
+    时段它会把页面又拉回来；看门狗没在跑时等满 20 秒就继续，
+    遗留 flag 由 start-kiosk.ps1 下次启动清除。"""
+    if os.name != "nt":
+        return
+    flag_path = os.path.join(LAUNCHER_DIR, "stop.flag")
+    try:
+        with open(flag_path, "w", encoding="utf-8") as f:
+            f.write(dt.datetime.now().isoformat(timespec="seconds"))
+    except OSError:
+        pass
+    for _ in range(40):
+        time.sleep(0.5)
+        try:
+            if not os.path.exists(flag_path):
+                break
+        except OSError:
+            break
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        for hwnd, _t in find_kiosk_windows():
+            user32.PostMessageW(hwnd, 0x0010, 0, 0)       # WM_CLOSE：温和关
+        for _ in range(15):
+            time.sleep(0.2)
+            if not find_kiosk_windows():
+                return
+        pid = wintypes.DWORD()
+        for hwnd, _t in find_kiosk_windows():
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value:
+                h = kernel32.OpenProcess(0x0001, False, pid.value)   # PROCESS_TERMINATE
+                if h:
+                    kernel32.TerminateProcess(h, 1)
+                    kernel32.CloseHandle(h)
+    except Exception:
+        pass
+
 
 def _backup_path(day):
     return os.path.join(BACKUP_DIR, "rhythm-%s.json" % day)
@@ -860,6 +959,23 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         u = urlparse(self.path)
         route = u.path.rstrip("/")
+
+        if route == "/api/screen/minimize":
+            # 大屏⋯菜单的「最小化」：窗口交给任务栏，恢复靠任务栏点击
+            # 或桌面图标（单实例会把窗口还原置前）。只对本机开放，
+            # 手机页没有任何入口，局域网误触不了。
+            if not self._loopback():
+                return self._err("只接受本机操作", 403)
+            found, done = screen_minimize()
+            return self._json({"ok": True, "found": found, "minimized": done})
+
+        if route == "/api/screen/exit":
+            # 大屏⋯菜单的「退出程序」：关大屏窗口 + 看门狗退场；
+            # 服务保留，后台收尾（等 flag / 关窗）放线程里，响应立刻返回。
+            if not self._loopback():
+                return self._err("只接受本机操作", 403)
+            threading.Thread(target=screen_exit, daemon=True).start()
+            return self._json({"ok": True})
 
         if route == "/api/retract":
             ev = retract_latest()

@@ -383,6 +383,7 @@
       }
       if (lg && lg.ok && lg.data) ui.legacy = lg.data;
       render();
+      paintDot();
 
       /* 旧接口只知道「有新版」，不知道更新说明。
          面板刚打开且确实有新版时，自动补一次清单，别让老师多点一下。 */
@@ -397,6 +398,12 @@
   }
 
   // ---------------------------------------------------------------- 入口
+
+  /* ⋯菜单里「更新」一项的红点：有新版就亮，不用老师记得点开看 */
+  function paintDot() {
+    var d = el("update-dot");
+    if (d) d.hidden = !(ui.legacy && ui.legacy.available);
+  }
 
   function openPanel() {
     var modal = el("updatePanel");
@@ -437,6 +444,7 @@
 
     ensurePoll();
     refresh();
+    paintDot();
   }
 
   function init() {

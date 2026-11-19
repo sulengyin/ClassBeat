@@ -432,8 +432,18 @@ if ($DryRun) {
 # ---------- 5.5 单实例 ----------
 # kiosk 没有关闭按钮，叠两个全屏窗口只能硬关，所以在这里拦住：
 # 重复双击、看门狗误拉，都到这一步为止。
+# 2026-11-20：窗口已在时不只是退出——先把窗口还原/置前再走。
+# 背景：大屏⋯菜单有了「最小化」，最小化后双击桌面图标是最直接的回来方式。
 if (Test-KioskWindow $activePort) {
-  Write-Log '检测到大屏 kiosk 窗口已在运行，不开第二个（单实例）。要退出请用「退出大屏.bat」。'
+  Write-Log '检测到大屏 kiosk 窗口已在运行，不开第二个（单实例），把它还原置前。'
+  try {
+    . (Join-Path $PSScriptRoot 'win-titles.ps1')
+    $brought = Show-CBWindowByTitle -Pattern '班级节律屏'
+    if ($brought) { Write-Log '已把在跑的大屏窗口带到前台。' }
+    else { Write-Log '置前没生效（窗口可能在别的虚拟桌面），页面内容不受影响。' }
+  } catch {
+    Write-Log ('置前失败（不影响大屏本身）：' + $_.Exception.Message)
+  }
   exit 0
 }
 

@@ -92,6 +92,10 @@ class El {
     return out;
   }
   querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
+  contains(n) {
+    if (n === this) return true;
+    return this.children.some(c => c.contains(n));
+  }
 }
 
 const body = new El("body");
@@ -120,15 +124,21 @@ const document = {
 };
 
 /* 主屏骨架：与 index.html 的 id 对齐 */
+const BTN_IDS = new Set(["warn-title", "btn-help", "btn-min", "btn-exit",
+  "exitCancel", "exitGo", "guideSkip", "guideNext", "helpClose", "helpCloseBtn", "helpPhone"]);
 ["cls", "date", "clock", "sec", "main", "band", "bandText", "spine", "heroMain", "heroSub", "heroTask", "after", "chips",
- "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner",
+ "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner", "menu",
  "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
+ "btn-update", "update-dot", "btn-help", "btn-min", "btn-exit",
+ "exitModal", "exitCancel", "exitGo", "exitText",
+ "guideModal", "guideTitle", "guideText", "guideDots", "guideSkip", "guideNext",
+ "helpModal", "helpClose", "helpCloseBtn", "helpPhone",
  "qr-panel", "qr-url", "qr-empty", "qr-close",
  "qr-copy-row", "qr-copy", "qr-copied", "qr-change",
  "msgModal", "msgCard", "msgContent", "msgBody", "msgTitle", "msgTime", "msgClose",
  "setup", "btn-setup", "ver", "tip", "tipText", "tipClose",
  "demo", "d-play", "d-now", "d-ribbon", "d-range", "d-speed", "d-close"].forEach(id => {
-  const e = new El(id.indexOf("btn") === 0 || id === "warn-title" ? "button" : "div");
+  const e = new El(id.indexOf("btn") === 0 || BTN_IDS.has(id) ? "button" : "div");
   e.id = id;
   body.appendChild(e);
 });
@@ -1508,6 +1518,63 @@ global.Remote.info.phone = "";
     check(hp([{ start: "", end: "09:00" }]).includes("还没填时间"), "缺时间单独提示");
     check(hp([{ start: "10:00", end: "09:00" }]).includes("早于结束"), "倒挂单独提示");
   }
+
+  /* ---------- 2026-11-20 屏面收纳与窗口动作 ---------- */
+
+  /* 屏面瘦身：常驻工具区只剩 4 个图标按钮（深色/全屏/倒计时/编辑），
+     低频项全部收进⋯菜单；退出和最小化必须有、退出必须先确认 */
+  const cornerHtml = pageHtml.slice(pageHtml.indexOf('<div class="corner"'),
+    pageHtml.indexOf('<div class="setup"'));
+  const toolsHtml = cornerHtml.slice(cornerHtml.indexOf('<div class="tools">'),
+    cornerHtml.indexOf('<button class="gear"'));
+  const toolsCount = (toolsHtml.match(/id="btn-/g) || []).length;
+  check(toolsCount === 4 && /btn-theme/.test(toolsHtml) && /btn-cd/.test(toolsHtml)
+        && /btn-full/.test(toolsHtml) && /btn-edit/.test(toolsHtml),
+    "常驻工具区只有深色/全屏/倒计时/编辑四个", toolsCount + " 个");
+  check(/id="menu"/.test(cornerHtml) && /btn-phone/.test(cornerHtml)
+        && /btn-demo/.test(cornerHtml) && /btn-update/.test(cornerHtml)
+        && /btn-setup/.test(cornerHtml) && /btn-help/.test(cornerHtml)
+        && /btn-min/.test(cornerHtml) && /btn-exit/.test(cornerHtml)
+        && /update-dot/.test(cornerHtml),
+    "低频项收进⋯菜单且带最小化/退出/帮助/红点");
+  check(cornerHtml.indexOf("btn-help") < cornerHtml.indexOf("mi-sep")
+        && cornerHtml.indexOf("mi-sep") < cornerHtml.indexOf("btn-min")
+        && cornerHtml.indexOf("btn-min") < cornerHtml.indexOf("btn-exit"),
+    "最小化与退出单独分组，退出放最后");
+
+  /* 倒计时状态写在悬停提示里（按钮已图标化，不能再往按钮里塞文字） */
+  const cdEl = document.getElementById("btn-cd");
+  check(cdEl.dataset.tip && cdEl.dataset.tip.indexOf("倒计时 · 按推荐") === 0
+        && cdEl.textContent === "",
+    "倒计时状态写进 data-tip，按钮本身无文字", cdEl.dataset.tip);
+
+  /* 首次引导：第一次打开弹出、走完或跳过后写 localStorage 不再来 */
+  const guideModal = document.getElementById("guideModal");
+  check(guideModal.hidden === false, "第一次打开弹出 4 步引导");
+  check(document.getElementById("guideTitle").textContent === "这块屏自己会走",
+    "引导第一步讲这块屏", document.getElementById("guideTitle").textContent);
+  document.getElementById("guideSkip")._h.click();
+  check(guideModal.hidden === true && localStorage.getItem("cb-guide-v1") === "1",
+    "跳过引导后写 localStorage，不再出现");
+
+  /* 帮助入口在⋯菜单里，能开能关 */
+  const helpModal = document.getElementById("helpModal");
+  document.getElementById("btn-help")._h.click();
+  check(helpModal.hidden === false, "⋯→使用帮助能打开帮助页");
+  document.getElementById("helpClose")._h.click();
+  check(helpModal.hidden === true, "帮助页能关掉");
+
+  /* 退出确认：kiosk 会压掉系统 confirm，必须用页面自己的弹层；
+     没有本地服务时把出路说清楚，而不是静默失败 */
+  const exitModal = document.getElementById("exitModal");
+  document.getElementById("btn-exit")._h.click();
+  check(exitModal.hidden === false, "点退出程序先弹确认");
+  global.location = { search: "", protocol: "file:", hostname: "", port: "" };
+  document.getElementById("exitGo")._h.click();
+  check(document.getElementById("exitText").textContent.includes("退出大屏.bat"),
+    "没有本地服务时提示用退出大屏.bat", document.getElementById("exitText").textContent);
+  document.getElementById("exitCancel")._h.click();
+  check(exitModal.hidden === true, "确认框能取消");
 
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);

@@ -822,7 +822,10 @@
 
   function paintControls() {
     var p = S.prefs();
-    el.btnCd.textContent = "倒计时 · " + MODE_LABEL[p.cdMode || "auto"];
+    /* 2026-11-20 图标化：倒计时按钮不再占文字，状态写进悬停提示 */
+    var cdTip = "倒计时 · " + MODE_LABEL[p.cdMode || "auto"];
+    el.btnCd.dataset.tip = cdTip;
+    el.btnCd.setAttribute("aria-label", cdTip);
     el.btnCd.classList.toggle("on", (p.cdMode || "auto") !== "auto");
     /* 2026-11-19 真机反馈③：默认无动效。亮起表示「动效开着」；
      文案跟着状态走，点一下就是切到另一边。 */
@@ -841,9 +844,15 @@
       after: $("after"), chips: $("chips"), duty: $("duty"),
       dutyDetail: $("dutyDetail"),
       warn: $("warn"), warnTitle: $("warn-title"), warnText: $("warn-text"),
-      corner: $("corner"), btnCd: $("btn-cd"), btnFull: $("btn-full"),
+      corner: $("corner"), menu: $("menu"), btnCd: $("btn-cd"), btnFull: $("btn-full"),
       btnReduce: $("btn-reduce"), btnEdit: $("btn-edit"), btnGear: $("btn-gear"),
-      btnTheme: $("btn-theme"),
+      btnTheme: $("btn-theme"), btnMin: $("btn-min"), btnExit: $("btn-exit"),
+      exitModal: $("exitModal"), exitCancel: $("exitCancel"), exitGo: $("exitGo"),
+      exitText: $("exitText"),
+      guideModal: $("guideModal"), guideTitle: $("guideTitle"), guideText: $("guideText"),
+      guideDots: $("guideDots"), guideSkip: $("guideSkip"), guideNext: $("guideNext"),
+      helpModal: $("helpModal"), helpClose: $("helpClose"), helpCloseBtn: $("helpCloseBtn"),
+      helpPhone: $("helpPhone"), btnHelp: $("btn-help"),
       msgModal: $("msgModal"), msgCard: $("msgCard"), msgContent: $("msgContent"),
       msgBody: $("msgBody"), msgTitle: $("msgTitle"), msgTime: $("msgTime"),
       msgClose: $("msgClose"),
@@ -859,6 +868,69 @@
 
     el.btnGear.addEventListener("click", function () {
       el.corner.classList.toggle("open");
+    });
+
+    /* 菜单项点完就收起；点菜单外也收起（大屏上不留一堆敞开的控件） */
+    function closeMenu() { el.corner.classList.remove("open"); }
+    if (el.menu) el.menu.addEventListener("click", function (e) {
+      if (e.target && e.target.closest && e.target.closest("button")) closeMenu();
+    });
+    document.addEventListener("click", function (e) {
+      if (menuIsOpen() && !el.corner.contains(e.target)) closeMenu();
+    });
+
+    function menuIsOpen() { return el.corner.classList.contains("open"); }
+
+    /* ---------- 最小化 / 退出：网页关不掉 kiosk 窗口，由本地服务出面 ---------- */
+    function hasServer() {
+      var loc = root.location || {};
+      return loc.protocol === "http:" || loc.protocol === "https:";
+    }
+
+    if (el.btnMin) el.btnMin.addEventListener("click", function () {
+      if (!hasServer() || !root.fetch) return;
+      try { root.fetch("/api/screen/minimize", { method: "POST" }).catch(function () { }); } catch (e) { }
+    });
+
+    function openExit() {
+      el.exitModal.hidden = false;
+      el.exitGo.disabled = false;
+      el.exitGo.textContent = "退出";
+      el.exitText.innerHTML = "大屏窗口会关闭，看门狗一起停；手机发消息的服务不受影响。<br>要再打开，双击桌面上的 ClassBeat 图标就行。";
+    }
+    function closeExit() { if (el.exitModal) el.exitModal.hidden = true; }
+
+    if (el.btnExit) el.btnExit.addEventListener("click", openExit);
+    if (el.exitCancel) el.exitCancel.addEventListener("click", closeExit);
+    if (el.exitModal) el.exitModal.addEventListener("click", function (e) {
+      if (e.target === el.exitModal) closeExit();
+    });
+
+    if (el.exitGo) el.exitGo.addEventListener("click", function () {
+      function fail(msg) {
+        el.exitGo.disabled = false;
+        el.exitGo.textContent = "退出";
+        el.exitText.textContent = msg;
+      }
+      if (!hasServer() || !root.fetch) {
+        fail("本地服务没在跑，这里退不了。请双击大屏文件夹里的「退出大屏.bat」。");
+        return;
+      }
+      el.exitGo.disabled = true;
+      el.exitGo.textContent = "正在退出…";
+      try {
+        root.fetch("/api/screen/exit", { method: "POST" })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data && data.ok) {
+              /* 服务线程正在等看门狗退场再关窗，页面这边只需要把话说清 */
+              el.exitText.textContent = "正在退出：窗口马上会自己关闭。要回来，双击桌面上的 ClassBeat 图标。";
+            } else {
+              fail("退出没成功。请双击大屏文件夹里的「退出大屏.bat」。");
+            }
+          })
+          .catch(function () { fail("退出没成功。请双击大屏文件夹里的「退出大屏.bat」。"); });
+      } catch (e) { fail("退出没成功。请双击大屏文件夹里的「退出大屏.bat」。"); }
     });
 
     el.btnFull.addEventListener("click", function () {
@@ -893,9 +965,77 @@
     /* 弹窗关闭：同样按住才生效，学生乱点关不掉 */
     if (el.msgClose) bindHold(el.msgClose, function () { hideMessage(true); });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && el.msgModal && el.msgModal.classList.contains("open")) {
-        hideMessage(true);
+      if (e.key !== "Escape") return;
+      if (el.exitModal && !el.exitModal.hidden) { closeExit(); return; }
+      if (el.helpModal && !el.helpModal.hidden) { closeHelp(); return; }
+      if (el.guideModal && !el.guideModal.hidden) { closeGuide(true); return; }
+      if (menuIsOpen()) { closeMenu(); return; }
+      if (el.msgModal && el.msgModal.classList.contains("open")) hideMessage(true);
+    });
+
+    /* ---------- 首次引导：只在第一次见到这块屏时出现一次 ---------- */
+    var GUIDE_KEY = "cb-guide-v1";
+    var GUIDE_STEPS = [
+      ["这块屏自己会走", "上课、课间、眼保健操、值日都按班里的作息表自动切换，平时不用管它。"],
+      ["右下角四个图标", "深色、全屏、倒计时、编辑。把鼠标停在图标上会显示名字。"],
+      ["⋯菜单收着别的", "手机、演练、更新、配置班级、帮助，还有最小化和退出。"],
+      ["手机也能发消息上屏", "⋯菜单 →「手机」，用手机扫二维码就行。想再看一遍，点「使用帮助」。"]
+    ];
+    var guideStep = 0;
+    var guideReady = !!(el.guideModal && el.guideTitle && el.guideText
+      && el.guideDots && el.guideNext && el.guideSkip);
+
+    function guideStoreSet() {
+      try { root.localStorage.setItem(GUIDE_KEY, "1"); } catch (e) { }
+    }
+    function paintGuide() {
+      if (!guideReady) return;
+      var step = GUIDE_STEPS[guideStep];
+      el.guideTitle.textContent = step[0];
+      el.guideText.textContent = step[1];
+      el.guideNext.textContent = guideStep === GUIDE_STEPS.length - 1 ? "开始使用" : "下一步";
+      var dots = "";
+      for (var i = 0; i < GUIDE_STEPS.length; i++) {
+        dots += '<i' + (i === guideStep ? ' class="on"' : '') + '></i>';
       }
+      el.guideDots.innerHTML = dots;
+    }
+    function openGuide() {
+      guideStep = 0;
+      paintGuide();
+      el.guideModal.hidden = false;
+    }
+    function closeGuide(done) {
+      el.guideModal.hidden = true;
+      if (done) guideStoreSet();
+    }
+
+    if (el.guideNext) el.guideNext.addEventListener("click", function () {
+      if (guideStep < GUIDE_STEPS.length - 1) {
+        guideStep++;
+        paintGuide();
+      } else {
+        closeGuide(true);
+      }
+    });
+    if (el.guideSkip) el.guideSkip.addEventListener("click", function () { closeGuide(true); });
+
+    var needGuide = guideReady;
+    try { needGuide = guideReady && !root.localStorage.getItem(GUIDE_KEY); } catch (e) { }
+    if (needGuide) openGuide();
+
+    /* ---------- 使用帮助 ---------- */
+    function openHelp() { el.helpModal.hidden = false; }
+    function closeHelp() { el.helpModal.hidden = true; }
+    if (el.btnHelp) el.btnHelp.addEventListener("click", openHelp);
+    if (el.helpClose) el.helpClose.addEventListener("click", closeHelp);
+    if (el.helpCloseBtn) el.helpCloseBtn.addEventListener("click", closeHelp);
+    if (el.helpModal) el.helpModal.addEventListener("click", function (e) {
+      if (e.target === el.helpModal) closeHelp();
+    });
+    if (el.helpPhone) el.helpPhone.addEventListener("click", function () {
+      closeHelp();
+      if (root.PhoneUI && root.PhoneUI.open) root.PhoneUI.open();
     });
 
     paintControls();
