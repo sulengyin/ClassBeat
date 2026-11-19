@@ -146,6 +146,33 @@
     return (v == null ? "" : String(v)).trim();
   }
 
+  /* 晨间贴纸的文字只有一个来源：提示语编辑里「晨间自主管理」那一格
+     （真机反馈 2026-11-20：老师和旧贴纸看成同一个东西，就让它真的是）。
+     条目形状和 reminders 一致：字符串 = 每天这句；对象 = {default, days?,
+     [星期几]: 覆盖}。旧配置没写过这一格时，回退 reminders（老机器不变）。
+     旧配置块名可能还是「早读」，两个键都认。 */
+  function tipEntryText(e, weekday) {
+    if (e == null) return null;
+    if (typeof e === "string") return e.trim() ? e.trim() : "";
+    var days = e.days;
+    if (days && days.length && days.indexOf(weekday) < 0) return "";
+    var v = e[String(weekday)];
+    if (v == null || String(v).trim() === "") v = e["default"];
+    return (v == null ? "" : String(v)).trim();
+  }
+
+  function morningReminder(opts, day) {
+    var tips = opts && opts.texts && opts.texts.tips;
+    if (tips) {
+      var e = tips["晨间自主管理"] != null ? tips["晨间自主管理"] : tips["早读"];
+      if (e != null) {
+        var v = tipEntryText(e, day.weekday);
+        if (v != null) return v;
+      }
+    }
+    return reminderFor(opts, day);
+  }
+
   /* picks：老师逐段勾选（prefs.cdPicks，null = 跟随推荐/旧的三档模式）。
      勾选优先级高于 mode：勾了就显示、去勾就隐藏；勾选一个推荐里没有的段
      （如上课）时给它 untilEnd/10 分钟的默认窗口，别让数字一闪而过。 */
@@ -211,7 +238,7 @@
         /* 到校到第一节课打铃前整段都是晨间自主管理：
            作息第一块（晨间）之前的时间也并进来，不再单独有「到校前」。
            大字和第二行仍取 stage.before 的两个字段，空着就回退「晨间自主管理」。 */
-        var remEarly = reminderFor(opts, day);
+        var remEarly = morningReminder(opts, day);
         var noteEarly = stageText(opts, "before", "note", "");
         var bigEarly = stageText(opts, "before", "title", "");
         /* 这一段从「到校」算起；没有到校时刻就按第一块前 40 分钟兜底。
@@ -259,7 +286,7 @@
 
     if (b.type === "reading") {
       var firstClass = t.filter(function (x) { return x.type === "class"; })[0];
-      var rem = reminderFor(opts, day);
+      var rem = morningReminder(opts, day);
       /* 晨间大字用设置里「晨间自主管理 · 大字」那个框；
          没填或只有空白就回退块名（默认就是「晨间自主管理」）。
          学习建议仍不上屏，旧数据原样留在存储里。 */

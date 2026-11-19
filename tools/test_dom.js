@@ -1619,6 +1619,64 @@ global.Remote.info.phone = "";
   const editCssSrc = fs.readFileSync(path.join(ROOT, "app/edit.css"), "utf8");
   check(editCssSrc.includes(".ep-daybtn.on"), "星期按钮有选中态样式");
 
+  /* ---------- 2026-11-20 反馈③：提示语逐段 = 贴纸来源 + 按星期定制 ---------- */
+
+  /* 晨间自主管理那格就是贴纸：days 只含周四 → 周四显示、其余天不显示 */
+  global.Store.patchTexts({
+    reminders: null,
+    tips: { "晨间自主管理": { "default": "周五带美术用品", days: [5] } }
+  });
+  global.__rhythmDate = "2026-11-05";
+  global.__rhythmTime = 7 * 60 + 30;
+  Screen.render();
+  check(!document.querySelector(".reminder-line"),
+    "贴纸文字来自提示语晨间那格：没选周四就不显示");
+  global.Store.patchTexts({
+    tips: { "晨间自主管理": { "default": "周五带美术用品", days: [4] } }
+  });
+  Screen.render();
+  const remRowThu = document.querySelector(".reminder-line");
+  check(!!remRowThu && remRowThu.textContent.indexOf("周五带美术用品") >= 0,
+    "选了周四 → 贴纸显示提示语里的那句话",
+    remRowThu ? remRowThu.textContent : "缺失");
+
+  /* 同一段不同星期写不同的话：周四用覆盖那句，默认那句管其余天 */
+  global.Store.patchTexts({
+    tips: { "晨间自主管理": { "default": "带齐作业", "4": "今天交回执" } }
+  });
+  Screen.render();
+  check(document.querySelector(".reminder-line").textContent.indexOf("今天交回执") >= 0,
+    "周四显示按星期覆盖的那句");
+  global.Store.patchTexts({ tips: null, reminders: { "default": "带齐回执" } });
+
+  /* 普通时段的提示语也支持「哪几天显示」（走 applyTexts 的按天解析） */
+  const noonBlock = (global.Runtime.day("2026-11-05").timeline || [])
+    .filter(b => b.type === "noon")[0];
+  if (noonBlock) {
+    global.Store.patchTexts({
+      tips: { [noonBlock.name]: { "default": "午休要安静", days: [1] } }
+    });
+    global.__rhythmTime = global.Rhythm.t2m(noonBlock.start) + 1;
+    Screen.render();
+    check(document.body.textContent.indexOf("午休要安静") < 0,
+      "普通时段：days 不含周四 → 提示语不上屏");
+    global.Store.patchTexts({
+      tips: { [noonBlock.name]: { "default": "午休要安静", days: [4] } }
+    });
+    Screen.render();
+    check(document.body.textContent.indexOf("午休要安静") >= 0,
+      "普通时段：选了周四 → 提示语上屏");
+    global.Store.patchTexts({ tips: null });
+    global.__rhythmTime = 7 * 60 + 30;
+    Screen.render();
+  }
+
+  /* 编辑面板结构：逐段分组 + 按星期展开器存在 */
+  const editSrc2 = fs.readFileSync(path.join(ROOT, "app/edit.js"), "utf8");
+  check(editSrc2.includes("function tipSeg") && editSrc2.includes("ep-wdrow")
+        && editSrc2.includes("其中几天要写不同的话"),
+    "编辑面板：每段有星期展开器（默认收起，保证简洁）");
+
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
 })();

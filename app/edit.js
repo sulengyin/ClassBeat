@@ -511,7 +511,8 @@
       ((d && d.timeline) || []).forEach(function (b) {
         if (b.type === "class" || !b.name || seen[b.name]) return;
         seen[b.name] = 1;
-        out.push({ name: b.name, label: R.blockName(b), tip: b.tip || "" });
+        out.push({ name: b.name, label: R.blockName(b), tip: b.tip || "",
+                 reading: b.type === "reading" });
       });
     });
     return out;
@@ -530,17 +531,84 @@
     { n: 4, label: "周四" }, { n: 5, label: "周五" }
   ];
 
-  /* 提醒事项：一句文字 + 选哪几天显示（都选 = 每天）。
-   存储仍写 reminders：default 存文字、days 存选中的星期（缺 days = 每天），
-   旧版本按星期单独填的覆盖条目原样保留、照旧生效。 */
-  function setReminderConfig(text, days) {
-    var r = Object.assign({}, S.texts().reminders);
-    text = (text || "").trim();
-    if (text) r["default"] = text; else delete r["default"];
-    if (days && days.length && days.length < WEEKDAYS.length) r.days = days;
-    else delete r.days;
-    S.patchTexts({ reminders: Object.keys(r).length ? r : null });
+  /* 时段提示条目（真机反馈 2026-11-20 ③）：默认一句、每天显示；
+   可点掉哪几天（days）、也可某几天写不同的话（按星期覆盖，留空=用默认）。
+   存储形状：字符串（旧，每天这句）或 {default, days?, [星期几]: 文字}。
+   晨间自主管理那一格就是屏上的黄色贴纸，旧 reminders 数据回退兼容。 */
+  function tipEntryOf(name) {
+    var t = (S.texts().tips || {})[name];
+    if (t == null) return {};
+    if (typeof t === "string") return { "default": t };
+    return Object.assign({}, t);
   }
+
+  function setTipEntry(name, patch) {
+    var tips = Object.assign({}, S.texts().tips);
+    var e = Object.assign(tipEntryOf(name), patch);
+    Object.keys(e).forEach(function (k) {
+      if (k === "days") return;
+      if (e[k] != null && !String(e[k]).trim()) delete e[k];
+    });
+    if (e.days && (!e.days.length || e.days.length === WEEKDAYS.length)) delete e.days;
+    if (Object.keys(e).length) tips[name] = e; else delete tips[name];
+    S.patchTexts({ tips: tips });
+  }
+
+  function tipDaysRow(name, daysSel) {
+    var row = h("div", "ep-rem-days");
+    row.appendChild(h("span", "ep-flabel", "哪几天显示"));
+    WEEKDAYS.forEach(function (w) {
+      var b = h("button", "ep-daybtn" + (daysSel.indexOf(w.n) >= 0 ? " on" : ""), w.label);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        var i = daysSel.indexOf(w.n);
+        if (i >= 0) daysSel.splice(i, 1); else daysSel.push(w.n);
+        b.classList.toggle("on", daysSel.indexOf(w.n) >= 0);
+        setTipEntry(name, { days: daysSel.slice() });
+        flash("已保存，大屏已经换了");
+        if (root.Screen) root.Screen.render();
+      });
+      row.appendChild(b);
+    });
+    return row;
+  }
+
+  function tipSeg(seg) {
+    var isMorning = !!seg.reading;
+    var e0 = tipEntryOf(seg.name);
+    var daysSel = (e0.days && e0.days.length) ? e0.days.slice()
+      : WEEKDAYS.map(function (w) { return w.n; });
+    /* 晨间那格默认值兼容旧数据：没写过提示语时显示旧贴纸那句 */
+    var initVal = e0["default"] || "";
+    if (isMorning && !initVal) {
+      var rems = S.texts().reminders || {};
+      initVal = rems["default"] || "";
+    }
+
+    var wrap = h("div", "ep-tipseg");
+    wrap.appendChild(field(
+      isMorning ? seg.label + " · 提醒文字（屏上是黄色贴纸）" : seg.label,
+      seg.tip || "（这一时段没有提示语）", initVal,
+      function (v) { setTipEntry(seg.name, { "default": v }); }));
+    wrap.appendChild(tipDaysRow(seg.name, daysSel));
+
+    var wdWrap = h("div", "ep-wdrow");
+    wdWrap.hidden = true;
+    WEEKDAYS.forEach(function (w) {
+      wdWrap.appendChild(field(w.label + " · 不同的话（留空 = 用上面那句）", "",
+        e0[String(w.n)] || "",
+        function (v) { var p = {}; p[String(w.n)] = v; setTipEntry(seg.name, p); }));
+    });
+    var toggle = h("button", "ep-ghost ep-wdtoggle", "其中几天要写不同的话");
+    toggle.type = "button";
+    toggle.addEventListener("click", function () {
+      wdWrap.hidden = !wdWrap.hidden;
+      toggle.textContent = wdWrap.hidden ? "其中几天要写不同的话" : "收起按星期设置";
+    });
+    wrap.appendChild(toggle);
+    wrap.appendChild(wdWrap);
+    return wrap;
+ }
 
   function readInput(ph, value, onSave) {
     var inp = document.createElement("input");
@@ -653,49 +721,12 @@
 
     var sec2 = h("section", "ep-sec wide");
     sec2.appendChild(h("h3", null, "各时段的提示语"));
-    sec2.appendChild(h("p", "ep-note", "留空就是原来的话，清空即恢复。"));
-    blockNames().forEach(function (b) {
-      sec2.appendChild(field(b.label, b.tip || "（这一时段没有提示语）",
-        (T.tips || {})[b.name] || "",
-        function (v) {
-          var tips = Object.assign({}, S.texts().tips);
-          if (v.trim()) tips[b.name] = v.trim();
-          else delete tips[b.name];
-          S.patchTexts({ tips: tips });
-        }));
-    });
-
-    /* 提醒事项（真机反馈 2026-11-20 ②）：它本来就是各时段提示的一部分，
-       从单独一块并入这里；保留黄色贴纸样式，加「哪几天显示」多选。 */
-    var rems = T.reminders || {};
-    var daysSel = (rems.days && rems.days.length) ? rems.days.slice()
-      : WEEKDAYS.map(function (w) { return w.n; });
-
-    sec2.appendChild(h("p", "ep-note", "—— 晨间自主管理 · 提醒事项 ——"));
-    sec2.appendChild(field("提醒文字（黄色贴纸，留空 = 不显示）",
-      "带齐今天要用的书和作业，课前摆好。", rems["default"] || "",
-      function (v) { setReminderConfig(v, daysSel); }));
-
-    var daysRow = h("div", "ep-rem-days");
-    daysRow.appendChild(h("span", "ep-flabel", "哪几天显示"));
-    var dayBtns = {};
-    WEEKDAYS.forEach(function (w) {
-      var b = h("button", "ep-daybtn" + (daysSel.indexOf(w.n) >= 0 ? " on" : ""), w.label);
-      b.type = "button";
-      b.addEventListener("click", function () {
-        var i = daysSel.indexOf(w.n);
-        if (i >= 0) daysSel.splice(i, 1); else daysSel.push(w.n);
-        b.classList.toggle("on", daysSel.indexOf(w.n) >= 0);
-        setReminderConfig((rems["default"] || ""), daysSel);
-        flash("已保存，大屏已经换了");
-        if (root.Screen) root.Screen.render();
-      });
-      dayBtns[w.n] = b;
-      daysRow.appendChild(b);
-    });
-    sec2.appendChild(daysRow);
     sec2.appendChild(h("p", "ep-note",
-      "都选着 = 每天显示；哪天有特别安排就把它点掉。大屏样式不变，仍是黄色贴纸。"));
+      "每段默认每天显示同一句；哪天有特别安排就点掉星期、或展开写不同的话。"
+      + "晨间自主管理那一格就是屏上的黄色贴纸。留空就是原来的话。"));
+    blockNames().forEach(function (seg) {
+      sec2.appendChild(tipSeg(seg));
+    });
     bodyEl.appendChild(sec2);
 
     var sec3 = h("section", "ep-sec wide");

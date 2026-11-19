@@ -421,16 +421,33 @@
   /* ---------- 老师改过的文字 ----------
      只改"说什么"，不动"什么时候说"：提示语按时段名替换，
      准备清单按科目的 key 替换，其余规则仍由 rhythm.js 决定。
-     传进来的 day 必须是可以就地改的副本（render 里保证）。 */
+     传进来的 day 必须是可以就地改的副本（render 里保证）。
+     提示语条目（真机反馈 2026-11-20）：字符串 = 每天这句；
+     对象 = { default, days?: 哪几天显示, [星期几]: 覆盖文字 }，
+     按今天解析出一句字符串再写进 b.tip，引擎不用知道这些。 */
+  function tipTextFor(entry, weekday) {
+    if (entry == null) return null;
+    if (typeof entry === "string") return entry;
+    var days = entry.days;
+    if (days && days.length && days.indexOf(weekday) < 0) return "";
+    var v = entry[String(weekday)];
+    if (v == null || String(v).trim() === "") v = entry["default"];
+    return v == null ? "" : String(v);
+  }
+
   function applyTexts(day) {
     var T = S.texts ? S.texts() : null;
     if (!T) return;
     var tips = T.tips || {};
     var prep = T.prep || {};
+    var weekday = day.weekday;
     if (!Object.keys(tips).length && !Object.keys(prep).length) return;
 
     (day.timeline || []).forEach(function (b) {
-      if (b.name && tips[b.name] != null && tips[b.name] !== "") b.tip = tips[b.name];
+      if (b.name && tips[b.name] != null) {
+        var t = tipTextFor(tips[b.name], weekday);
+        if (t != null && t !== "") b.tip = t;
+      }
       if (b.prep && b.prep.key && prep[b.prep.key] && prep[b.prep.key].length) {
         b.prep = { key: b.prep.key, level: b.prep.level, items: prep[b.prep.key].slice() };
       }

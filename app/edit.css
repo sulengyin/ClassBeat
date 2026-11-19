@@ -101,6 +101,12 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
            background:transparent;color:#C1B09A;cursor:pointer}
 .ep-daybtn.on{background:#FFD64F;border-color:#FFD64F;color:#2B1D10;font-weight:900}
 
+/* 每个时段一个分组：默认一句 + 星期显示 + 可展开的按星期覆盖 */
+.ep-tipseg{margin:0 0 2vmin;padding-bottom:1.6vmin;border-bottom:.2vmin dashed rgba(107,86,65,.25)}
+.ep-wdrow{margin:.8vmin 0 .4vmin;padding:1.2vmin;border-radius:1.2vmin;
+          background:rgba(107,86,65,.06)}
+.ep-wdtoggle{margin-top:.8vmin;font-size:2vmin}
+
 .ep-hintrow{margin-top:1.3vmin}
 .ep-warn{display:flex;align-items:center;gap:1.5vmin;flex-wrap:wrap;
          font-size:2.2vmin;color:#2B1D10;background:#FFD64F;
