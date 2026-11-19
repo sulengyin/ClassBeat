@@ -1,14 +1,15 @@
 ﻿# ============================================================
 # ClassBeat 大屏看门狗（节律时刻弹屏版，2026-11-19 真机反馈 ①）
 # ------------------------------------------------------------
-# 行为模型（与 0.3.8 及之前的「页面没了就重拉」完全不同）：
+# 行为模型（2026-11-19 真机反馈 ① + 晚间补充）：
 #   1) 开机第一屏：看门狗刚被自启拉起时，大屏窗口不在就拉一次——
 #      「打开电脑」这个动作本身就该见到大屏。
-#   2) 之后只在「节律时刻」行动：课间（break）与眼保健操/大课间
-#      （ritual）开始那一刻——窗口在就带到前台，不在就拉起。
+#   2) 课间（break）与眼保健操/大课间（ritual）时段内：作为「下课了 /
+#      到眼保健操了」的提醒，把大屏带到前台——窗口不在就拉起，最小化
+#      或被盖住就置前。**每个时段只提醒一次**：提醒后老师再关闭或
+#      最小化，该时段内不再重拉或弹出，下个时段另算。
 #   3) 其余时间（上课、午间、放学后）无论大屏开没开、老师用不用
-#      浏览器，一律不打扰、不抢屏、不自动拉起。老师关掉的大屏要
-#      到下一个节律时刻才会回来；想立刻回来双击「打开大屏.bat」。
+#      浏览器，一律不打扰、不抢屏。想立刻回大屏双击「打开大屏.bat」。
 #   4) 作息依据来自大屏自己落盘的配置快照（backups/config/rhythm-
 #      日期.json，每 10 秒同步一次）。快照读不到/解析不了 → 不弹。
 #      周末与节假日（快照里 calendar 标了 holiday）不弹。
@@ -31,12 +32,9 @@ param(
   [string]$TitlePattern = '班级节律屏',
   [string]$LauncherPath = '',
   [switch]$DryRun,
-  # 哪些时段开始时要弹屏：课间 break、眼保健操/大课间 ritual
-  # （真机反馈 2026-11-19：只需要这两个瞬间，其余时间不打扰）
+  # 哪些时段要做提醒：课间 break、眼保健操/大课间 ritual
+  # （真机反馈 2026-11-19：只提醒这两个，其余时间不打扰）
   [string[]]$PopTypes = @('break', 'ritual'),
-  # 容错窗口：轮询间隔可能刚好跨过开始那一分钟，给 3 分钟余量，
-  # 一个时刻只弹一次（不做迟到补弹——错过 3 分钟就等下一个时刻）
-  [int]$PopWindowMinutes = 3,
   [string]$BackupDir = '',
   [switch]$SelfTest,
   [string]$TodayStr = ''
@@ -164,10 +162,23 @@ function Get-CBPopMoments {
       $h = 0; $m = 0
       if (-not [int]::TryParse($parts[0], [ref]$h)) { continue }
       if (-not [int]::TryParse($parts[1], [ref]$m)) { continue }
+      $startMin = $h * 60 + $m
+      # 时段终点：提醒的生效范围是整个时段（start—end），不只是开始那一分钟
+      $endMin = $startMin + 1
+      $ep = ([string]$b.end).Split(':')
+      if ($ep.Count -ge 2) {
+        $eh = 0; $em = 0
+        if ([int]::TryParse($ep[0], [ref]$eh) -and [int]::TryParse($ep[1], [ref]$em)) {
+          $endMin = $eh * 60 + $em
+          if ($endMin -le $startMin) { $endMin = $startMin + 1 }   # 不跨夜，防坏数据
+        }
+      }
       $out += @{
         Key = $ForDay + 'T' + $b.start + '#' + $b.type
-        Minutes = $h * 60 + $m
+        Minutes = $startMin
+        EndMinutes = $endMin
         Start = [string]$b.start
+        End = [string]$b.end
         Name = [string]$b.name
         Type = [string]$b.type
       }
@@ -204,7 +215,7 @@ if ($SelfTest) {
   if ($ms -eq $null) { Write-Output ('SELFTEST parse-error day=' + $day); exit 3 }
   Write-Output ('SELFTEST day=' + $day + ' count=' + $ms.Count)
   foreach ($m in $ms) {
-    Write-Output ('SELFTEST ' + $m.Key + ' minutes=' + $m.Minutes + ' type=' + $m.Type + ' name=' + $m.Name)
+    Write-Output ('SELFTEST ' + $m.Key + ' minutes=' + $m.Minutes + ' end=' + $m.EndMinutes + ' type=' + $m.Type + ' name=' + $m.Name)
   }
   exit 0
 }
@@ -269,8 +280,8 @@ if (Test-Path $stopFlag) {
   } catch { }
 }
 
-Write-Log ('看门狗启动（节律时刻弹屏模式）：弹屏类型 ' + ($PopTypes -join '/') +
-  '，容错 ' + $PopWindowMinutes + ' 分钟，快照目录 ' + $BackupDir)
+Write-Log ('看门狗启动（节律时段提醒模式）：提醒类型 ' + ($PopTypes -join '/') +
+  '，快照目录 ' + $BackupDir)
 
 # 开机第一屏：自启拉起看门狗时，大屏不在就先拉一次。之后进主循环，
 # 只在节律时刻行动（上课期间无论用不用浏览器都不抢屏）。
@@ -328,14 +339,15 @@ while ($true) {
       Write-Log '配置快照目录没了（可能是数据被清），停止自动弹屏。'
     }
 
-    # 到点了吗：开始时刻落在容错窗口内、且这个时刻今天还没弹过
+    # 到提醒时段了吗：现在落在某个 break/ritual 时段内（start—end），
+    # 且这个时段今天还没提醒过——每个时段只提醒一次（真机反馈 2026-11-19
+    # 晚间补充：提醒后老师再关/再最小化，该时段内不再打扰）
     $nowMin = $now.Hour * 60 + $now.Minute
     $due = $null
     if ($moments) {
       foreach ($mo in $moments) {
         if ($fired.ContainsKey($mo.Key)) { continue }
-        $delta = $nowMin - $mo.Minutes
-        if ($delta -ge 0 -and $delta -lt $PopWindowMinutes) { $due = $mo; break }
+        if ($nowMin -ge $mo.Minutes -and $nowMin -lt $mo.EndMinutes) { $due = $mo; break }
       }
     }
     if ($due -ne $null) {
@@ -345,12 +357,12 @@ while ($true) {
       if ($present) {
         $ok = Show-CBWindowByTitle -Pattern $TitlePattern
         if ($ok) {
-          Write-Log ('节律时刻 ' + $due.Start + '（' + $due.Name + '）：大屏已在，已带到前台。')
+          Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：大屏已在，已带到前台（本时段只提醒这一次）。')
         } else {
-          Write-Log ('节律时刻 ' + $due.Start + '（' + $due.Name + '）：大屏已在，置前没成功（前台锁），不影响页面内容。')
+          Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：大屏已在，置前没成功（前台锁），不影响页面内容。')
         }
       } else {
-        Write-Log ('节律时刻 ' + $due.Start + '（' + $due.Name + '）：大屏不在，拉起。')
+        Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：大屏不在，拉起（本时段只提醒这一次）。')
         Start-KioskHidden
       }
     }

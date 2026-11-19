@@ -111,6 +111,8 @@ jobs:
           }
           $mon = Invoke-SelfTest '2026-11-23'
           if ($mon.Code -ne 0 -or $mon.Text -notmatch 'count=2') { Write-Output "::error::周一应解析出 2 个节律时刻"; exit 1 }
+          # 课间 08:10-08:20 → minutes=490 end=500：提醒的生效范围是整个时段
+          if ($mon.Text -notmatch 'minutes=490 end=500 type=break') { Write-Output "::error::时段端点解析不对"; exit 1 }
           $hol = Invoke-SelfTest '2026-11-21'
           if ($hol.Code -ne 0 -or $hol.Text -notmatch 'count=0') { Write-Output "::error::假日周六应为 0 个时刻"; exit 1 }
           $sun = Invoke-SelfTest '2026-11-22'
