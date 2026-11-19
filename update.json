@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.14",
-  "build": "286e41c",
-  "publishedAt": "2026-11-19T23:45:14+08:00",
+  "version": "0.3.15",
+  "build": "b026f16",
+  "publishedAt": "2026-11-20T00:53:51+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **「倒计时」改成弹窗直接选**：之前是\"按推荐 / 全部显示 / 全部关闭\"\n  三档循环，看不出是什么意思。现在点倒计时图标会弹出一个说明加\n  勾选框：课间、午餐、午间、活动、晨间自主管理、上课、眼保健操、\n  课后服务逐段勾选（推荐的 4 段默认勾上），勾完立即生效；\n  「恢复按推荐」一键回到默认。\n- **编辑面板精简：「提醒事项」并入「各时段的提示语」**：不再单独\n  占一个板块。大屏样式不变（仍是黄色贴纸），文字下面多了一排\n  「哪几天显示」的星期按钮（可多选）——周一有特别安排就只勾周一，\n  都选着就是每天显示。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.14/classbeat-0.3.14.zip",
-  "sha256": "5475e2ba61410dd55830b23a503e8da3d5600ee5c976f32f41047d3e602b3649",
-  "bytes": 11781453,
+  "notes": "- **提示语逐段升级，晨间贴纸统一来源**：「各时段的提示语」里第一项\n  「晨间自主管理」写的文字，就是屏上那张黄色贴纸（样式、字体、位置\n  都和以前的提醒事项一样）——不用再去找另一个\"提醒事项\"入口。\n- **每段都可以按星期定制**：默认一句话、每天显示，保证界面简洁；\n  点「哪几天显示」可以把某些天点掉（比如只有周一的提示），点\n  「其中几天要写不同的话」展开后按星期单独填（周一交回执、周五带\n  美术用品……留空就用默认那句）。\n- 旧配置无缝兼容：之前在\"提醒事项\"里写过的话继续生效，在编辑里\n  会显示在晨间自主管理那一格里。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.15/classbeat-0.3.15.zip",
+  "sha256": "5d7464f308d43f871ebfc2051be60b50a78834003faf5a6c2d115ea859683e8b",
+  "bytes": 11783471,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "58d3f86e3bca41115b5d72f2c58ebb6c34b2d0666bc578f3d37b48fef4d02d87",
+      "sha256": "e8ae7b50ff8f4b5428a238ff8794db00a2ea6352ca5c76c170e7b99c45b4b19d",
       "bytes": 17039
     },
     {
@@ -36,13 +36,13 @@
     },
     {
       "path": "app/edit.css",
-      "sha256": "94d913ed637326f320feeba4adceeab596b8eafcb861547f86ce01b7199e201e",
-      "bytes": 15835
+      "sha256": "298107e1b40ee2344bb1ed6b588d4a47d0bfbd4954ec8b8a3abcd6851a8ed400",
+      "bytes": 16189
     },
     {
       "path": "app/edit.js",
-      "sha256": "f55a22d7d08dd7ce0da4e90b609cbfedb95208b9aa32ff0a4210d1f0cc44f78c",
-      "bytes": 63771
+      "sha256": "c893674853b7d5bd2588c9f9f770ae918515af8b606deaf1adfa9293b3268380",
+      "bytes": 64781
     },
     {
       "path": "app/engine/schedule.js",
@@ -76,8 +76,8 @@
     },
     {
       "path": "app/rhythm.js",
-      "sha256": "a96485b35dccb100fb19a88b33beafe1f88d1f88a13658a3b48d5169f67c4dc6",
-      "bytes": 19817
+      "sha256": "6c3b7331e9dc1bbc6989b031b70d86d276408f5e3a11309413ac7c1138cd3787",
+      "bytes": 21026
     },
     {
       "path": "app/runtime.js",
@@ -86,8 +86,8 @@
     },
     {
       "path": "app/screen.js",
-      "sha256": "0d3ad83aded1d912519a772dd02e4f3111377b33a08c4cde40bf5c6dd767d68e",
-      "bytes": 42722
+      "sha256": "8e8a5593c5f2ba3d3369db087d6a329e801088ee357504263d6af1b29f040352",
+      "bytes": 43428
     },
     {
       "path": "app/setup.css",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "0a01f0efb5ee05e8679b2b98e5a46586475bac3e32e690350200dbf810f7dd00",
+      "sha256": "f8a6b310d8cabeced4723d03d22bfbab83b52323b3c97d2fbb45c9f5da5bcada",
       "bytes": 594
     },
     {
