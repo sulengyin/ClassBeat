@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.7",
-  "build": "47caa2f",
-  "publishedAt": "2026-11-19T16:06:17+08:00",
+  "version": "0.3.8",
+  "build": "3ec73db",
+  "publishedAt": "2026-11-19T16:34:40+08:00",
   "minVersion": "0.2.0",
-  "notes": "- **大屏不再反复抢屏幕了**：老师在同一台电脑上用浏览器干别的时，\n  看门狗会把 kiosk 窗口误判成\"没开\"，隔几秒拉一次，大屏不断跳\n  出来。现在改成枚举所有窗口标题判断，误判消除；另外如果你主动\n  关了大屏（要用电脑），10 分钟内不再自动拉起，暂停时间逐次加长。\n  要用电脑时双击「退出大屏.bat」，恢复双击「打开大屏.bat」。\n- **改作息不再误报\"时段重叠或空缺\"**：11:40-11:50、11:50-12:20\n  这种首尾相接的时段曾被误判。现在改某一段的起止，相邻段的边界\n  自动跟着补齐，报错信息也会把两段时间明明白白写出来。\n- **改完作息，文字页签即时跟上**：之前保存被误报拦住、改时段名\n  时提示语没跟着搬，都会让文字页签看着是旧的。两处都修了。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.7/classbeat-0.3.7.zip",
-  "sha256": "d880c122762e21873b84096587000108f3e4fab3ac4b5f4bfad88ca50dc4c572",
-  "bytes": 11762329,
+  "notes": "- **「检查更新」不再报\"不该替换的文件\"了**：v0.3.4 起程序内更新\n  一直被一个内部检查卡死（提示 `server/icons/icon-192.png` 不该\n  替换）。这次修好后，卡在老版本的大屏可以直接一路升上来。\n- **换人候选不再出现别班名字**：值日表上的名字是对的，但点\n  「换人」弹出的候选是打包时的示例名单。现在候选只认本班：\n  录了名单就出名单，没录名单就只出这个岗位现有的人，并提示\n  去「⋯ 菜单 → 配置班级」补录。\n- **动效默认关闭**：大屏默认不带动画，想要的话点「⋯ 菜单 →\n  增加动效」打开；再点一次关闭。老师主动选过的设置优先于系统\n  的\"减少动态效果\"设置。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.8/classbeat-0.3.8.zip",
+  "sha256": "baa15de3bec469bddcb4d3c1f6e604dfc6a8d376f5c6dde7c90c0e8a16c92100",
+  "bytes": 11764276,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "c1621589f4b320b6dc636bf5a9a9d6337ab4e2942e1a85d3e487ec5e9aacc00b",
+      "sha256": "785bc4a15b92dd240a97637d7cbe67b88b33a3a7eb30b31b7ea2fb7374b2a889",
       "bytes": 17039
     },
     {
@@ -41,8 +41,8 @@
     },
     {
       "path": "app/edit.js",
-      "sha256": "ee10aa405ab52c056e49736b6f9e6a804e38d244fc47c83939f4c873ec1d7716",
-      "bytes": 61844
+      "sha256": "354e9888eab2561e0608d562ba5fb7eb7543fc779bead898bb9ef4434626df6d",
+      "bytes": 63131
     },
     {
       "path": "app/engine/schedule.js",
@@ -51,7 +51,7 @@
     },
     {
       "path": "app/index.html",
-      "sha256": "3cc525dc97dfa38a3e80572c1fe95f0f2e32d229a741f0225caafe211298108f",
+      "sha256": "aa99f39d46ea4ed7cbbdd65d01f953fb1d44a46943e58efc0233e46e9627945e",
       "bytes": 45088
     },
     {
@@ -86,8 +86,8 @@
     },
     {
       "path": "app/screen.js",
-      "sha256": "d31790124fa617bc24f9fee248a05af78f4d44278c7ecfbf657938f7461486cd",
-      "bytes": 33371
+      "sha256": "22bba02a712e77f650061d6cdc7c6d9c7047e5006ebc4ce0afc2615c8d8fbc8b",
+      "bytes": 33690
     },
     {
       "path": "app/setup.css",
@@ -101,8 +101,8 @@
     },
     {
       "path": "app/store.js",
-      "sha256": "f6205378c42734298bafb5db13687395af1fcf16e418e46137a41e0a99af654e",
-      "bytes": 26233
+      "sha256": "4072d40f50946d2e52c648678fa105c202405ca18032653406b59cebc4dc9189",
+      "bytes": 26870
     },
     {
       "path": "app/templates.js",
@@ -121,18 +121,8 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "0804c0d82108828c026e091d2eb99ddaa68acdf692cc38b83bda4647951eacee",
+      "sha256": "1d7fd4c77778d511cbe4b9b423cebc127941a58fa5ff763ebecd4087b433ab3a",
       "bytes": 593
-    },
-    {
-      "path": "server/icons/icon-192.png",
-      "sha256": "03c3be6e408a4498c9baab27b400824c7d6681e3a6f77519ccf7f742f524bb9b",
-      "bytes": 33256
-    },
-    {
-      "path": "server/icons/icon-512.png",
-      "sha256": "37b67836222ad77b7b8e63bcc3cfae1f5edc23249a0faf4a8a1e780f9608d6c3",
-      "bytes": 146478
     },
     {
       "path": "server/phone.html",
@@ -150,54 +140,14 @@
       "bytes": 7944
     },
     {
-      "path": "server/sw.js",
-      "sha256": "fd89b6fb7bd26cab40ede9f6f57aba3ac4ba5290f866de736c09356ea5c66544",
-      "bytes": 2359
-    },
-    {
       "path": "server/update_manifest.py",
       "sha256": "3f9916159a2bd8c9b6de16631fbf6092673212d969767ded6fe92db28ad40408",
       "bytes": 9857
     },
     {
       "path": "server/updater.py",
-      "sha256": "4855ca452877cc93271f089496c248319147405ce746f60eae34399263570558",
-      "bytes": 26432
-    },
-    {
-      "path": "tools/launcher/exit-kiosk.cmd",
-      "sha256": "e48203d86c146581a82efa4d636824295962a6c691695d79efc6c70210b739a8",
-      "bytes": 258
-    },
-    {
-      "path": "tools/launcher/exit-kiosk.ps1",
-      "sha256": "efefa1514a8ccb0071cd2f9909b1621f0256d18830e33e16389afe12466b47b0",
-      "bytes": 6024
-    },
-    {
-      "path": "tools/launcher/install-autostart.ps1",
-      "sha256": "1d63f6ae67b5003c90472fc401f03e5996bf092691f6d9713aa221c943e42f0d",
-      "bytes": 4968
-    },
-    {
-      "path": "tools/launcher/start-kiosk.cmd",
-      "sha256": "875de55c4e5971297efd5bd40ad4804694de3b1e3d4b7dca9d28306347838870",
-      "bytes": 270
-    },
-    {
-      "path": "tools/launcher/start-kiosk.ps1",
-      "sha256": "28a7a79d441c4b7a01262f42a7be0508f6a239f439371eb00c8edbcf3d43fb07",
-      "bytes": 17301
-    },
-    {
-      "path": "tools/launcher/watchdog.ps1",
-      "sha256": "c2d44733939d480ea9ffb4bbfc52e2b80940e89bfd9c54934354f50f2aa8342e",
-      "bytes": 10861
-    },
-    {
-      "path": "tools/launcher/win-titles.ps1",
-      "sha256": "bbf4319240abb2d7aacc287cad1c46a617bf476eecbae405ebc5f79d360a7241",
-      "bytes": 1952
+      "sha256": "e03c2920c64e2d07f0e3b7560d1961ac0b8b9ef8ed84dd1b4f6465d1ac46dfb4",
+      "bytes": 27019
     },
     {
       "path": "停止手机服务.bat",
