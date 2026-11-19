@@ -20,16 +20,46 @@ public static class CBWinTitles {
   [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc cb, IntPtr lParam);
   [DllImport("user32.dll")] private static extern int GetWindowText(IntPtr hWnd, StringBuilder sb, int nMax);
   [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
-  public static string[] VisibleTitles() {
-    var list = new List<string>();
+  [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr hWnd);
+  [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+  private static IntPtr[] Hwnds = new IntPtr[0];
+  private static string[] Titles = new string[0];
+  private static void Collect() {
+    var hs = new List<IntPtr>();
+    var ts = new List<string>();
     EnumWindows(delegate(IntPtr h, IntPtr lp) {
       if (IsWindowVisible(h)) {
         var sb = new StringBuilder(512);
-        if (GetWindowText(h, sb, 512) > 0) list.Add(sb.ToString());
+        if (GetWindowText(h, sb, 512) > 0) { hs.Add(h); ts.Add(sb.ToString()); }
       }
       return true;
     }, IntPtr.Zero);
-    return list.ToArray();
+    Hwnds = hs.ToArray();
+    Titles = ts.ToArray();
+  }
+  public static string[] VisibleTitles() {
+    Collect();
+    return Titles;
+  }
+  // 找到第一个标题含 pattern 的可见窗口并带到前台；找不到返回 false。
+  public static bool ActivateByTitle(string pattern) {
+    Collect();
+    for (int i = 0; i < Titles.Length; i++) {
+      if (Titles[i] != null && Titles[i].Contains(pattern)) {
+        IntPtr h = Hwnds[i];
+        if (IsIconic(h)) ShowWindow(h, 9);   // SW_RESTORE：最小化的先还原
+        keybd_event(0x12, 0, 0, UIntPtr.Zero);      // Alt down：解锁前台锁的经典绕法
+        keybd_event(0x12, 0, 2, UIntPtr.Zero);      // Alt up (KEYEVENTF_KEYUP)
+        SetForegroundWindow(h);
+        BringWindowToTop(h);
+        return true;   // 找到并已尝试置前；失败也不重试（页面内容不受影响）
+      }
+    }
+    return false;
   }
 }
 "@ -ErrorAction Stop
@@ -47,4 +77,19 @@ function Test-CBWindowTitle([string]$Pattern) {
     if ($t -and $t -match $Pattern) { return $true }
   }
   return $false
+}
+
+function Show-CBWindowByTitle {
+  # 节律时刻（课间 / 眼保健操开始）把已在的大屏窗口带到前台。
+  # SetForegroundWindow 有前台锁：后台进程直接调会被 Windows 拒掉，
+  # 经典绕法是先模拟按一次 Alt 再调；再不行就 ShowWindow + BringWindowToTop，
+  # 实在不行返回 $false，调用方只记日志不重试（页面内容不受影响）。
+  param([string]$Pattern = '班级节律屏')
+  try {
+    if (-not ('CBWinTitles' -as [type])) { $null = Get-CBWinTitles }
+    if (-not ('CBWinTitles' -as [type])) { return $false }
+    return [CBWinTitles]::ActivateByTitle($Pattern)
+  } catch {
+    return $false
+  }
 }

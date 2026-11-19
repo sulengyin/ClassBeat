@@ -92,6 +92,31 @@ jobs:
           if ($hit -ne $false) { Write-Output "::error::按标题匹配应返回 false，实际 $hit"; exit 1 }
           Write-Output "窗口枚举助手验证通过"
 
+      # 节律时刻弹屏（PLAN 2.48 ①）：看门狗从配置快照解析"今天哪些时刻
+      # 要弹屏"。本地安全钩子禁 powershell 派生验证，放 runner 上真跑：
+      # 造一份假快照，断言周一出 2 个时刻、假日周六 0 个、调休周日 2 个。
+      - name: 节律时刻解析自检
+        shell: pwsh
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP 'cb-schedule-selftest'
+          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+          $snap = @'
+          {"config":{"timetable":{"blocks":[{"start":"07:30","end":"08:10","type":"reading","name":"晨间自主管理"},{"start":"08:10","end":"08:20","type":"break","name":"课间"},{"start":"09:00","end":"09:30","type":"ritual","name":"大课间"},{"start":"11:40","end":"12:10","type":"meal","name":"午餐"}]},"calendar":{"days":{"2026-11-21":{"kind":"holiday","name":"运动会"},"2026-11-22":{"kind":"school","asWeekday":5,"name":"调休上课"}}}}}
+          '@
+          [System.IO.File]::WriteAllText((Join-Path $tmp 'rhythm-2026-11-19.json'), $snap, (New-Object System.Text.UTF8Encoding($false)))
+          function Invoke-SelfTest([string]$day) {
+            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File tools\launcher\watchdog.ps1 -SelfTest -BackupDir $tmp -TodayStr $day 2>&1
+            Write-Output ($out -join "`n")
+            return @{ Code = $LASTEXITCODE; Text = ($out | Out-String) }
+          }
+          $mon = Invoke-SelfTest '2026-11-23'
+          if ($mon.Code -ne 0 -or $mon.Text -notmatch 'count=2') { Write-Output "::error::周一应解析出 2 个节律时刻"; exit 1 }
+          $hol = Invoke-SelfTest '2026-11-21'
+          if ($hol.Code -ne 0 -or $hol.Text -notmatch 'count=0') { Write-Output "::error::假日周六应为 0 个时刻"; exit 1 }
+          $sun = Invoke-SelfTest '2026-11-22'
+          if ($sun.Code -ne 0 -or $sun.Text -notmatch 'count=2') { Write-Output "::error::调休周日应出 2 个时刻"; exit 1 }
+          Write-Output "节律时刻解析自检通过"
+
       # 简易安装器（PLAN 2.45 ③）：真 Windows 上构建 + 真实跑一遍。
       # 本地开发机沙箱会拦截「未签名 exe 派生 powershell」，只能在这里验。
       - name: 构建简易安装器

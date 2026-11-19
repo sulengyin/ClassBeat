@@ -125,6 +125,33 @@ if (-not (Test-Path $serverScript)) {
 }
 Write-Log ('服务入口：' + $serverScript)
 
+# ---------- 1.5 桌面图标自愈 ----------
+# 真机反馈 2026-11-19：有的机器是解压文件夹装的，桌面上只有文件夹、
+# 没有图标。每次打开大屏时顺手补：桌面缺 ClassBeat.lnk 就建一个，
+# 指向「大屏全屏.bat」（与 install-autostart.ps1 同款，幂等、可重入）。
+if (-not $DryRun) {
+  try {
+    $kioskBatHere = Join-Path $root '大屏全屏.bat'
+    $desktopDir = [Environment]::GetFolderPath('Desktop')
+    if ((Test-Path $kioskBatHere) -and $desktopDir) {
+      $deskLnk = Join-Path $desktopDir 'ClassBeat.lnk'
+      if (-not (Test-Path $deskLnk)) {
+        $wshIcon = New-Object -ComObject WScript.Shell
+        $dsc = $wshIcon.CreateShortcut($deskLnk)
+        $dsc.TargetPath = $kioskBatHere
+        $dsc.WorkingDirectory = $root
+        $dsc.Description = '打开班级节律屏（全屏）'
+        $icoPath = Join-Path $scriptDir 'classbeat.ico'
+        if (Test-Path $icoPath) { $dsc.IconLocation = $icoPath }
+        $dsc.Save()
+        Write-Log ('桌面图标缺失，已补上：' + $deskLnk)
+      }
+    }
+  } catch {
+    Write-Log ('桌面图标自愈失败（不影响大屏）：' + $_.Exception.Message)
+  }
+}
+
 $span = 9
 $ports = @()
 for ($i = 0; $i -le $span; $i++) { $ports += ($Port + $i) }
