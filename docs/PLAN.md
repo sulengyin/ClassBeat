@@ -1550,6 +1550,18 @@ smoke.yml windows-smoke「安装器真实安装验证」把关（造旧数据
 powershell（进程树被杀、无诊断），本地只能验证产物结构与
 7zr 列包，运行验证依赖 Actions runner。
 
+**运行记录（2026-11-19）**：7 轮 windows-smoke 才收敛。①`&`
+不等待 GUI 子系统进程（退出码永远拿不到）→ Start-Process +
+WaitForExit；②默认 GUI 弹窗无人点挂死 20 分钟 → Progress=no
++ `-y` 启动；③RunProgram 命令行被加 `.\` 前缀致 CreateProcess
+不走 PATH（读 SfxSetup.cpp 源码定位）→ 改 ExecuteFile 路线；
+④install.ps1 完整性检查写错文件名（app/screen.html，实际
+app/index.html）→ 误报退出被 SFX 不透传子进程退出码掩盖三轮，
+黑匣子 transcript 才抓到。第 7 轮全绿：旧数据保留、85 文件
+齐全、regress-rounds 通过。tag v0.3.6 发布，Release 四资产
+（setup exe / zip / single.html / update.json），加速链路
+清单 latest=0.3.6 · 44 文件验证通过。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。
