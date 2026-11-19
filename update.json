@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.8",
-  "build": "3ec73db",
-  "publishedAt": "2026-11-19T16:34:40+08:00",
+  "version": "0.3.9",
+  "build": "e049250",
+  "publishedAt": "2026-11-19T19:21:18+08:00",
   "minVersion": "0.2.0",
-  "notes": "- **「检查更新」不再报\"不该替换的文件\"了**：v0.3.4 起程序内更新\n  一直被一个内部检查卡死（提示 `server/icons/icon-192.png` 不该\n  替换）。这次修好后，卡在老版本的大屏可以直接一路升上来。\n- **换人候选不再出现别班名字**：值日表上的名字是对的，但点\n  「换人」弹出的候选是打包时的示例名单。现在候选只认本班：\n  录了名单就出名单，没录名单就只出这个岗位现有的人，并提示\n  去「⋯ 菜单 → 配置班级」补录。\n- **动效默认关闭**：大屏默认不带动画，想要的话点「⋯ 菜单 →\n  增加动效」打开；再点一次关闭。老师主动选过的设置优先于系统\n  的\"减少动态效果\"设置。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.8/classbeat-0.3.8.zip",
-  "sha256": "baa15de3bec469bddcb4d3c1f6e604dfc6a8d376f5c6dde7c90c0e8a16c92100",
-  "bytes": 11764276,
+  "notes": "- **大屏只在课间和眼保健操开始那一瞬间出现**：之前页面被关掉后，\n  看门狗隔几秒就拉一次，上课期间也在抢屏幕。现在的规矩是——开机\n  时出现一次；**课间、眼保健操/大课间开始那一刻**，大屏在就带到\n  前台、不在就拉起；其余时间（上课、午间、放学后）不管老师在不在\n  用浏览器，都不打扰、不抢屏。关掉的大屏下一个课间开始才回来，\n  想立刻回来双击「打开大屏.bat」。\n- **桌面上有图标了**：如果桌面上缺 ClassBeat 图标，每次打开大屏时\n  会自动补一个（指向「大屏全屏.bat」），不用再跑「安装开机自启.bat」。\n- 周末与节假日不弹屏（按大屏里的校历判断）。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.9/classbeat-0.3.9.zip",
+  "sha256": "92b0647da117f568ca48573f9b6e304e11acdc3fe2a98da4df500a474b5ea92a",
+  "bytes": 11767104,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "785bc4a15b92dd240a97637d7cbe67b88b33a3a7eb30b31b7ea2fb7374b2a889",
+      "sha256": "5ba529e1f7555f59af1d26217dba38652c202e8df925d1b2afaad22660ca5917",
       "bytes": 17039
     },
     {
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "1d7fd4c77778d511cbe4b9b423cebc127941a58fa5ff763ebecd4087b433ab3a",
+      "sha256": "69de7704c327a75c219e05680dca14f54448e5183c4c034b291ed1a50d93f38b",
       "bytes": 593
     },
     {
