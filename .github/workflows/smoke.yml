@@ -120,6 +120,15 @@ jobs:
             exit 1
           }
           if ($p.ExitCode -ne 0) { Write-Output "::error::安装器退出码 $($p.ExitCode)"; exit 1 }
+          # 黑匣子：install.ps1 的控制台输出不进 job 日志，读它的 transcript
+          $log = Join-Path $env:TEMP 'classbeat-install.log'
+          if (Test-Path $log) {
+            Write-Output "--- install.ps1 transcript ---"
+            Get-Content $log | Write-Output
+            Write-Output "--- transcript 结束 ---"
+          } else {
+            Write-Output "::warning::没有 install.ps1 transcript，安装脚本可能没跑起来"
+          }
           $t = $env:CBTARGET
           if ((Get-Content (Join-Path $t 'data\marker.txt')) -ne 'keepme') {
             Write-Output "::error::老师数据 marker.txt 被覆盖"; exit 1 }

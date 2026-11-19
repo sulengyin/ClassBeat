@@ -23,6 +23,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
+# ---------- 黑匣子：全程记录到 %TEMP%\classbeat-install.log ----------
+# SFX 壳启动的本脚本有自己的控制台窗口，输出不进调用方的日志；
+# 排查安装问题全靠这份 transcript（2026-11-19 冒烟第五轮教训）。
+$transcript = Join-Path $env:TEMP 'classbeat-install.log'
+try { Start-Transcript -Path $transcript -Force -ErrorAction SilentlyContinue | Out-Null } catch { }
+
 # ---------- 0. 路径 ----------
 $src = $PSScriptRoot
 if (-not $src) { $src = Split-Path -Parent $MyInvocation.MyCommand.Path }
@@ -62,7 +68,8 @@ if (Test-Path $TargetDir) {
 # 文件级复制，配合退出码判断（0-7 算成功，>=8 失败）最稳。
 if (Test-Path $TargetDir) { Remove-Item -Path $TargetDir -Recurse -Force }
 New-Item -ItemType Directory -Path $TargetDir | Out-Null
-robocopy $src $TargetDir /E /R:2 /W:2 /NFL /NDL /NJH /NJS /NP | Out-Null
+robocopy $src $TargetDir /E /R:2 /W:2 /NFL /NDL /NJH /NJS /NP
+Write-Output ('robocopy 退出码 ' + $LASTEXITCODE)
 if ($LASTEXITCODE -ge 8) {
   Write-Output ('robocopy 复制失败，退出码 ' + $LASTEXITCODE)
   if (-not $NoPause) { Read-Host '按回车退出' | Out-Null }
@@ -101,5 +108,6 @@ Write-Output '=============================================='
 Write-Output ('安装完成：' + $TargetDir)
 Write-Output '桌面上双击 ClassBeat 图标即可打开大屏。'
 Write-Output '=============================================='
+try { Stop-Transcript | Out-Null } catch { }
 if (-not $NoPause) { Read-Host '按回车退出' | Out-Null }
 exit 0
