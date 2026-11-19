@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.12",
-  "build": "d0ce046",
-  "publishedAt": "2026-11-19T22:08:11+08:00",
+  "version": "0.3.13",
+  "build": "1e43486",
+  "publishedAt": "2026-11-19T22:39:42+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **装完即生效，不用再重启电脑**：安装器现在会自动让旧看门狗退出、\n  新看门狗立即在后台接管（旧版本装完要重启一次电脑，看门狗的新\n  规则才生效）。装完大屏会自动打开，桌面上就是 ClassBeat 图标。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.12/classbeat-0.3.12.zip",
-  "sha256": "06ec4a4a96b7fa535a3fefd39a850610eed1d55f462a3b0a90ab3ab6291a3544",
-  "bytes": 11767251,
+  "notes": "- **屏面更干净**：右下角常驻工具只留四个图标（深色、全屏、倒计时、\n  编辑），鼠标停上去显示名字；手机、演练、动效、更新、配置班级\n  收进「⋯」菜单。有新版本时「更新」旁边会亮红点。\n- **最小化与退出进了「⋯」菜单**：「最小化」把大屏收到任务栏，点\n  任务栏图标或双击桌面 ClassBeat 图标就回来（重复双击桌面图标不再\n  开第二个窗口，会把已在的大屏带到前台）；「退出程序」关掉大屏\n  窗口、看门狗一起停，手机发消息不受影响——退出前有确认，不会\n  误触。\n- **第一次使用有引导**：首次打开会弹 4 步轻引导（这块屏是什么、\n  图标是什么意思、⋯菜单、手机发消息），看完或跳过就不再出现；\n  「⋯」菜单里随时有「使用帮助」。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.13/classbeat-0.3.13.zip",
+  "sha256": "392b942cb090b809e4b9e791d29f8c803815c6af4e3c7c3d9e05d6228030ea7b",
+  "bytes": 11777921,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "ba1ba769a1078fcae24a68a088b49b69ad06e50993deaad723632e4a6256c049",
+      "sha256": "13dfc94c6b973b9448777b680808195949549a23d638590e285e5c6d4fe6981a",
       "bytes": 17039
     },
     {
@@ -51,8 +51,8 @@
     },
     {
       "path": "app/index.html",
-      "sha256": "aa99f39d46ea4ed7cbbdd65d01f953fb1d44a46943e58efc0233e46e9627945e",
-      "bytes": 45088
+      "sha256": "3f03295c4ced9bf73537c1452ea842a17d56b7a827829c03a18af4467905ddc6",
+      "bytes": 54227
     },
     {
       "path": "app/phoneui.js",
@@ -86,8 +86,8 @@
     },
     {
       "path": "app/screen.js",
-      "sha256": "22bba02a712e77f650061d6cdc7c6d9c7047e5006ebc4ce0afc2615c8d8fbc8b",
-      "bytes": 33690
+      "sha256": "8ba48a0feb8143599a45880b04d6520c978e869a85db58591eaef8f2fae7a8ea",
+      "bytes": 40401
     },
     {
       "path": "app/setup.css",
@@ -111,8 +111,8 @@
     },
     {
       "path": "app/update.js",
-      "sha256": "67e2c8f764e594c1edae5da675d151e7e333935c606d60a0d4f60f92bec60faa",
-      "bytes": 15769
+      "sha256": "a7772f3563307a69c08d46b768022da3aba0699818014e5c0961a74d2e6bc218",
+      "bytes": 16017
     },
     {
       "path": "app/vendor/qrcode.min.js",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "706d00d86f20c69204a5647dcf9e26b895eede54a0b76f8a78ac1f193ed979d9",
+      "sha256": "692b0ce700c5d543b8eb0ed96d3e9be96ed69aa4d3b8de4a7f1804767f800e15",
       "bytes": 594
     },
     {
@@ -141,8 +141,8 @@
     },
     {
       "path": "server/rhythm_server.py",
-      "sha256": "97c49bc68b8bd80257870e18cdad340e1725bca06f263c4f84cf0c9a8920ba3b",
-      "bytes": 49374
+      "sha256": "fa63b4dc059e78ab73c5287b446516f66744be5fc0ad78cd5d0b2e9d17891f96",
+      "bytes": 54007
     },
     {
       "path": "server/run.py",
@@ -186,8 +186,8 @@
     },
     {
       "path": "tools/launcher/start-kiosk.ps1",
-      "sha256": "7eb11f278fa08868cf80a3c21ba8790a455b84fcc2c49e581dc8b1a4a2b8f892",
-      "bytes": 18491
+      "sha256": "1dc8a729e188fd31d2de1e74f9afb2eb498b335641ab547997dc545c84a789a4",
+      "bytes": 19076
     },
     {
       "path": "tools/launcher/watchdog.ps1",
