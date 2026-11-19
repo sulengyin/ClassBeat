@@ -92,6 +92,10 @@ if (installer / "install.ps1").exists():
     check("install.ps1 带 UTF-8 BOM（GBK 环境直接跑会炸）", ps1[:3] == b"\xef\xbb\xbf")
     check("install.ps1 保留老师数据", all(
         w in ps1.decode("utf-8-sig") for w in ("data", "backups", "update-source.txt")))
+    # 2026-11-19 真机反馈：装完不该再让老师重启——安装器自动交接看门狗
+    ps1text = ps1.decode("utf-8-sig")
+    check("install.ps1 自动交接看门狗（旧进程退出 + 新进程上岗）", all(
+        w in ps1text for w in ("stop.flag", "Stop-Process", "watchdog.ps1")))
 else:
     check("install.ps1 存在", False, "tools/installer/install.ps1 不存在")
 check("build_installer.py 存在", (TOOLS / "build_installer.py").exists())
