@@ -56,6 +56,17 @@ jobs:
             --min-version 0.2.0
           test -s dist/update.json
 
+      # 简易安装器（PLAN 2.45 ③）：py7zr 打包 + 7zSD.sfx 三段拼接，
+      # 与操作系统无关，Ubuntu 上就能出 exe；真机行为由 Smoke 的
+      # windows-smoke「安装器真实安装验证」把关。
+      - name: 构建简易安装器
+        run: |
+          set -e
+          python3 -m pip install py7zr
+          python3 tools/build_installer.py
+          test -s dist/classbeat-setup-*.exe
+          ls -lh dist/classbeat-setup-*.exe
+
       - name: 检查产物
         run: |
           set -e
@@ -71,6 +82,8 @@ jobs:
             unzip -l "$zip" | grep -E "/(data/|server/messages\.json|server/server\.log|server/service\.pid)"
             exit 1
           fi
+          setup=$(ls dist/classbeat-setup-*.exe | head -1)
+          echo "setup=$setup" >> "$GITHUB_ENV"
           echo "zip=$zip" >> "$GITHUB_ENV"
           if [ -f dist/update.json ]; then
             python3 tools/make_update.py --check-only --dist dist
@@ -108,6 +121,7 @@ jobs:
           name: classbeat-package
           path: |
             dist/*.zip
+            dist/classbeat-setup-*.exe
             dist/*-single.html
           retention-days: 30
 
@@ -125,8 +139,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            "$zip" dist/*-single.html dist/update.json \
+            "$setup" "$zip" dist/*-single.html dist/update.json \
             --title "ClassBeat $GITHUB_REF_NAME" \
-            --notes "Windows：下载 classbeat-版本号.zip，解压后双击「打开大屏.bat」；只想看看效果可下载 classbeat-版本号-single.html 双击打开；附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」，包内目录仍是中文；完整说明见仓库 CHANGELOG.md。" \
+            --notes "Windows：推荐下载 classbeat-setup-版本号.exe 双击安装（自动装到本机用户目录、保留班级数据、建桌面 ClassBeat 图标）；或下载 classbeat-版本号.zip 解压后双击「打开大屏.bat」；只想看看效果可下载 classbeat-版本号-single.html 双击打开；附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」，包内目录仍是中文；完整说明见仓库 CHANGELOG.md。" \
             --generate-notes \
             --verify-tag

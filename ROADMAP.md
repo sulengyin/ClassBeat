@@ -310,7 +310,9 @@ GET  /api/ping    配对信息（当前局域网地址 + 端口）
 
 补充（2026-11-11）：`--kiosk` 不只是体验优化，它同时是 9.6「页面被误触关闭」的第一道防线，所以第一档的优先级应当提前，不必等「跑两周再决定」。
 
-进展（2026-11-16）：第一档已实装并随包发布——`tools/launcher/`（start-kiosk / watchdog / install-autostart / exit-kiosk 逃生门），包根三个双击入口（大屏全屏 / 退出大屏 / 安装开机自启），打包清单由 `tools/test_package.py` 钉住；单实例由启动器自己保证（已有 kiosk 窗口不再开第二个）。Windows 测试机 2026-11-16 真跑通过（顺手修掉环境撞键与动态标题两个判据级 bug，见 PLAN.md）。**教室真机验收 NOT_RUN。**
+进展（2026-11-16）：第一档已实装并随包发布——`tools/launcher/`（start-kiosk / watchdog / install-autostart / exit-kiosk 逃生门），包根三个双击入口（大屏全屏 / 退出大屏 / 安装开机自启），打包清单由 `tools/test_package.py` 钉住；单实例由启动器自己保证（已有 kiosk 窗口不再开第二个）。Windows 测试机 2026-11-16 真跑通过（顺手修掉环境撞键与动态标题两个判据级 bug，见 PLAN.md）。教室真机验收 2026-11-19 通过（自启 ✅ 手机通知 ✅）。
+
+进展（2026-11-19）：第二档走了比 PyInstaller 更轻的**简易安装器**路线（用户在真机反馈后选定）：7-Zip SFX 自解压 exe 双击安装（`tools/build_installer.py` + `tools/installer/`），装到用户目录、保留班级数据、建桌面 ClassBeat 图标，release.yml 随 tag 产出、smoke.yml 真机化验证。PyInstaller 单 exe（托盘/防休眠）保留为后续可选升级，未启动。
 
 ### 9.4 落地顺序（已确认）
 

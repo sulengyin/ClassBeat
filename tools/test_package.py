@@ -81,6 +81,20 @@ if src:
     check("使用说明提到程序内更新", "检查更新" in package.README
           and "update-source.txt" in package.README)
 
+# 六、简易安装器的三件套（2026-11-19 真机反馈「依然是压缩包」，9.3 第二档）：
+# SFX 壳 + 安装脚本 + 构建脚本缺一个就出不了安装器
+installer = TOOLS / "installer"
+check("7zSD.sfx 安装壳在仓库里", (installer / "7zSD.sfx").exists()
+      and (installer / "7zSD.sfx").stat().st_size > 100_000)
+if (installer / "install.ps1").exists():
+    ps1 = (installer / "install.ps1").read_bytes()
+    check("install.ps1 带 UTF-8 BOM（GBK 环境直接跑会炸）", ps1[:3] == b"\xef\xbb\xbf")
+    check("install.ps1 保留老师数据", all(
+        w in ps1.decode("utf-8-sig") for w in ("data", "backups", "update-source.txt")))
+else:
+    check("install.ps1 存在", False, "tools/installer/install.ps1 不存在")
+check("build_installer.py 存在", (TOOLS / "build_installer.py").exists())
+
 if failures:
     print(f"\n{len(failures)} 项没过：" + "、".join(failures))
     sys.exit(1)

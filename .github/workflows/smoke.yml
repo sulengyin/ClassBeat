@@ -78,6 +78,39 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Output "启动器两件套 DryRun 通过"
 
+      # 简易安装器（PLAN 2.45 ③）：真 Windows 上构建 + 真实跑一遍。
+      # 本地开发机沙箱会拦截「未签名 exe 派生 powershell」，只能在这里验。
+      - name: 构建简易安装器
+        shell: pwsh
+        run: |
+          python -m pip install py7zr
+          $target = Join-Path $env:RUNNER_TEMP 'cb-install-target'
+          New-Item -ItemType Directory -Path (Join-Path $target 'data') -Force | Out-Null
+          Set-Content -Path (Join-Path $target 'data\marker.txt') -Value 'keepme'
+          Set-Content -Path (Join-Path $target 'update-source.txt') -Value 'my own source'
+          python tools\build_installer.py --install-args "-TargetDir $target -NoAutostart"
+          "CBTARGET=$target" >> $env:GITHUB_ENV
+
+      - name: 安装器真实安装验证
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist\classbeat-setup-*.exe | Select-Object -First 1
+          Write-Output "运行 $($setup.Name)"
+          & $setup.FullName
+          if ($LASTEXITCODE -ne 0) { Write-Output "::error::安装器退出码 $LASTEXITCODE"; exit 1 }
+          $t = $env:CBTARGET
+          if ((Get-Content (Join-Path $t 'data\marker.txt')) -ne 'keepme') {
+            Write-Output "::error::老师数据 marker.txt 被覆盖"; exit 1 }
+          if ((Get-Content (Join-Path $t 'update-source.txt')) -ne 'my own source') {
+            Write-Output "::error::自定义更新源被覆盖"; exit 1 }
+          foreach ($f in @('server\python\python.exe', 'app\screen.html',
+                           'tools\launcher\install-autostart.ps1',
+                           '安装开机自启.bat', '启动手机服务.bat', 'install.ps1')) {
+            if (-not (Test-Path (Join-Path $t $f))) {
+              Write-Output "::error::安装后缺文件：$f"; exit 1 }
+          }
+          Write-Output "安装器验证通过：旧数据/更新源保留，程序文件齐全"
+
       - name: 冒烟结果汇总
         if: always()
         run: echo "Windows 冒烟结束。"
