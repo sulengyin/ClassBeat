@@ -1533,12 +1533,22 @@ backup 循环把配置写进新 origin，以后再漂移照样能回来。老师
 不带班名，看起来像正式程序）；卸载时新旧两个名字都清。打包文案
 同步，test_package 钉住。
 
-**③ 压缩包 → 安装形态（NOT_RUN，9.3 第二档启动）**。真机反馈
-"依然是压缩文件格式"，即 9.3 第二档的真 exe/安装器诉求被验收
-确认。前置已满足（教室验收通过），按 9.3 节奏启动：优先评估
-简易安装器（zip 内容安装到固定目录 + 桌面 ClassBeat 图标 + 开始
-菜单项，杀软风险≈0）vs PyInstaller 单 exe（托盘/防休眠，误报
-风险需实测）。待与用户确认范围后实施。
+**③ 压缩包 → 安装形态（DONE 2026-11-19，9.3 第二档简易路线）**。
+用户选择简易安装器（vs PyInstaller 单 exe）。实现 =
+7-Zip SFX 自解压：`tools/installer/7zSD.sfx`（LZMA SDK 官方
+安装壳，LGPL，允许再分发）+ py7zr 打的纯 LZMA2 7z 包（去默认
+BCJ，最大化 SFX 兼容）+ UTF-8 配置段，三段拼接出
+`classbeat-setup-<版本>.exe`；`tools/installer/install.ps1`
+负责：装到 `%LOCALAPPDATA%\ClassBeat`、旧安装的 data/、
+backups/、update-source.txt 原样保留、跑 install-autostart
+（自启 + 桌面 ClassBeat 图标）。IExpress 路线弃用（静默模式
+产物损坏 rc=1 无诊断，UI 模式挂死）。构建与发布接入
+release.yml（Ubuntu 产出 exe，拼接与 OS 无关）；真机行为由
+smoke.yml windows-smoke「安装器真实安装验证」把关（造旧数据
+→ 真装一遍 → 验证数据保留 + 文件齐全）。test_package 第六节
+钉住三件套。验证备注：本地开发机沙箱拦截未签名 exe 派生
+powershell（进程树被杀、无诊断），本地只能验证产物结构与
+7zr 列包，运行验证依赖 Actions runner。
 
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
