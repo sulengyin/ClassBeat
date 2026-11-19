@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.13",
-  "build": "1e43486",
-  "publishedAt": "2026-11-19T22:39:42+08:00",
+  "version": "0.3.14",
+  "build": "286e41c",
+  "publishedAt": "2026-11-19T23:45:14+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **屏面更干净**：右下角常驻工具只留四个图标（深色、全屏、倒计时、\n  编辑），鼠标停上去显示名字；手机、演练、动效、更新、配置班级\n  收进「⋯」菜单。有新版本时「更新」旁边会亮红点。\n- **最小化与退出进了「⋯」菜单**：「最小化」把大屏收到任务栏，点\n  任务栏图标或双击桌面 ClassBeat 图标就回来（重复双击桌面图标不再\n  开第二个窗口，会把已在的大屏带到前台）；「退出程序」关掉大屏\n  窗口、看门狗一起停，手机发消息不受影响——退出前有确认，不会\n  误触。\n- **第一次使用有引导**：首次打开会弹 4 步轻引导（这块屏是什么、\n  图标是什么意思、⋯菜单、手机发消息），看完或跳过就不再出现；\n  「⋯」菜单里随时有「使用帮助」。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.13/classbeat-0.3.13.zip",
-  "sha256": "392b942cb090b809e4b9e791d29f8c803815c6af4e3c7c3d9e05d6228030ea7b",
-  "bytes": 11777921,
+  "notes": "- **「倒计时」改成弹窗直接选**：之前是\"按推荐 / 全部显示 / 全部关闭\"\n  三档循环，看不出是什么意思。现在点倒计时图标会弹出一个说明加\n  勾选框：课间、午餐、午间、活动、晨间自主管理、上课、眼保健操、\n  课后服务逐段勾选（推荐的 4 段默认勾上），勾完立即生效；\n  「恢复按推荐」一键回到默认。\n- **编辑面板精简：「提醒事项」并入「各时段的提示语」**：不再单独\n  占一个板块。大屏样式不变（仍是黄色贴纸），文字下面多了一排\n  「哪几天显示」的星期按钮（可多选）——周一有特别安排就只勾周一，\n  都选着就是每天显示。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.14/classbeat-0.3.14.zip",
+  "sha256": "5475e2ba61410dd55830b23a503e8da3d5600ee5c976f32f41047d3e602b3649",
+  "bytes": 11781453,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "13dfc94c6b973b9448777b680808195949549a23d638590e285e5c6d4fe6981a",
+      "sha256": "58d3f86e3bca41115b5d72f2c58ebb6c34b2d0666bc578f3d37b48fef4d02d87",
       "bytes": 17039
     },
     {
@@ -36,13 +36,13 @@
     },
     {
       "path": "app/edit.css",
-      "sha256": "8ac9bc5bd604d7f0ba9f26a2370bb41f46e14beffe30c5ea542e52eccb804be2",
-      "bytes": 15256
+      "sha256": "94d913ed637326f320feeba4adceeab596b8eafcb861547f86ce01b7199e201e",
+      "bytes": 15835
     },
     {
       "path": "app/edit.js",
-      "sha256": "354e9888eab2561e0608d562ba5fb7eb7543fc779bead898bb9ef4434626df6d",
-      "bytes": 63131
+      "sha256": "f55a22d7d08dd7ce0da4e90b609cbfedb95208b9aa32ff0a4210d1f0cc44f78c",
+      "bytes": 63771
     },
     {
       "path": "app/engine/schedule.js",
@@ -51,8 +51,8 @@
     },
     {
       "path": "app/index.html",
-      "sha256": "3f03295c4ced9bf73537c1452ea842a17d56b7a827829c03a18af4467905ddc6",
-      "bytes": 54227
+      "sha256": "a02df62ea2b49dca8bd1f8f04ffe014c4e923de38e1c98df855019a31f68b1b1",
+      "bytes": 56478
     },
     {
       "path": "app/phoneui.js",
@@ -76,8 +76,8 @@
     },
     {
       "path": "app/rhythm.js",
-      "sha256": "d39365c2b513a0fe6517f64798fe3b95ca7d5eebd8731274dc127d87a8d07286",
-      "bytes": 18961
+      "sha256": "a96485b35dccb100fb19a88b33beafe1f88d1f88a13658a3b48d5169f67c4dc6",
+      "bytes": 19817
     },
     {
       "path": "app/runtime.js",
@@ -86,8 +86,8 @@
     },
     {
       "path": "app/screen.js",
-      "sha256": "8ba48a0feb8143599a45880b04d6520c978e869a85db58591eaef8f2fae7a8ea",
-      "bytes": 40401
+      "sha256": "0d3ad83aded1d912519a772dd02e4f3111377b33a08c4cde40bf5c6dd767d68e",
+      "bytes": 42722
     },
     {
       "path": "app/setup.css",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "692b0ce700c5d543b8eb0ed96d3e9be96ed69aa4d3b8de4a7f1804767f800e15",
+      "sha256": "0a01f0efb5ee05e8679b2b98e5a46586475bac3e32e690350200dbf810f7dd00",
       "bytes": 594
     },
     {
