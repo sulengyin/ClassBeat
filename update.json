@@ -1,18 +1,18 @@
 {
   "schema": 1,
-  "version": "0.3.4",
-  "build": "5bf609a",
-  "publishedAt": "2026-11-18T21:02:52+08:00",
+  "version": "0.3.5",
+  "build": "3433b59",
+  "publishedAt": "2026-11-19T11:03:16+08:00",
   "minVersion": "0.2.0",
-  "notes": "- **屏上可以直接升级了**：大屏右下角「⋯」菜单的「检查更新」真正\n  可用——有新版点「应用」，服务自动备份、替换、重启生效，不用再\n  重新下载安装包。更新走国内加速域名（GitHub 内容 + 加速前缀），\n  直连 GitHub 不稳定也不影响；前缀失效时改包根 update-source.txt\n  一行换备用地址即可。\n- 升级不会覆盖老师的设置和数据（名册、作息、话术都原样保留），\n  每次升级前自动备份到 backups\\program\\（保留最近两份），更新后\n  自检不过会自动回滚。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.4/classbeat-0.3.4.zip",
-  "sha256": "c289bcd9f14ef642f0164f76e81138693acadcb9b7a8ec7159d5cfb6f6444680",
-  "bytes": 11755451,
+  "notes": "- **重启再也不丢配置了**：真机发现换浏览器或端口变化后，屏上会\n  变成空样例（数据其实一直自动备份在电脑里）。现在开机发现「这份\n  不是老师配的那份」就自动从本机备份恢复，无感回来；手动恢复入口\n  保留不变。\n- **桌面图标改叫 ClassBeat**：不带班名，看起来像正式程序；旧图标\n  卸载时一并清理。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.5/classbeat-0.3.5.zip",
+  "sha256": "440151c16124d444be4a1e26c232e795ab1603c34646fe72e729eefb52d6e9a2",
+  "bytes": 11757216,
   "files": [
     {
       "path": "app/backup.js",
-      "sha256": "a964d674cc6f6b501caa77faaee5e2bcf1da3384a65cdf0246bfaa567fca1bbb",
-      "bytes": 7399
+      "sha256": "6befee1ce4a73efeb6c60012b7ee95da19eb74610af4a0059393d6b9e7209e12",
+      "bytes": 9457
     },
     {
       "path": "app/clock.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "5a522e165ced5608eb759eeb4f4abcde601a67a94ba06088f8732d800f7a0a54",
+      "sha256": "d6c06b9541f8a18b9248d381c833e3e42fe8005294882721fc339a2d342434bb",
       "bytes": 17039
     },
     {
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "4fbfdd4171bd0eead045d4c29134b5e0b467f181eeb4a8089a65a612a7e590e9",
+      "sha256": "10ba0bcdf75d5157a4801fa3ac06d7cbc2d406bd872c0f69afe9644e3e7ffb69",
       "bytes": 593
     },
     {
@@ -141,8 +141,8 @@
     },
     {
       "path": "server/rhythm_server.py",
-      "sha256": "5340442728257064781aa4081163cf1375bd76aca9636c2fd07a902723fa55de",
-      "bytes": 48280
+      "sha256": "4094a5a4e7b1878984290f083887a979ff8d2071db32c5c16b46cb0688ba252b",
+      "bytes": 48835
     },
     {
       "path": "server/run.py",
@@ -181,8 +181,8 @@
     },
     {
       "path": "安装开机自启.bat",
-      "sha256": "cfcb4eb54db26e99085da60073d4466228009850eb43a43473cf389d1b40655b",
-      "bytes": 588
+      "sha256": "75f01aa120b5f69435fd04091ca7e3ab124e4a96a3a8f0c45b9ec56696b9cb5a",
+      "bytes": 585
     },
     {
       "path": "打开大屏.bat",
