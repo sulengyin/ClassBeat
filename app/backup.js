@@ -106,24 +106,64 @@
         if (document.visibilityState === "hidden") tick();
       });
     } catch (e) { /* 没有 document：测试环境，忽略 */ }
-    if (mode === "http") hintIfEmpty();
+    if (mode === "http") bootRestore();
   }
 
-  /* 换来源（file:// → 8765）后 localStorage 是空的：本机有备份就提示一句，
-     不给老师弹模态框，也不挡屏。 */
-  function hintIfEmpty() {
+  /* 本地班名（当前 origin 里生效的配置；空壳/样例包也有班名） */
+  function currentKlass() {
+    try {
+      var full = root.Store.exportAll();
+      var meta = (full && full.config && full.config.meta) || {};
+      return meta.klass || meta.school || "";
+    } catch (e) { return ""; }
+  }
+
+  /* 开机自动恢复（2026-11-19 真机反馈：换浏览器/端口漂移后配置"没了"）。
+     localStorage 按 origin 隔离：导入数据时的浏览器或端口与开机自启
+     打开的不一致时，新 origin 里是样例空壳，老师看到的就是"数据没了"。
+     其实配置一直躺在服务端 backups/config/ 里（每 10 秒同步落盘）——
+     这里把"提示手动恢复"升级为"自动恢复"：
+       本机有快照 且 快照班名 ≠ 当前 origin 的班名
+         → 说明这个 origin 不是老师配过的那份 → 静默恢复最新快照 → 刷新。
+       班名一致（就是这个 origin 自己的配置）→ 一个字都不动。
+     恢复后 backup 循环会把配置写进新 origin，以后再漂移也照样能回来。 */
+  function bootRestore() {
     root.setTimeout(function () {
-      if (snapshotText()) return;                 // 当前有配置，不用提示
       list(function (items) {
-        if (!items || !items.length) return;
-        var box = document.getElementById("tip");
-        var txt = document.getElementById("tipText");
-        if (!box || !txt) return;
-        txt.textContent = "这台电脑上有 " + items[0].day + " 的班级配置备份，"
-          + "点右下角「⋯」→ 编辑 → 带走这些修改 → 本机自动备份，可以恢复。";
-        box.hidden = false;
+        if (!items || !items.length) return;          // 服务端没有备份：首次安装，正常
+        var day = items[0].day;
+        try {
+          root.fetch("/api/config/backup/" + encodeURIComponent(day),
+                     { cache: "no-store" })
+            .then(function (r) { return r && r.ok ? r.json() : null; })
+            .then(function (d) {
+              if (!d) return showRestoreHint(items);
+              var klass = ((d.config || {}).meta || {}).klass
+                          || ((d.config || {}).meta || {}).school || "";
+              if (!klass) return showRestoreHint(items);
+              if (klass === currentKlass()) return;   // 同一份配置，别画蛇添足
+              apply(d, function (r) {
+                if (r && r.ok) {
+                  try { root.location.reload(); } catch (e) { /* 测试环境 */ }
+                } else {
+                  showRestoreHint(items);
+                }
+              });
+            })
+            .catch(function () { /* 连不上服务：当没有备份 */ });
+        } catch (e) { /* 老浏览器：退化为提示 */ }
       });
     }, FIRST + 2000);
+  }
+
+  /* 自动恢复不可用时的原提示（手动恢复入口在「⋯」菜单） */
+  function showRestoreHint(items) {
+    var box = document.getElementById("tip");
+    var txt = document.getElementById("tipText");
+    if (!box || !txt) return;
+    txt.textContent = "这台电脑上有 " + items[0].day + " 的班级配置备份，"
+      + "点右下角「⋯」→ 编辑 → 带走这些修改 → 本机自动备份，可以恢复。";
+    box.hidden = false;
   }
 
   /* ---- 面板用的接口 ---- */

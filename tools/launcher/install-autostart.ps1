@@ -29,11 +29,14 @@ $lnkPath = Join-Path $startupDir 'ClassBeat 大屏自动恢复.lnk'
 
 # 桌面图标：老师眼里「桌面上一个图标，双击就开」。包根下有
 # 「大屏全屏.bat」才建（仓库源码里没有，安静跳过不影响自启）。
+# 名字直接叫 ClassBeat（2026-11-19 真机反馈：不带班名，看起来像正式程序）。
+# 旧版叫「班级节律屏.lnk」，卸载时两个名字都清。
 $pkgRoot = Split-Path -Parent $scriptDir
 $kioskBat = Join-Path $pkgRoot '大屏全屏.bat'
 $icoPath = Join-Path $scriptDir 'classbeat.ico'
 $desktop = [Environment]::GetFolderPath('Desktop')
-$deskLnk = Join-Path $desktop '班级节律屏.lnk'
+$deskLnk = Join-Path $desktop 'ClassBeat.lnk'
+$deskLnkOld = Join-Path $desktop '班级节律屏.lnk'
 
 Write-Output '本次要操作的路径：'
 Write-Output ('  启动文件夹：' + $startupDir)
@@ -70,6 +73,10 @@ if ($Remove) {
   if (Test-Path $deskLnk) {
     Remove-Item -Path $deskLnk -Force -ErrorAction SilentlyContinue
     Write-Output '已删除桌面图标。'
+  }
+  if (Test-Path $deskLnkOld) {
+    Remove-Item -Path $deskLnkOld -Force -ErrorAction SilentlyContinue
+    Write-Output '已删除旧版桌面图标（班级节律屏）。'
   }
   exit 0
 }

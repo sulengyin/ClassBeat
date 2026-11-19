@@ -57,6 +57,9 @@ for needle in ("大屏全屏.bat", "退出大屏.bat", "安装开机自启.bat")
 # 四、kiosk 没有关闭按钮，使用说明必须写清唯一出口
 check("使用说明写明退出大屏的入口", "退出大屏.bat" in package.README and "看门狗" in package.README)
 
+# 四之一、桌面图标叫 ClassBeat，不带班名（2026-11-19 真机反馈）
+check("使用说明写明桌面图标名 ClassBeat", "ClassBeat 图标" in package.README)
+
 # 五、程序内更新的更新源文件（2026-11-17 P2 9.5）：必须存在，且
 # 默认源必须是「加速前缀 + GitHub raw」——GitHub 裸直连在国内不稳
 # 定（2026-11-17 用户确认）；加速域名方案是用户 2026-11-18 选定的
