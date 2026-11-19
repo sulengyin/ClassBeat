@@ -287,16 +287,20 @@ def main():
               "㉝ 真实包的清单版本与文件范围正确",
               "%d 个文件" % len(paths))
 
-        # 2026-11-19 真机教训：icons/sw.js/launcher 在包里但绝不能进清单，
-        # 否则 v0.3.4 老更新器把它们当"不该替换的文件"拒换，自更新整体卡死。
+        # 0.3.10 起清单重新全量：icons/sw.js/launcher 进清单（启动器修复
+        # 能随「检查更新」到达）；minVersion=0.3.8 闸门挡住白名单窄的
+        # 旧更新器，老机器得到"请装完整安装包"的清晰提示而不是中途报错。
         with zipfile.ZipFile(real_zip) as z:
             znames = [n.split("/", 1)[1] for n in z.namelist() if "/" in n]
         check("server/icons/icon-192.png" in znames
-              and "server/icons/icon-192.png" not in paths
-              and "server/sw.js" in znames and "server/sw.js" not in paths
+              and "server/icons/icon-192.png" in paths
+              and "server/sw.js" in znames and "server/sw.js" in paths
               and "tools/launcher/watchdog.ps1" in znames
-              and not any(p.startswith("tools/launcher/") for p in paths),
-              "㉞ 包里带 icons/sw.js/launcher，但清单不发它们（老机器白名单窄）")
+              and "tools/launcher/watchdog.ps1" in paths,
+              "㉞ 清单全量：icons/sw.js/launcher 都随版本走")
+        check(packed_manifest["minVersion"] == "0.3.8",
+              "㉞补 minVersion 闸门 = 0.3.8（白名单窄的旧更新器提前拦下）",
+              packed_manifest["minVersion"])
 
         # 不变量：清单里的每个文件都要过替换白名单，两边口径永不反向
         sys.path.insert(0, str(pkgrepo / "server"))

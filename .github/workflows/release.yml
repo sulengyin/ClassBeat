@@ -53,7 +53,7 @@ jobs:
             --tag "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --notes-file CHANGELOG.md \
-            --min-version 0.2.0
+            --min-version 0.3.8
           test -s dist/update.json
 
       # 简易安装器（PLAN 2.45 ③）：py7zr 打包 + 7zSD.sfx 三段拼接，

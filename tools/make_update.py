@@ -28,8 +28,9 @@ import update_manifest as um  # noqa: E402
 
 BEIJING = dt.timezone(dt.timedelta(hours=8))
 
-# 低于这个版本的安装包不保证目录结构一致，直接走完整安装包。
-DEFAULT_MIN_VERSION = "0.2.0"
+# 低于这个版本的机器不保证更新器认得全部程序文件（0.3.8 起白名单
+# 才认 icons/sw.js/launcher），直接提示装完整安装包，不再半路报错。
+DEFAULT_MIN_VERSION = "0.3.8"
 DEFAULT_REPO = "sulengyin/ClassBeat"
 
 
@@ -47,27 +48,27 @@ def read_version(entries):
 def is_program_file(rel):
     """只列会被替换的程序文件；运行时、说明和单文件版不进清单。
 
-    2026-11-19 真机反馈①：v0.3.4 老更新器的替换白名单只认 app/、
-    phone.html、server/*.py 和根目录 .bat——server/icons/、tools/launcher/
-    这类进了清单就被当成"不该替换的文件"拒换，老机器的自更新整个
-    卡死（icon-192.png 那个报错）。现阶段这些不进清单：server/icons/、
-    server/sw.js、tools/launcher/ ——安装器/zip 自带全量，自更新不刷新
-    它们；等现役机器都过 0.3.8（新白名单已认这几类）再考虑放开。
-    受保护文件（data/、assets/、server/messages.json 等）就算误进了包
-    也不发清单。"""
+    0.3.8 曾临时把 server/icons/、server/sw.js、tools/launcher/ 摘出
+    清单（当时老机器的替换白名单窄，进清单就被拒换，卡死升级）。
+    0.3.10 起现役机器都过了宽白名单，且用 minVersion=0.3.8 做闸门：
+    白名单不够宽的老更新器会在「检查更新」阶段就得到"请装完整安装
+    包"的清晰提示，不会再中途报"不该替换的文件"。清单重新全量发布，
+    启动器/图标/PWA 壳随版本走。受保护文件（data/、assets/、
+    server/messages.json 等）就算误进了包也不发清单。"""
     if rel in ("MANIFEST.txt", "使用说明.txt", "update-source.txt"):
         return False
     if rel in um.PROTECTED_FILES or rel.startswith(um.PROTECTED_PREFIXES):
         return False
     if rel.endswith("-单文件版.html") or rel.endswith("-single.html"):
         return False
-    if rel.startswith("server/python/") or rel.startswith("server/icons/"):
+    if rel.startswith("server/python/"):
         return False
-    if rel == "server/sw.js":
+    # 启动器只有脚本随版本走（.ps1/.cmd，与替换白名单同口径）；
+    # classbeat.ico 这类静态图标不进清单
+    if rel.startswith("tools/launcher/") and not rel.endswith((".ps1", ".cmd")):
         return False
-    if rel.startswith("tools/"):
-        return False
-    return rel.startswith("app/") or rel.startswith("server/") or rel.endswith(".bat")
+    return rel.startswith("app/") or rel.startswith("server/") \
+        or rel.startswith("tools/launcher/") or rel.endswith(".bat")
 
 
 def read_zip(zip_path):

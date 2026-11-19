@@ -409,11 +409,13 @@ def main():
         check(not mkm.is_program_file("server/messages.json")
               and not mkm.is_program_file("data/schedule.json"),
               "㉗补 受保护文件即使进了包也不发清单")
-        check(not mkm.is_program_file("server/icons/icon-192.png")
-              and not mkm.is_program_file("tools/launcher/watchdog.ps1")
+        # 0.3.10 起清单重新全量（minVersion=0.3.8 闸门挡住白名单窄的旧更新器）
+        check(mkm.is_program_file("server/icons/icon-192.png")
+              and mkm.is_program_file("server/sw.js")
+              and mkm.is_program_file("tools/launcher/watchdog.ps1")
               and mkm.is_program_file("app/index.html")
               and mkm.is_program_file("退出大屏.bat"),
-              "㉗补 清单现阶段不发 icons 与 launcher（老机器白名单窄）")
+              "㉗补 清单全量：icons/sw.js/launcher 随版本走")
         mgr10 = U.UpdateManager(str(single), source.base + "/update.json", "0.2.1")
         ok, err = False, ""
         try:
