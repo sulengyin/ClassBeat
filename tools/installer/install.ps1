@@ -56,11 +56,26 @@ if (Test-Path $TargetDir) {
 }
 
 # ---------- 2. 换成新副本 ----------
-# 目标目录整个换成新副本（比逐文件覆盖干净：旧版废弃文件不留）
+# 目标目录整个换成新副本（比逐文件覆盖干净：旧版废弃文件不留）。
+# 用 robocopy 而不是 Copy-Item：runner 实测 pwsh7 的通配 + 递归
+# 组合偶发丢深层文件（server\python\python.exe），robocopy /E 是
+# 文件级复制，配合退出码判断（0-7 算成功，>=8 失败）最稳。
 if (Test-Path $TargetDir) { Remove-Item -Path $TargetDir -Recurse -Force }
 New-Item -ItemType Directory -Path $TargetDir | Out-Null
-Copy-Item -Path (Join-Path $src '*') -Destination $TargetDir -Recurse -Force
-Write-Output '程序文件已就位。'
+robocopy $src $TargetDir /E /R:2 /W:2 /NFL /NDL /NJH /NJS /NP | Out-Null
+if ($LASTEXITCODE -ge 8) {
+  Write-Output ('robocopy 复制失败，退出码 ' + $LASTEXITCODE)
+  if (-not $NoPause) { Read-Host '按回车退出' | Out-Null }
+  exit 1
+}
+if (-not (Test-Path (Join-Path $TargetDir 'server\python\python.exe'))) {
+  Write-Output '复制后校验失败：server\python\python.exe 不在目标目录。'
+  Write-Output ('来源目录 ' + $src + ' 内容：')
+  Get-ChildItem $src -Recurse -File | Select-Object -First 10 -ExpandProperty FullName | Write-Output
+  if (-not $NoPause) { Read-Host '按回车退出' | Out-Null }
+  exit 1
+}
+Write-Output ('程序文件已就位（' + (Get-ChildItem $TargetDir -Recurse -File).Count + ' 个文件）。')
 
 # ---------- 3. 老师数据放回去 ----------
 foreach ($p in $keep) {
