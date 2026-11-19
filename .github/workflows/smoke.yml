@@ -97,8 +97,19 @@ jobs:
           $setup = Get-ChildItem dist\classbeat-setup-*.exe | Select-Object -First 1
           Write-Output "运行 $($setup.Name)"
           # 7zSD 是 GUI 子系统程序，& 不会等它跑完（$LASTEXITCODE 不会被
-          # 设置，2026-11-19 第一轮冒烟踩到），必须 Start-Process -Wait
-          $p = Start-Process -FilePath $setup.FullName -Wait -PassThru
+          # 设置，2026-11-19 第一轮冒烟踩到），必须 Start-Process + WaitForExit；
+          # 再挂有界超时，超时抓现场（第二轮冒烟默认 GUI 弹窗挂死 20 分钟）
+          $p = Start-Process -FilePath $setup.FullName -PassThru
+          if (-not $p.WaitForExit(180000)) {
+            Write-Output "::warning::安装器 180 秒没退出，抓现场："
+            Get-Process | Where-Object { $_.ProcessName -match 'classbeat|powershell|pwsh' } |
+              Select-Object Id, ProcessName, MainWindowTitle | Format-Table | Out-String | Write-Output
+            if (Test-Path $env:CBTARGET) {
+              Get-ChildItem $env:CBTARGET -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty Name | Write-Output }
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            exit 1
+          }
           if ($p.ExitCode -ne 0) { Write-Output "::error::安装器退出码 $($p.ExitCode)"; exit 1 }
           $t = $env:CBTARGET
           if ((Get-Content (Join-Path $t 'data\marker.txt')) -ne 'keepme') {

@@ -35,10 +35,14 @@ SFX = ROOT / "tools" / "installer" / "7zSD.sfx"
 INSTALL_PS1 = ROOT / "tools" / "installer" / "install.ps1"
 
 # 7zSD 安装壳配置：解压完直接跑 install.ps1（UTF-8 变体要求本段
-# 以 UTF-8 无 BOM 编码、紧跟在 sfx 模块字节之后）。
+# 以 UTF-8 无 BOM 编码、紧跟在 sfx 模块字节之后）。GUIMode=2 全静默：
+# 默认模式会在解压时弹进度窗、出错时弹没人点的错误框把流程挂死
+# （2026-11-19 第二轮冒烟 20 分钟超时踩到）；静默模式下 install.ps1
+# 自己的控制台窗口照常显示安装进度。
 CONFIG_TMPL = (
     ";!@Install@!UTF-8!\n"
     'Title="ClassBeat"\n'
+    'GUIMode="2"\n'
     'RunProgram="{runprogram}"\n'
     ";!@InstallEnd@!\n"
 )
