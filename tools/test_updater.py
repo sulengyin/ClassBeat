@@ -389,6 +389,31 @@ def main():
               and not U.is_program_path("server/messages.json")
               and U.is_program_path("app/index.html"),
               "㉗ 替换白名单挡住数据和消息")
+        # 2026-11-19 真机教训：发布清单的口径比替换白名单宽，
+        # server/icons/icon-192.png 进了清单被旧机器当"不该替换的文件"
+        # 拒换，v0.3.4 起自更新整体卡死。不变量：清单会列的文件 ⊆ 白名单。
+        both = [
+            "app/index.html", "app/version.js", "app/edit.js",
+            "server/rhythm_server.py", "server/updater.py", "server/phone.html",
+            "server/sw.js",
+            "server/icons/icon-192.png", "server/icons/icon-512.png",
+            "tools/launcher/watchdog.ps1", "tools/launcher/win-titles.ps1",
+            "tools/launcher/exit-kiosk.cmd", "打开大屏.bat", "退出大屏.bat",
+            "data/schedule.json", "server/messages.json", "backups/x/y",
+        ]
+        wider = [p for p in both if mkm.is_program_file(p)
+                 and not U.is_program_path(p)]
+        check(not wider,
+              "㉗补 清单口径 ⊆ 替换白名单（icon-192 卡死升级的教训）",
+              "、".join(wider))
+        check(not mkm.is_program_file("server/messages.json")
+              and not mkm.is_program_file("data/schedule.json"),
+              "㉗补 受保护文件即使进了包也不发清单")
+        check(not mkm.is_program_file("server/icons/icon-192.png")
+              and not mkm.is_program_file("tools/launcher/watchdog.ps1")
+              and mkm.is_program_file("app/index.html")
+              and mkm.is_program_file("退出大屏.bat"),
+              "㉗补 清单现阶段不发 icons 与 launcher（老机器白名单窄）")
         mgr10 = U.UpdateManager(str(single), source.base + "/update.json", "0.2.1")
         ok, err = False, ""
         try:

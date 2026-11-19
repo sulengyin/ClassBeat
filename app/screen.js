@@ -810,6 +810,7 @@
   function reduced() {
     var p = S.prefs();
     if (p.reduce) return true;
+    if (p.reduceChosen) return false;  /* 老师主动选过，别被系统设置压住 */
     try {
       return root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches;
     } catch (e) { return false; }
@@ -823,7 +824,10 @@
     var p = S.prefs();
     el.btnCd.textContent = "倒计时 · " + MODE_LABEL[p.cdMode || "auto"];
     el.btnCd.classList.toggle("on", (p.cdMode || "auto") !== "auto");
-    el.btnReduce.classList.toggle("on", !!p.reduce);
+    /* 2026-11-19 真机反馈③：默认无动效。亮起表示「动效开着」；
+     文案跟着状态走，点一下就是切到另一边。 */
+    el.btnReduce.textContent = p.reduce ? "增加动效" : "关闭动效";
+    el.btnReduce.classList.toggle("on", !p.reduce);
     document.body.dataset.reduce = p.reduce ? "1" : "0";
     applyTheme();
   }

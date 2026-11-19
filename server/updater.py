@@ -69,13 +69,23 @@ def single_file_hint():
 
 
 def is_program_path(rel):
-    """替换白名单：只认程序文件，不认数据、资源、消息和配置。"""
+    """替换白名单：只认程序文件，不认数据、资源、消息和配置。
+
+    server/icons/ 与 tools/launcher/ 是随包发布的程序资产。2026-11-19
+    真机教训：白名单口径比发布清单窄，server/icons/icon-192.png 进了
+    清单就被当成"不该替换的文件"拒换，v0.3.4 起所有自更新都卡死在这。
+    两边口径永远不能反过来：这里接受的范围 ≥ make_update 会列进清单的
+    范围，宁可多认，不能拒掉清单里的程序文件。"""
     rel = rel.replace("\\", "/")
     if rel in um.PROTECTED_FILES or rel.startswith(um.PROTECTED_PREFIXES):
         return False
     if rel.startswith("app/"):
         return True
     if rel == "server/phone.html":
+        return True
+    if rel == "server/sw.js":
+        return True
+    if rel.startswith("server/icons/") and rel.endswith((".png", ".ico", ".svg")):
         return True
     if rel.startswith("server/") and rel.endswith(".py") \
             and not rel.startswith("server/python/"):

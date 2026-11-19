@@ -689,7 +689,10 @@ check(idx14 >= 0 && idx14 < idx18,
   "▲ 调完顺序立刻进本机配置，且排到同一时刻更前面",
   "r14=" + idx14 + "，r18=" + idx18);
 
-/* 人群组：换人弹窗里点组一次带出整组；临时勾选不落库，显式存组才落库 */
+/* 人群组：换人弹窗里点组一次带出整组；临时勾选不落库，显式存组才落库。
+   2026-11-19 真机反馈②后名单只认本机配置（样例不再兜底），
+   夹具先模拟向导已录名单。 */
+global.Store.patchConfig({ students: global.window.RHYTHM_DATA.students });
 const cleanLine = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
 cleanLine.children[0]._h.click();
@@ -741,6 +744,27 @@ check(updatedGroup.length === 1 && updatedGroup[0].name === "放学留下"
 document.querySelectorAll(".ep-group-del")[0]._h.click();
 check(global.Store.peopleGroups().length === 0,
   "删组只删这一条，不动名单", global.Store.peopleGroups().length + " 组");
+
+/* 2026-11-19 真机反馈②：名单没录入时绝不拿样例名单冒充本班学生，
+   候选退化为岗位现有的人，并给补录指引。 */
+global.Store.patchConfig({ students: null });
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+const bareLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
+bareLine.children[0]._h.click();
+const bareNames = Array.from(document.querySelectorAll(".ep-person"))
+  .map(b => b.textContent);
+check(bareNames.length > 0
+      && bareNames.every(n => window.RHYTHM_DATA.students
+        .some(s => s.name === n))
+      && bareNames.indexOf("吕雨桐") >= 0,
+  "名单没录入时候选只含岗位现有的人（节能小队长是吕雨桐）",
+  bareNames.join("、"));
+check(Array.from(document.querySelectorAll(".ep-note"))
+      .map(n => n.textContent).join("｜").indexOf("配置班级") >= 0,
+  "名单没录入时弹窗里有补录指引");
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+global.Store.patchConfig({ students: window.RHYTHM_DATA.students });
 
 /* 回归：单选岗位点一下就该选定，不该再要求点「就是 TA」二次确认 */
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
@@ -832,6 +856,29 @@ check(document.querySelector(".ep-rows").scrollTop === 77
 
 global.Store.resetConfig();
 global.Edit.close();
+
+/* ---------- 动效默认关（2026-11-19 真机反馈③） ---------- */
+/* 旧机器没按过开关（无 reduceChosen）：升级后一律进"无动效" */
+global.Store.setPref("cdMode", "all");   /* 顺手存点别的东西，模拟旧偏好 */
+check(global.Store.prefs().reduce === true
+      && global.Store.prefs().reduceChosen === false,
+  "没主动选过时动效默认关（旧偏好迁移）",
+  JSON.stringify(global.Store.prefs()));
+/* 点了「增加动效」才算老师的选择 */
+global.Store.setPref("reduce", false);
+check(global.Store.prefs().reduce === false
+      && global.Store.prefs().reduceChosen === true,
+  "点「增加动效」后动效开，并记住是老师自己选的");
+global.Store.setPref("reduce", true);
+check(global.Store.prefs().reduce === true
+      && global.Store.prefs().reduceChosen === true,
+  "再点「关闭动效」又回到无动效");
+/* 别的偏好不丢 */
+global.Store.setPref("prepLead", 12);
+check(global.Store.prefs().prepLead === 12 && global.Store.prefs().cdMode === "all",
+  "动效迁移不丢 theme/倒计时这些别的偏好",
+  JSON.stringify(global.Store.prefs()));
+global.Store.setPref("prepLead", undefined);
 
 /* ---------- 课前准备提前量：老师自己在「文字」页改 ---------- */
 const prepLead = global.Store.prefs().prepLead;

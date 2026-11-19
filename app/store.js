@@ -527,9 +527,26 @@
   }
 
   /* ---------- 偏好 ---------- */
-  function prefs() { return read(KEY.prefs, { cdMode: "auto", reduce: false }); }
+  /* 动效默认关（2026-11-19 真机反馈③：默认无动效，点「增加动效」才开）。
+     reduceChosen 记录老师是否主动按过开关：没按过的旧机器升级后一律
+     进"无动效"，按过之后才按自己的选择来。其余键（theme、prepLead…）
+     原样保留。 */
+  function prefs() {
+    var p = read(KEY.prefs, {}) || {};
+    var chosen = p.reduceChosen === true;
+    var out = clone(p);
+    if (!out || typeof out !== "object") out = {};
+    out.cdMode = p.cdMode || "auto";
+    out.reduce = chosen ? p.reduce !== false : true;
+    out.reduceChosen = chosen;
+    return out;
+  }
   function setPref(k, v) {
-    var p = prefs(); p[k] = v; write(KEY.prefs, p); return p;
+    var p = read(KEY.prefs, {}) || {};
+    p[k] = v;
+    if (k === "reduce") p.reduceChosen = true;
+    write(KEY.prefs, p);
+    return prefs();
   }
 
   /* ---------- 备份 / 迁移 ---------- */

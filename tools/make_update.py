@@ -45,16 +45,28 @@ def read_version(entries):
 
 
 def is_program_file(rel):
-    """只列会被替换的程序文件；运行时、说明和单文件版不进清单。"""
+    """只列会被替换的程序文件；运行时、说明和单文件版不进清单。
+
+    2026-11-19 真机反馈①：v0.3.4 老更新器的替换白名单只认 app/、
+    phone.html、server/*.py 和根目录 .bat——server/icons/、tools/launcher/
+    这类进了清单就被当成"不该替换的文件"拒换，老机器的自更新整个
+    卡死（icon-192.png 那个报错）。现阶段这些不进清单：server/icons/、
+    server/sw.js、tools/launcher/ ——安装器/zip 自带全量，自更新不刷新
+    它们；等现役机器都过 0.3.8（新白名单已认这几类）再考虑放开。
+    受保护文件（data/、assets/、server/messages.json 等）就算误进了包
+    也不发清单。"""
     if rel in ("MANIFEST.txt", "使用说明.txt", "update-source.txt"):
+        return False
+    if rel in um.PROTECTED_FILES or rel.startswith(um.PROTECTED_PREFIXES):
         return False
     if rel.endswith("-单文件版.html") or rel.endswith("-single.html"):
         return False
-    if rel.startswith("server/python/"):
+    if rel.startswith("server/python/") or rel.startswith("server/icons/"):
         return False
-    # 启动器脚本随版本走（2026-11-19），与 updater.is_program_path 同口径
-    if rel.startswith("tools/launcher/") and rel.endswith((".ps1", ".cmd")):
-        return True
+    if rel == "server/sw.js":
+        return False
+    if rel.startswith("tools/"):
+        return False
     return rel.startswith("app/") or rel.startswith("server/") or rel.endswith(".bat")
 
 

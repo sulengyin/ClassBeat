@@ -82,9 +82,10 @@ def main():
                      repo / "server" / "update_manifest.py")
 
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        # 假节插在真 0.2.2 节前面，避免 changelog_notes 读到真 0.2.2 的内容
         changelog = changelog.replace(
-            "## 0.2.1",
-            "## 0.2.2 — 2026-11-12\n\n- 测试用更新说明：新增自动更新。\n\n## 0.2.1", 1)
+            "## 0.2.2",
+            "## 0.2.2 — 2026-11-12\n\n- 测试用更新说明：新增自动更新。\n\n## 0.2.2", 1)
         (repo / "CHANGELOG.md").write_text(changelog, encoding="utf-8")
 
         top, files = make_fake_zip(repo / "dist" / "classbeat-0.2.2.zip")
@@ -245,8 +246,12 @@ def main():
         (pkgrepo / "server").mkdir()
         shutil.copytree(ROOT / "app", pkgrepo / "app")
         shutil.copytree(ROOT / "sample", pkgrepo / "sample")
+        # 打包脚本会带 tools/launcher/、server/icons/ 和 server/sw.js，
+        # 夹具也得给全
+        shutil.copytree(ROOT / "tools" / "launcher", pkgrepo / "tools" / "launcher")
+        shutil.copytree(ROOT / "server" / "icons", pkgrepo / "server" / "icons")
         for name in ("rhythm_server.py", "run.py", "phone.html",
-                     "update_manifest.py", "updater.py"):
+                     "update_manifest.py", "updater.py", "sw.js"):
             shutil.copy2(ROOT / "server" / name, pkgrepo / "server" / name)
         shutil.copy2(ROOT / "tools" / "package.py", pkgrepo / "tools" / "package.py")
         shutil.copy2(ROOT / "tools" / "make_update.py", pkgrepo / "tools" / "make_update.py")
@@ -281,6 +286,23 @@ def main():
               and "MANIFEST.txt" not in paths,
               "㉝ 真实包的清单版本与文件范围正确",
               "%d 个文件" % len(paths))
+
+        # 2026-11-19 真机教训：icons/sw.js/launcher 在包里但绝不能进清单，
+        # 否则 v0.3.4 老更新器把它们当"不该替换的文件"拒换，自更新整体卡死。
+        with zipfile.ZipFile(real_zip) as z:
+            znames = [n.split("/", 1)[1] for n in z.namelist() if "/" in n]
+        check("server/icons/icon-192.png" in znames
+              and "server/icons/icon-192.png" not in paths
+              and "server/sw.js" in znames and "server/sw.js" not in paths
+              and "tools/launcher/watchdog.ps1" in znames
+              and not any(p.startswith("tools/launcher/") for p in paths),
+              "㉞ 包里带 icons/sw.js/launcher，但清单不发它们（老机器白名单窄）")
+
+        # 不变量：清单里的每个文件都要过替换白名单，两边口径永不反向
+        sys.path.insert(0, str(pkgrepo / "server"))
+        up = __import__("updater")
+        wider = [p for p in paths if not up.is_program_path(p)]
+        check(not wider, "㉟ 清单每个文件都能过替换白名单", "、".join(wider[:5]))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

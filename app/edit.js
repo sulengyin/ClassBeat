@@ -1074,10 +1074,12 @@
   }
 
   /* ---------- 人群组：点组带出（PLAN 2.18） ---------- */
-  /* 名单以本机配置为准（向导可能补过），没有再回退到包里的。 */
+  /* 名单只认本机配置（向导补录过的那份）：没录入就是没有，
+     绝不拿包里的样例名单冒充本班学生（2026-11-19 真机反馈②：
+     值日表名字对，换人候选却出现别班名字）。 */
   function rosterStudents() {
     var cfg = S.config ? S.config() : null;
-    var d = cfg && cfg.students ? cfg.students : DATA.students;
+    var d = cfg ? cfg.students : null;
     if (d && Array.isArray(d.students)) return d.students;
     return Array.isArray(d) ? d : [];
   }
@@ -1099,15 +1101,20 @@
     var out = [];
     var day = RT && RT.day ? RT.day(key) : null;
     var roster = rosterStudents();
-    var keep = {};
-    roster.forEach(function (s) {
-      if (s && s.name && s.active !== false) keep[s.name] = 1;
-    });
+    /* 名单没录入时不过滤（keep=null）：值日条上的名字来自岗位配置，
+       是对的；不能因为名单空了把组也带不出来。 */
+    var keep = null;
+    if (roster.length) {
+      keep = {};
+      roster.forEach(function (s) {
+        if (s && s.name && s.active !== false) keep[s.name] = 1;
+      });
+    }
 
     if (role && role.grp) {
       var names = [];
       function add(n) {
-        if (n && keep[n] && names.indexOf(n) < 0) names.push(n);
+        if (n && (keep === null || keep[n]) && names.indexOf(n) < 0) names.push(n);
       }
       if (day) {
         (S.applyOverrides(day, S.getDayOverride(key)).duties || []).forEach(function (d) {
@@ -1184,6 +1191,12 @@
     var grid = h("div", "ep-people");
     wrap.appendChild(grid);
 
+    /* 名单没录入时指一条路：候选只剩岗位现有人，完整名单要去向导补 */
+    if (!rosterStudents().length) {
+      wrap.appendChild(h("p", "ep-note",
+        "还没录入班级名单：候选只显示这个岗位现有的人；要完整名单，去「⋯ 菜单 → 配置班级」补录。"));
+    }
+
     var selected = [];
     var saveBtn = null;
     var related = relatedNames(role);
@@ -1191,6 +1204,18 @@
     var nameInput = null;
     var groupHint = null;
     var modifyBtn = null;
+
+    /* 候选 = 名单 + 本岗位现有的人：名单没录入时，老师至少能把
+       值日的人换给同岗位的其他人（2026-11-19 真机反馈②）。 */
+    function pickerPool() {
+      var list = rosterStudents().slice();
+      var have = {};
+      list.forEach(function (s) { if (s && s.name) have[s.name] = 1; });
+      related.forEach(function (n) {
+        if (n && !have[n]) { list.push({ name: n }); have[n] = 1; }
+      });
+      return list;
+    }
 
     /* 选定即写入：同一天同一岗位只写这一处，关掉弹窗就是确认。 */
     function commit(names) {
@@ -1202,7 +1227,8 @@
       renderBody(role.id);
     }
 
-    /* 勾选的人名 → 名单 id；没有 id 的名单用 name: 兜底，组仍然存得住。 */
+    /* 勾选的人名 → 名单 id；没有 id 的名单用 name: 兜底，组仍然存得住。
+       名单没录入时也用 name: 兜底（候选里有岗位现有人，见 pickerPool）。 */
     function pickedIds() {
       var roster = rosterStudents();
       var ids = [];
@@ -1210,8 +1236,8 @@
         var hit = roster.filter(function (s) {
           return s && s.name === n && s.active !== false;
         })[0];
-        if (!hit) return;
-        var id = hit.id ? String(hit.id) : "name:" + hit.name;
+        var id = hit ? (hit.id ? String(hit.id) : "name:" + hit.name)
+                     : "name:" + n;
         if (ids.indexOf(id) < 0) ids.push(id);
       });
       return ids;
@@ -1263,7 +1289,7 @@
 
     function paint() {
       grid.innerHTML = "";
-      var res = S.rankStudents(rosterStudents(), q.value, related, 24);
+      var res = S.rankStudents(pickerPool(), q.value, related, 24);
       if (!res.length) {
         grid.appendChild(h("p", "ep-note", "名单里没有这个人"));
         return;

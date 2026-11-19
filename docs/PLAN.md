@@ -1614,6 +1614,52 @@ patchConfig → reload → rev++ → RT.day() 重算）。另补一个真
 "作息边界联动 + 改名后文字同步"用例，3 视口通过；test_setup
 137、test_server 91、test_package 回归全过。
 
+### 2.47 真机第三批反馈：更新被卡死 / 换人候选是别班名 / 动效默认（2026-11-19）
+
+**背景**：教室一体机还在 v0.3.4（升不上去），老师又报三个问题。
+
+**① 点「立即更新」报"安装包里有不该替换的文件：server/icons/icon-192.png"
+（FIXED，根因级）**。更新链路有两份"程序文件"口径：发布清单
+`make_update.is_program_file`（server/ 下几乎全收）和替换白名单
+`updater.is_program_path`（只认 app/、phone.html、server/*.py、根
+.bat）。v0.3.1 起 server/icons/ 进了包、进了清单，白名单却不认
+→ v0.3.4 起**所有机器的自更新都卡死在这一步**。修复：
+
+- 不变量钉死：**清单口径 ⊆ 替换白名单**。test_updater 加路径表
+  对拍，test_update_manifest 加 ㉞㉟（真实打包 → 生成清单 →
+  每个文件过白名单）；㉟ 顺带又抓出 server/sw.js 同类缺口。
+- v0.3.4 老机器的更新器在它机器上跑，改新代码救不了它 → 清单侧
+  暂不发 server/icons/、server/sw.js、tools/launcher/（安装器/zip
+  自带全量，自更新不刷新这三类）；新白名单把三类都认进来。等
+  现役机器都过 0.3.8 再考虑在清单里放开。
+- 顺带修好两个测试夹具陈旧问题（临时仓库缺 tools/launcher/
+  server/icons/sw.js；CHANGELOG 假节插在真 0.2.2 节后读到真内容）。
+
+**② 值日表名字对，换人候选却是别班学生（FIXED）**。候选链
+`rosterStudents()` 在本机没录名单时**回退到包内样例名单**（五（1）
+班的 48 人）——老师只导入过值日表没走名单补录，岗位人名存在
+roles 里（对），候选却全来自样例（错）。修复三层：
+
+- 名单只认本机配置，样例不再兜底（`rosterStudents`）；
+- 候选 = 名单 ∪ 本岗位现有的人（`pickerPool`）：名单缺失时老师
+  至少能把值日的人换给同岗位的其他人；`pickedIds` 对名单外的
+  人用 `name:` id 兜底；
+- 排班组 `groupDefs` 的"只认名单里的人"过滤在名单为空时跳过；
+  弹窗里加补录指引（⋯ 菜单 → 配置班级）。
+
+**③ 动效默认无，点「增加动效」才开（DONE）**。原默认 `reduce:
+false`（动效开），按钮叫「减少动效」。改为：默认 `reduce: true`；
+`reduceChosen` 记录老师是否主动按过开关——没按过的旧机器升级
+后一律进"无动效"，按过之后按自己的选择来（否则旧机器存的
+false 会顶着新默认）。按钮文案跟状态走（增加动效/关闭动效），
+亮起表示动效开着；老师主动选过后优先于系统的
+prefers-reduced-motion。其余偏好键（theme、prepLead）迁移不丢。
+
+**测试**：test_dom 267/267（+名单退化候选 3 项、动效迁移 4 项）、
+test_updater 35/35、test_update_manifest 35/35（夹具补齐 + ㉞㉟）、
+test_setup 137、test_store 73、test_server 91、test_package 全过。
+发布 v0.3.8 后 v0.3.4 机器应可直接在应用内升级。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。
