@@ -37,7 +37,10 @@ param(
   [string[]]$PopTypes = @('break', 'ritual'),
   [string]$BackupDir = '',
   [switch]$SelfTest,
-  [string]$TodayStr = ''
+  [string]$TodayStr = '',
+  # 服务端自动交接（0.3.16）用：交接发生在老师用电脑的中途，
+  # 不做「开机第一屏」，免得大屏自己蹦出来抢屏。
+  [switch]$NoFirstScreen
 )
 
 $ErrorActionPreference = 'Continue'
@@ -285,11 +288,16 @@ Write-Log ('看门狗启动（节律时段提醒模式）：提醒类型 ' + ($P
 
 # 开机第一屏：自启拉起看门狗时，大屏不在就先拉一次。之后进主循环，
 # 只在节律时刻行动（上课期间无论用不用浏览器都不抢屏）。
-if (-not (Test-ShutdownOrLogoff) -and -not (Test-AppWindow)) {
+# 服务端自动交接（-NoFirstScreen）跳过这一步：交接发生在使用中途。
+if (-not $NoFirstScreen -and -not (Test-ShutdownOrLogoff) -and -not (Test-AppWindow)) {
   Write-Log '看门狗启动时大屏不在：先拉起一次（开机第一屏）。'
   Start-KioskHidden
 } else {
-  Write-Log '看门狗启动时大屏已在（或正在锁屏/注销），不重复拉。'
+  if ($NoFirstScreen) {
+    Write-Log '服务端交接启动（-NoFirstScreen）：不拉大屏，交给主循环按节律时刻行动。'
+  } else {
+    Write-Log '看门狗启动时大屏已在（或正在锁屏/注销），不重复拉。'
+  }
 }
 
 $fired = @{}

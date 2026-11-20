@@ -184,6 +184,91 @@ def screen_exit():
         pass
 
 
+# ---------- 看门狗自动交接（0.3.16） ----------
+# 程序内更新只替换磁盘上的 watchdog.ps1，从不重启看门狗进程——老进程
+# 内存里还是旧脚本（≤0.3.7 的"隔几秒重拉"），老师关一次它拉一次。
+# 服务每次启动时比对：watchdog 进程的启动时间早于 watchdog.ps1 的修改
+# 时间 = 进程在跑旧脚本 → 自动交接（stop.flag 优雅停 + 兜底强停 +
+# 以 -NoFirstScreen 启动新看门狗，使用中途不抢屏）。与 install.ps1
+# 的安装期交接同一套顺序。
+# （LAUNCHER_DIR 在上面的窗口管理段已定义）
+WATCHDOG_PS1 = os.path.join(LAUNCHER_DIR, "watchdog.ps1")
+
+
+def _stale_watchdog_pids():
+    """找出在跑旧脚本的看门狗进程：启动时间早于 watchdog.ps1 的修改时间。
+    返回 pid 列表；非 Windows / 找不到 / 出错一律 []。"""
+    if os.name != "nt" or not os.path.exists(WATCHDOG_PS1):
+        return []
+    try:
+        mtime = os.path.getmtime(WATCHDOG_PS1)
+        ps = (
+            "$ErrorActionPreference='SilentlyContinue';"
+            "$cut=(Get-Item '" + WATCHDOG_PS1 + "').LastWriteTime;"
+            "$out=@();"
+            "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe' OR Name='pwsh.exe'\" "
+            "| ForEach-Object { "
+            "  if ($_.CommandLine -and $_.CommandLine -match 'watchdog\\.ps1') { "
+            "    $p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; "
+            "    if ($p -and $p.StartTime -lt $cut) { $out+=$_.ProcessId } "
+            "  } "
+            "};"
+            "$out -join ','"
+        )
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, timeout=30,
+            creationflags=0x08000000 if os.name == "nt" else 0,
+        )
+        out = (r.stdout or "").strip()
+        if not out:
+            return []
+        return [int(x) for x in out.split(",") if x.strip().isdigit()]
+    except Exception:
+        return []
+
+
+def watchdog_handover():
+    """过期看门狗自动交接。任何失败都安静收手，不影响服务本身。"""
+    if os.name != "nt":
+        return
+    try:
+        pids = _stale_watchdog_pids()
+        if not pids:
+            return
+        _wlog("发现旧代看门狗进程（PID %s，跑的是更新前的脚本），自动交接…" % ",".join(map(str, pids)))
+        # 1) 先写 stop.flag：0.3.0 起的看门狗都认，让它优雅退
+        try:
+            with open(os.path.join(LAUNCHER_DIR, "stop.flag"), "w", encoding="utf-8") as f:
+                f.write(dt.datetime.now().isoformat(timespec="seconds"))
+        except OSError:
+            pass
+        time.sleep(3)
+        # 2) 兜底强停（优雅停没退干净的）
+        try:
+            for pid in pids:
+                subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                               capture_output=True, timeout=15)
+        except Exception:
+            pass
+        time.sleep(1)
+        # 3) 新看门狗上岗：-NoFirstScreen——交接发生在使用中途，不抢屏
+        try:
+            args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
+                    "-File", WATCHDOG_PS1, "-Port", str(CONF.get("port", DEFAULT_PORT)),
+                    "-NoFirstScreen"]
+            subprocess.Popen(
+                ["powershell"] + args, cwd=LAUNCHER_DIR,
+                creationflags=0x08000000,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            _wlog("新看门狗已上岗（-NoFirstScreen，节律时刻提醒模型）。")
+        except Exception as e:
+            _wlog("新看门狗启动失败（不影响服务）：" + str(e))
+    except Exception as e:
+        _wlog("看门狗交接检查失败（不影响服务）：" + str(e))
+
+
 def _backup_path(day):
     return os.path.join(BACKUP_DIR, "rhythm-%s.json" % day)
 
@@ -1327,6 +1412,9 @@ def main():
 
     srv, port = bind_server(a.host, a.port)
     CONF["port"] = port
+
+    # 过期看门狗自动交接（0.3.16）：后台线程做，别拖慢服务启动
+    threading.Thread(target=watchdog_handover, daemon=True).start()
 
     ip = lan_ip()
     CONF["lan"] = f"http://{ip}:{port}"
