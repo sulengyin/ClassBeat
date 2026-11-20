@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.22",
-  "build": "0531efd",
-  "publishedAt": "2026-11-20T15:35:35+08:00",
+  "version": "0.3.23",
+  "build": "6698e10",
+  "publishedAt": "2026-11-20T16:08:26+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **改课不用打字了**（编辑 → 今天 → 今天改哪一节）：学科改成下拉\n  直选，任课老师按课表自动带出——点选学科，老师名字自己出现。\n  同一门课由两位老师执教的（比如心理/班队），自动并列显示成\n  「张老师/李老师」。代课等特殊情况仍可手动改老师名。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.22/classbeat-0.3.22.zip",
-  "sha256": "6dc78281aaf62955cca8fb053ac7ca646461bcc61ef87978148ff80eb4de653e",
-  "bytes": 11797167,
+  "notes": "- **值日岗位按时段自由配置**（编辑 → 值日 →「哪些岗位整段常驻」）：\n  晨间自主管理、课间、午间这三个时段，想让哪些岗位整段挂在值日条\n  上，点选就行（自由多选）。选进来的岗位这一整段都在；没选的岗位\n  按各自原来设的触发方式出现，互不影响。\n- **岗位多了一行放不下时自动滚动**：值日条不再截成三条加\"还有 N 步\"，\n  全部岗位都上屏；写不下时整行文字从右往左慢慢循环滚动，不突然消失。\n  样式本身不变。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.23/classbeat-0.3.23.zip",
+  "sha256": "3123a87bedd1da16197081e3f1bff21d279e5b4209afef2712d47d7ed38536b1",
+  "bytes": 11800400,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "a6fe5875ad3dfcfe378233b7324f69356c5c4709e06ee144c303f96de812b677",
+      "sha256": "121821465cf6b9d44f8d0adb9096abc0cd03c0d0ed8573be74b592be1cfe7ee7",
       "bytes": 17039
     },
     {
@@ -41,18 +41,18 @@
     },
     {
       "path": "app/edit.js",
-      "sha256": "c30ad36f6f2926d51410b6b9de5203a173c9341d802c549f38eac7fa2bb120b7",
-      "bytes": 69170
+      "sha256": "cc71d938be1aae92b654e9aeaa44bcc746787ec4a7ba661d3fc36c02d964b764",
+      "bytes": 71257
     },
     {
       "path": "app/engine/schedule.js",
-      "sha256": "0a461ff9e163f653dd47ea4ee7a1befb20928681a811c70be3a082d47257b4d5",
-      "bytes": 15843
+      "sha256": "ff57cb6ad64f0178c66ba4f9f144118076f959593eac260702074eef6f8717f1",
+      "bytes": 17097
     },
     {
       "path": "app/index.html",
-      "sha256": "7fc6fb7e770400cb8eee86c2d69c36b23253afc7b5a778f7f80ba9549f7eb92c",
-      "bytes": 56898
+      "sha256": "d79bd7421e433d5aeedd2e4bde866ac9b11426ae8c42445d5127c8c56c715dc4",
+      "bytes": 57413
     },
     {
       "path": "app/phoneui.js",
@@ -76,18 +76,18 @@
     },
     {
       "path": "app/rhythm.js",
-      "sha256": "d809fa45ea2b0d2748b47ab9ba49866fb4d45309f454547facfe4cc71d9455c6",
-      "bytes": 23378
+      "sha256": "ee9b7b20c85fb17d46a14a42f03035e5933a2f58af0811e24b63e5b1faf88eb0",
+      "bytes": 23540
     },
     {
       "path": "app/runtime.js",
-      "sha256": "289ce6e45ba348052767684f636caa2fef88c13ed91c68a6021c9950e70e7e9d",
-      "bytes": 4137
+      "sha256": "f0bd28841ac17935b41bbc90b4e29a14a94dc695fe6f60eb323e274c0ed63887",
+      "bytes": 4187
     },
     {
       "path": "app/screen.js",
-      "sha256": "6970238ce09611c7baa6b20d6652c2c16113be38f6ba578bf3bb36dcccbce6f7",
-      "bytes": 44250
+      "sha256": "63dac79df6eb38faa2126851819bc4650b8260b2e4144a0bb7ecb6e9bc813813",
+      "bytes": 44924
     },
     {
       "path": "app/setup.css",
@@ -101,8 +101,8 @@
     },
     {
       "path": "app/store.js",
-      "sha256": "4072d40f50946d2e52c648678fa105c202405ca18032653406b59cebc4dc9189",
-      "bytes": 26870
+      "sha256": "e95326cf678ae483368d843fc8e5a99ee37ef203d6f7b64ba41dd2bbd5a5a775",
+      "bytes": 26909
     },
     {
       "path": "app/templates.js",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "fceb7a9483cfb9445efede03ff377ec0d6cf28a67094349b42a2d9981b2ce3d1",
+      "sha256": "d404ec5b8037ecd54e5609277b34759c94666f1044d451bba918a043a6333bc5",
       "bytes": 594
     },
     {
