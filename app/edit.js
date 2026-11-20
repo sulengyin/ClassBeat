@@ -1159,7 +1159,12 @@
       if (changed) who = (ov.roles[r.id].people || []).join("、");
       else if (r.people) who = r.people.join("、");
       else if (r.peopleMap) who = Object.keys(r.peopleMap).sort().map(function (k) { return r.peopleMap[k]; }).join("、");
-      else if (r.groups) who = "A/B 组";
+      else if (r.groups) {
+        var filled = Object.keys(r.groups).reduce(function (n, k) {
+          return n + ((r.groups[k] || []).length);
+        }, 0);
+        who = filled ? "A/B 组" : "A/B 组（成员还没填）";
+      }
 
       row.appendChild(h("span", "s", who || "未定"));
       row.appendChild(h("span", "x", changed ? "已换" : "换"));
@@ -1202,8 +1207,10 @@
       { key: "break", label: "课间" },
       { key: "noon", label: "午间" }
     ].forEach(function (slot) {
-      var row = h("div", "ep-field");
-      row.appendChild(h("span", "ep-flabel", slot.label));
+      /* 每时段一个带标题的子块 + 分隔线：三行岗位列表长得一样，
+         不分隔老师只能靠找重复来判断哪段是谁的（真机反馈 2026-11-20 ②） */
+      var slotBox = h("div", "ep-slot");
+      slotBox.appendChild(h("div", "ep-slot-title", slot.label));
       var opts = h("div", "ep-opts");
       roles.forEach(function (r) {
         var on = (pres[slot.key] || []).indexOf(r.id) >= 0;
@@ -1220,8 +1227,8 @@
         });
         opts.appendChild(b);
       });
-      row.appendChild(opts);
-      presSec.appendChild(row);
+      slotBox.appendChild(opts);
+      presSec.appendChild(slotBox);
     });
     bodyEl.appendChild(presSec);
   }

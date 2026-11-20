@@ -828,13 +828,27 @@ check(dutyTxt.indexOf(unsetRole.name) >= 0
 const presDuties = global.Runtime.day("2026-11-09").duties.filter(d => d.roleId === unsetRole.id);
 check(presDuties.length > 0 && presDuties.every(d => d.freqKind === "present"),
   "常驻岗位触发走 present，freq 不再另算");
+/* 组岗位常驻：格子要带具体任务名（"值日组·扫地"），不能只剩"值日组" */
+const grpRole = global.Runtime.config().roles.roles.find(r => r.grp && r.groups);
+check(!!grpRole, "样例里有组岗位（扫地）");
+global.Store.patchConfig({ dutyPresents: { break: [grpRole.id], reading: [], noon: [] } });
+global.Screen.render();
+const grpTxt = document.getElementById("duty").textContent;
+check(grpTxt.indexOf(grpRole.name) >= 0,
+  "组岗位常驻时格子带具体任务名，不只是组名", grpTxt);
 global.Store.patchConfig({ dutyPresents: null });
 global.Screen.render();
 
-/* 值日页有多选配置区（切页验证一次真实 UI） */
+/* 值日页有多选配置区（切页验证一次真实 UI），三个时段有标题分隔 */
 document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
 check(document.body.textContent.indexOf("哪些岗位整段常驻") >= 0,
   "值日页有「哪些岗位整段常驻」多选区");
+const slots = document.querySelectorAll(".ep-slot");
+check(slots.length === 3
+      && slots[0].querySelector(".ep-slot-title").textContent === "晨间自主管理"
+      && slots[1].querySelector(".ep-slot-title").textContent === "课间"
+      && slots[2].querySelector(".ep-slot-title").textContent === "午间",
+  "三个时段各有标题子块分隔", slots.length + " 块");
 document.querySelectorAll(".ep-tab").filter(b => b.textContent === "今天")[0]._h.click();
 
 const tabs = document.querySelectorAll(".ep-tab");

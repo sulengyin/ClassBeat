@@ -2108,6 +2108,32 @@ PSParser 语法解析通过；本机全量 e2e 87/87。版本 0.3.19。
 整段挂出、present 触发、值日页多选区）→ 329/329；对拍 132 天一致；
 e2e 87/87。版本 0.3.23。
 
+### 2.63 组岗呈现带任务名 + 常驻区分隔（2026-11-20 真机反馈批次九）
+
+**背景**：真机三条：① 选好常驻岗位，屏面却显示"值日组（自己商量）"；
+② 常驻配置区三时段无分隔，要靠找重复判断哪行属于哪个时段；
+③ "之前新建和保存的 A 组等现在没有了"。
+
+**排查**：①③同源——组岗位（grp="值日组"）合并格 name=组名，任务名
+（扫地等）只进点击详情不上屏；且该岗 cycle 轮换指向的组成员为空
+（A/B 组数据空）→ people=[] → assign=self-organize → "自己商量"。
+数据丢失无代码级确证（saveGroup/upsertGroup/patchConfig 顶层合并、
+CONFIG_BLOCKS 含 peopleGroups、exportAll/importAll 补齐 peopleGroups
+均核查无恙）——交给老师自查路径；屏面先把"看不懂"修掉。
+
+**做法**：
+
+- screen.js renderDuty：merged 格 label 带任务名
+  （d.tasks 非空且 ≠ name → "值日组·扫地"）。
+- edit.js 值日页岗位行 who：groups 存在但成员总数为 0 →
+  「A/B 组（成员还没填）」。
+- renderDutyPresents：三时段改为 .ep-slot 子块（黄色时段名标题 +
+  虚线分隔），edit.css 配套。修 MultiEdit 残留的 row 引用（旧结构
+  变量删干净）。
+
+**测试**：test_dom +3（组岗 task 名、三时段标题子块、样例组岗存在）
+→ 332/332；e2e 87/87。版本 0.3.24。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。

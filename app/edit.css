@@ -270,4 +270,9 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .tt-guard-note{font-size:2vmin;color:#A8957E;line-height:1.6;flex:1;min-width:40vmin}
 .tt-actions{display:flex;gap:1.2vmin;margin-top:1.6vmin}
 .ep-ghost.off{opacity:.28;cursor:not-allowed}
+/* 时段常驻：每时段一个子块，虚线分隔，时段名突出——三行岗位列表
+   长得一样，不分隔老师只能靠找重复判断哪段是谁的 */
+.ep-slot{padding:1.2vmin 0 1.6vmin;border-bottom:.2vmin dashed rgba(241,227,198,.25)}
+.ep-slot:last-child{border-bottom:none;padding-bottom:.2vmin}
+.ep-slot-title{font-size:2.4vmin;font-weight:700;color:#FFD64F;margin-bottom:.8vmin}
 .tt-sum{font-size:2.1vmin;color:#A8957E;line-height:1.7;margin-top:1.2vmin}

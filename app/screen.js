@@ -367,7 +367,14 @@
 
       var task = document.createElement("span");
       task.className = "task";
-      task.textContent = d.name;
+      /* 组岗位合并后 name 是组名（如「值日组」）：把具体任务带上，
+         否则屏面只剩「值日组 自己商量」，老师看不出岗位还在不在
+         （真机反馈 2026-11-20）。 */
+      var label = d.name;
+      if (d.tasks && d.tasks.length && d.tasks.indexOf(d.name) < 0) {
+        label = d.name + "·" + d.tasks.join("、");
+      }
+      task.textContent = label;
       item.appendChild(task);
 
       var who = document.createElement("span");
