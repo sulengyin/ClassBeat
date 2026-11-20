@@ -803,6 +803,40 @@ check(!!(ovAfter && ovAfter.lessons && Object.keys(ovAfter.lessons).length),
   "改课保存走今日覆盖", JSON.stringify(ovAfter && ovAfter.lessons));
 global.Store.clearDayOverride(global.Store.dayKey());
 
+/* 时段常驻（0.3.23）：课间/晨间自主管理/午间各配哪些岗位整段挂出，
+   自由多选；选进来的触发走 present（freq 不再另算），没选的照旧。 */
+const screenSrc = fs.readFileSync(path.join(ROOT, "app/screen.js"), "utf8");
+const indexSrc = fs.readFileSync(path.join(ROOT, "app/index.html"), "utf8");
+check(editSrcNow.includes("renderDutyPresents")
+      && fs.readFileSync(path.join(ROOT, "app/engine/schedule.js"), "utf8").includes("dutyPresents"),
+  "时段常驻：编辑面板配置区 + 引擎读 dutyPresents 都在");
+check(screenSrc.includes("duty-track") && indexSrc.includes("duty-marquee"),
+  "值日条跑马灯：track 包裹 + 循环滚动样式都在");
+const unsetRole = global.Runtime.config().roles.roles.find(r => r.freq && r.freq.kind === "unset");
+check(!!unsetRole, "样例里有未设时间的岗位（绿植守护者）");
+global.__rhythmDate = "2026-11-09";
+global.__rhythmTime = 10 * 60 + 24;   /* 课间 */
+global.Screen.render();
+check(document.getElementById("duty").textContent.indexOf(unsetRole.name) < 0,
+  "没配常驻时 unset 岗位不上屏");
+global.Store.patchConfig({ dutyPresents: { break: [unsetRole.id], reading: [], noon: [] } });
+global.Screen.render();
+const dutyTxt = document.getElementById("duty").textContent;
+check(dutyTxt.indexOf(unsetRole.name) >= 0
+      && !!document.querySelector("#duty .duty-track"),
+  "选进课间常驻后整段挂出（值日条在 track 里）", dutyTxt);
+const presDuties = global.Runtime.day("2026-11-09").duties.filter(d => d.roleId === unsetRole.id);
+check(presDuties.length > 0 && presDuties.every(d => d.freqKind === "present"),
+  "常驻岗位触发走 present，freq 不再另算");
+global.Store.patchConfig({ dutyPresents: null });
+global.Screen.render();
+
+/* 值日页有多选配置区（切页验证一次真实 UI） */
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
+check(document.body.textContent.indexOf("哪些岗位整段常驻") >= 0,
+  "值日页有「哪些岗位整段常驻」多选区");
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "今天")[0]._h.click();
+
 const tabs = document.querySelectorAll(".ep-tab");
 const hoursTab = tabs.filter(b => b.textContent === "作息")[0];
 check(!!hoursTab, "面板里有「作息」这一页");

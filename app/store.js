@@ -407,7 +407,8 @@
      整块替换而不是逐字段深合并：一张作息表改一条边界，本来就是整表重写，
      深合并只会留下「删掉的那一段又冒回来」这种怪事。 */
   var CONFIG_BLOCKS = ["meta", "timetable", "schedule", "roles",
-                       "content", "noon", "calendar", "students", "peopleGroups"];
+                       "content", "noon", "calendar", "students", "peopleGroups",
+                       "dutyPresents"];
 
   function config() {
     var c = read(KEY.config, null);

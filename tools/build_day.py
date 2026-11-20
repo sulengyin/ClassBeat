@@ -214,11 +214,27 @@ def resolve_people(role: dict, group: str | None, group_reason: str | None,
     return role.get("people", []), None
 
 
-def role_triggers(role: dict, blocks: list[dict], noon: dict, weekday: int) -> list[dict]:
+def role_triggers(role: dict, blocks: list[dict], noon: dict, weekday: int,
+                  presents: dict | None = None) -> list[dict]:
     """求一个岗位当天在哪些时刻触发。"""
     freq = role["freq"]
     kind = freq["kind"]
     out: list[dict] = []
+
+    # 时段常驻：被选进「晨间自主管理/课间/午间」任一时段后，触发完全
+    # 由时段呈现决定（整段都挂），freq 不再另算。与前端引擎保持一致。
+    if presents:
+        mine = any(role["id"] in (presents.get(k) or [])
+                   for k in ("reading", "break", "noon"))
+        if mine:
+            for b in blocks:
+                if b["type"] not in ("reading", "break", "noon"):
+                    continue
+                if role["id"] not in (presents.get(b["type"]) or []):
+                    continue
+                out.append({"at": b["start"], "end": b["end"],
+                            "block": b["seq"], "freqKind": "present"})
+            return out
 
     if kind == "unset":
         return out
@@ -250,18 +266,23 @@ def role_triggers(role: dict, blocks: list[dict], noon: dict, weekday: int) -> l
 
 
 def build_duties(roles: dict, blocks: list[dict], noon: dict, weekday: int,
-                 group: str | None, group_reason: str | None = None) -> tuple[list[dict], list[dict], list[str]]:
+                 group: str | None, group_reason: str | None = None,
+                 presents: dict | None = None) -> tuple[list[dict], list[dict], list[str]]:
     duties: list[dict] = []
     unset: list[str] = []
     unknown: list[dict] = []
 
     for role in roles["roles"]:
-        if role["freq"]["kind"] == "unset":
+        # 时段常驻可以让 unset 的岗位也挂上屏：被选中的 unset 岗位不跳过
+        is_present = presents and any(
+            role["id"] in (presents.get(k) or [])
+            for k in ("reading", "break", "noon"))
+        if role["freq"]["kind"] == "unset" and not is_present:
             unset.append(role["id"])
             continue
 
         people, reason = resolve_people(role, group, group_reason, weekday)
-        triggers = role_triggers(role, blocks, noon, weekday)
+        triggers = role_triggers(role, blocks, noon, weekday, presents)
         if not triggers:
             continue
 
@@ -283,7 +304,7 @@ def build_duties(roles: dict, blocks: list[dict], noon: dict, weekday: int,
                 "substitute": role.get("substitute", []),
                 "status": "ok" if people is not None else "unknown",
                 "reason": reason,
-                "freqKind": role["freq"]["kind"],
+                "freqKind": t.get("freqKind") or role["freq"]["kind"],
                 "order": role.get("order", 0),
                 "grp": role.get("grp"),
                 "assign": role.get("assign", "fixed"),

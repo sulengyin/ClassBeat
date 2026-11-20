@@ -2077,6 +2077,37 @@ PSParser 语法解析通过；本机全量 e2e 87/87。版本 0.3.19。
 **测试**：test_dom +6（源码断言、下拉选项数、单师自动带出、双师
 并列、保存落盘 override）→ 322/322；e2e 87/87。版本 0.3.22。
 
+### 2.62 值日时段常驻多选 + 值日条跑马灯（2026-11-20 老师定策）
+
+**背景**：老师定两条：① 哪些小岗位在课间/晨间自主管理/午间呈现，
+让用户自由多选；② 样式不变，岗位多到一行写不下时整行从右往左
+循环滚动，不要突然消失（原行为：截 3 条 + "还有 N 步"）。
+
+**做法**：
+
+- **dutyPresents**（本机 config 新块，进 CONFIG_BLOCKS 白名单）：
+  `{ reading:[roleId], break:[roleId], noon:[roleId] }`。
+- **引擎**（schedule.js / build_day.py 双端同步）：buildDuties 加
+  presents 参数。被选进任一时段的岗位：触发完全由时段呈现决定
+  （所在时段块的整段窗口，freqKind="present"），freq 不再另算
+  ——一个岗位一种呈现方式；**unset 岗位也能被选进来**（buildDuties
+  的 unset 早退要给 present 让路）；没选的岗位照旧走 freq。
+  sample 无 presents → golden 不变，对拍 132 天一致。
+- **屏面**（rhythm.js dutiesAt）：present 归入 each 的弱化组
+  （quiet、临时任务优先）；不再截 3 条，全部返回。
+- **跑马灯**（screen.js renderDuty + index.html CSS）：#duty 内包
+  .duty-track；单行 nowrap + overflow:hidden；内容宽超容器时构建
+  第二遍（不用 cloneNode——克隆丢点击监听）并加 .scroll 类，
+  animation translateX(0→-50%) 线性循环，时长按内容宽度（约 60px/s，
+  最少 10s）。子项间距用 margin-right 不用容器 gap，两份宽度严格
+  相等才无缝。样式本身（贴纸卡、旋转、弱化）全保留。
+- **编辑面板**（值日页「哪些岗位整段常驻」）：三个时段各一行
+  ep-opt 多选 chips，点选即 patchConfig 落盘，立刻生效。
+
+**测试**：test_dom +7（引擎/屏面源码断言、unset 不配不上屏、配置后
+整段挂出、present 触发、值日页多选区）→ 329/329；对拍 132 天一致；
+e2e 87/87。版本 0.3.23。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。

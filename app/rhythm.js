@@ -515,7 +515,7 @@
         g.assign = d.assign === "self-organize" ? "self-organize" : g.assign;
         return;
       }
-      if (d.freqKind === "each") {
+      if (d.freqKind === "each" || d.freqKind === "present") {
         each.push({ key: d.roleId, name: d.name, tasks: [], people: d.people || [],
                     order: d.order, assign: d.assign, unknown: d.status !== "ok", quiet: true });
         return;
@@ -528,8 +528,9 @@
     var items = merged.length ? merged : each;
     items.sort(function (a, b) { return a.order - b.order; });
 
-    var overflow = Math.max(0, items.length - 3);
-    return { items: items.slice(0, 3), overflow: overflow, quiet: !merged.length };
+    /* 0.3.23 起不截断：全部渲染，屏面写不下时整行从右往左循环滚动
+       （编辑面板按时段多选后岗位可能不止 3 个）。overflow 保留 0 兼容旧签名。 */
+    return { items: items, overflow: 0, quiet: !merged.length };
   }
 
   var api = { t2m: t2m, m2t: m2t, mmss: mmss, human: human,

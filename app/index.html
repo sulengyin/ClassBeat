@@ -581,7 +581,14 @@ footer{
   font-family:var(--hand);font-size:2.1vmin;letter-spacing:.16em;color:var(--ink-3);
   white-space:nowrap;flex:none;transform:rotate(-1deg);
 }
-.duty-list{display:flex;align-items:center;gap:.9vmin;flex-wrap:wrap;min-width:0}
+.duty-list{display:flex;align-items:center;min-width:0;overflow:hidden;flex:1}
+/* 0.3.23：岗位写不下时整行从右往左循环滚动。子项间距用 margin-right
+   而不是容器 gap：内容复制两份后两份宽度严格相等，translateX(-50%)
+   才能无缝绕回。 */
+.duty-track{display:flex;align-items:center;min-width:100%;white-space:nowrap;flex:none}
+.duty-track .duty,.duty-track .dot-sep{margin-right:.9vmin}
+.duty-track.scroll{animation:duty-marquee var(--dur,24s) linear infinite}
+@keyframes duty-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .duty{
   display:flex;align-items:baseline;gap:.9vmin;
   padding:.8vmin 1.5vmin;border-radius:1vmin 1.3vmin 1.1vmin .9vmin;

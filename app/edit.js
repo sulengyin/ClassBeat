@@ -1179,7 +1179,51 @@
       list.appendChild(line);
     });
     sec.appendChild(list);
+    renderDutyPresents(doc);
     bodyEl.appendChild(sec);
+  }
+
+  /* 时段常驻（0.3.23）：课间 / 晨间自主管理 / 午间各配哪些岗位整段挂在
+     值日条上，自由多选。选进来的岗位不再按各自设的触发方式另算
+     （一个岗位一种呈现方式）；没选的岗位照旧。 */
+  function renderDutyPresents(doc) {
+    var roles = (doc.roles || []).slice().sort(function (a, b) {
+      return (typeof a.order === "number" ? a.order : 0) - (typeof b.order === "number" ? b.order : 0);
+    });
+    if (!roles.length) return;
+    var presSec = h("section", "ep-sec");
+    presSec.appendChild(h("h3", null, "哪些岗位整段常驻"));
+    presSec.appendChild(h("p", "ep-note",
+      "点选岗位，让它在晨间自主管理 / 课间 / 午间这一整段都挂在值日条上；岗位多到一行放不下会自动滚动。没选的岗位按各自设的触发方式出现，互不影响。"));
+
+    var pres = (RT && RT.config) ? (RT.config().dutyPresents || {}) : {};
+    [
+      { key: "reading", label: "晨间自主管理" },
+      { key: "break", label: "课间" },
+      { key: "noon", label: "午间" }
+    ].forEach(function (slot) {
+      var row = h("div", "ep-field");
+      row.appendChild(h("span", "ep-flabel", slot.label));
+      var opts = h("div", "ep-opts");
+      roles.forEach(function (r) {
+        var on = (pres[slot.key] || []).indexOf(r.id) >= 0;
+        var b = h("button", "ep-opt" + (on ? " on" : ""), r.name);
+        b.addEventListener("click", function () {
+          var cur = ((RT.config().dutyPresents || {})[slot.key] || []).slice();
+          var at = cur.indexOf(r.id);
+          if (at >= 0) cur.splice(at, 1); else cur.push(r.id);
+          var next = Object.assign({}, RT.config().dutyPresents || {});
+          next[slot.key] = cur;
+          S.patchConfig({ dutyPresents: next });
+          b.classList.toggle("on");
+          flash(slot.label + "常驻岗位已更新");
+        });
+        opts.appendChild(b);
+      });
+      row.appendChild(opts);
+      presSec.appendChild(row);
+    });
+    bodyEl.appendChild(presSec);
   }
 
   function moveRole(doc, role, delta) {

@@ -342,7 +342,7 @@
     var res = R.dutiesAt(day, minutes);
     var sig = JSON.stringify(res.items.map(function (d) {
       return [d.name, d.people, d.unknown, d.quiet, d.tasks];
-    })) + "|" + res.overflow;
+    }));
 
     if (sig === lastDutySig) return;
     lastDutySig = sig;
@@ -358,13 +358,10 @@
       return;
     }
 
-    res.items.forEach(function (d, i) {
-      if (i) {
-        var sep = document.createElement("span");
-        sep.className = "dot-sep";
-        el.duty.appendChild(sep);
-      }
-
+    /* 0.3.23：岗位多到一行写不下时，整行从右往左循环滚动（不截断、
+       不突然消失）。内容复制两份接在后面，translateX(-50%) 才能无缝
+       绕回；每项用 margin-right 而不是容器 gap，两份宽度才严格相等。 */
+    function buildItem(d) {
       var item = document.createElement("div");
       item.className = "duty" + (d.quiet ? " quiet" : "");
 
@@ -392,16 +389,31 @@
         item.dataset.task = d.tasks && d.tasks.length ? d.tasks.join("、") : d.name;
         item.addEventListener("click", function () { showDetail(item); });
       }
-
-      el.duty.appendChild(item);
-    });
-
-    if (res.overflow) {
-      var more = document.createElement("span");
-      more.className = "more";
-      more.textContent = "还有 " + res.overflow + " 步";
-      el.duty.appendChild(more);
+      return item;
     }
+
+    var track = document.createElement("div");
+    track.className = "duty-track";
+    function appendPass() {
+      res.items.forEach(function (d, i) {
+        if (i) {
+          var sep = document.createElement("span");
+          sep.className = "dot-sep";
+          track.appendChild(sep);
+        }
+        track.appendChild(buildItem(d));
+      });
+    }
+    appendPass();
+
+    if (track.scrollWidth > el.duty.clientWidth + 4) {
+      appendPass();   /* 无缝循环：内容两份接在后面，translateX(-50%) 绕回 */
+      track.classList.add("scroll");
+      /* 滚一圈的时间按内容宽度算：约每秒 60px，最少 10 秒 */
+      track.style.setProperty("--dur",
+        Math.max(10, Math.round(track.scrollWidth / 60)) + "s");
+    }
+    el.duty.appendChild(track);
   }
 
   function showDetail(item) {

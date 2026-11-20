@@ -272,10 +272,30 @@
     return [role.people || [], null];
   }
 
-  function roleTriggers(role, blocks, noon, weekday) {
+  function roleTriggers(role, blocks, noon, weekday, presents) {
     var freq = role.freq || {};
     var kind = freq.kind;
     var out = [];
+
+    /* 时段常驻（0.3.23）：老师在编辑面板里把岗位选进「晨间自主管理 /
+       课间 / 午间」任一时段后，这个岗位的触发完全由时段呈现决定
+       （整段都挂在值日条上），freq 不再另算——一个岗位一种呈现方式，
+       不叠加。freq=unset 的岗位也能被选进来。 */
+    if (presents) {
+      var mine = false;
+      ["reading", "break", "noon"].forEach(function (k) {
+        if ((presents[k] || []).indexOf(role.id) >= 0) mine = true;
+      });
+      if (mine) {
+        blocks.forEach(function (b) {
+          var k = b.type;
+          if (k !== "reading" && k !== "break" && k !== "noon") return;
+          if ((presents[k] || []).indexOf(role.id) < 0) return;
+          out.push({ at: b.start, end: b.end, block: b.seq, freqKind: "present" });
+        });
+        return out;
+      }
+    }
 
     if (kind === "unset") return out;
 
@@ -307,13 +327,17 @@
     return out;
   }
 
-  function buildDuties(roles, blocks, noon, weekday, group, groupReason) {
+  function buildDuties(roles, blocks, noon, weekday, group, groupReason, presents) {
     var duties = [];
     var unset = [];
     var unknown = [];
 
     (roles.roles || []).forEach(function (role) {
-      if (!role.freq || role.freq.kind === "unset") {
+      /* 时段常驻可以徃 unset 的岗位也挂上屏：被选中的 unset 岗位不跳过 */
+      var isPresent = presents && ["reading", "break", "noon"].some(function (k) {
+        return (presents[k] || []).indexOf(role.id) >= 0;
+      });
+      if ((!role.freq || role.freq.kind === "unset") && !isPresent) {
         unset.push(role.id);
         return;
       }
@@ -321,7 +345,7 @@
       var res = resolvePeople(role, group, groupReason, weekday);
       var people = res[0];
       var reason = res[1];
-      var triggers = roleTriggers(role, blocks, noon, weekday);
+      var triggers = roleTriggers(role, blocks, noon, weekday, presents);
       if (!triggers.length) return;
 
       if (people === null) {
@@ -339,7 +363,7 @@
           substitute: role.substitute || [],
           status: people !== null ? "ok" : "unknown",
           reason: reason,
-          freqKind: role.freq.kind,
+          freqKind: t.freqKind || role.freq.kind,
           order: role.order === undefined ? 0 : role.order,
           grp: role.grp === undefined ? null : role.grp,
           assign: role.assign === undefined ? "fixed" : role.assign,
@@ -431,7 +455,8 @@
       timeline.push(item);
     });
 
-    var dutyResult = buildDuties(roles, blocks, noon, weekday, group, groupReason);
+    var dutyResult = buildDuties(roles, blocks, noon, weekday, group, groupReason,
+                                 config.dutyPresents || null);
     var duties = dutyResult.duties;
     var unknown = dutyResult.unknown;
     var unset = dutyResult.unset;

@@ -42,7 +42,8 @@
       content: pick("content") || [],
       roles: pick("roles") || { roles: [], dutyCycle: {} },
       noon: pick("noon") || EMPTY_NOON,
-      calendar: pick("calendar") || { days: {} }
+      calendar: pick("calendar") || { days: {} },
+      dutyPresents: pick("dutyPresents") || null
     };
   }
 
