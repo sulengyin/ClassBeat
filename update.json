@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.15",
-  "build": "b026f16",
-  "publishedAt": "2026-11-20T00:53:51+08:00",
+  "version": "0.3.16",
+  "build": "de03d0c",
+  "publishedAt": "2026-11-20T08:03:15+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **提示语逐段升级，晨间贴纸统一来源**：「各时段的提示语」里第一项\n  「晨间自主管理」写的文字，就是屏上那张黄色贴纸（样式、字体、位置\n  都和以前的提醒事项一样）——不用再去找另一个\"提醒事项\"入口。\n- **每段都可以按星期定制**：默认一句话、每天显示，保证界面简洁；\n  点「哪几天显示」可以把某些天点掉（比如只有周一的提示），点\n  「其中几天要写不同的话」展开后按星期单独填（周一交回执、周五带\n  美术用品……留空就用默认那句）。\n- 旧配置无缝兼容：之前在\"提醒事项\"里写过的话继续生效，在编辑里\n  会显示在晨间自主管理那一格里。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.15/classbeat-0.3.15.zip",
-  "sha256": "5d7464f308d43f871ebfc2051be60b50a78834003faf5a6c2d115ea859683e8b",
-  "bytes": 11783471,
+  "notes": "- **修\"关闭后几秒又自动跳出来\"**：根因是有些机器还在跑更新前的\n  旧版看门狗进程——程序内更新只替换文件、不重启看门狗，老进程\n  内存里还是\"隔几秒就重拉\"的老逻辑。现在服务每次启动会自动检查：\n  发现跑旧脚本的看门狗就自动交接（旧进程退场、新进程接管，\n  交接时不抢屏）。装完这个版本后老看门狗会被自动换掉，不需要\n  重启电脑、不需要重装安装包。\n- 交接期间大屏不会被拉起；新看门狗沿用\"每时段只提醒一次\"的规矩。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.16/classbeat-0.3.16.zip",
+  "sha256": "4fcf1b245e12fe4ef2803aa968c34c4f0cdc1765d011341b0d2cf4ad64f6f49a",
+  "bytes": 11785106,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "e8ae7b50ff8f4b5428a238ff8794db00a2ea6352ca5c76c170e7b99c45b4b19d",
+      "sha256": "dc7f54f6bab1e983d1da20b2f22099bdff733f4606616b267ef471333951437e",
       "bytes": 17039
     },
     {
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "f8a6b310d8cabeced4723d03d22bfbab83b52323b3c97d2fbb45c9f5da5bcada",
+      "sha256": "29ed58285b5c483de70dae9798e278642246fb280443b978c4293a6ac61b0363",
       "bytes": 594
     },
     {
@@ -141,8 +141,8 @@
     },
     {
       "path": "server/rhythm_server.py",
-      "sha256": "fa63b4dc059e78ab73c5287b446516f66744be5fc0ad78cd5d0b2e9d17891f96",
-      "bytes": 54007
+      "sha256": "80b9c5d7187618ac3f0eb97ad85fde2679880601717b8b8b73b1a3740555679a",
+      "bytes": 58090
     },
     {
       "path": "server/run.py",
@@ -191,8 +191,8 @@
     },
     {
       "path": "tools/launcher/watchdog.ps1",
-      "sha256": "e9a155faa40e1e9b0e9372b655b7d9b092e5c3994bf5332bd284ab53c51b36f7",
-      "bytes": 15626
+      "sha256": "36a1fb2fb5a2c95519f4b81a06a0f77ce9906cf9d7b8a45350ee6d35ab60549a",
+      "bytes": 16082
     },
     {
       "path": "tools/launcher/win-titles.ps1",
