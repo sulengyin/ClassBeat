@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.18",
-  "build": "04af030",
-  "publishedAt": "2026-11-20T11:43:15+08:00",
+  "version": "0.3.19",
+  "build": "b9bcefe",
+  "publishedAt": "2026-11-20T12:54:06+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **修\"用 PPT / 希沃白板时课间、眼保健操没跳出来\"**：全屏应用占着\n  前台时，系统会把后台程序的置前请求拒掉。现在置前失败会自动升级\n  （借前台线程切换 → 系统内部切换 → 把挡在前面的窗口最小化），\n  确认大屏真的到前台才算成功；一个时段内最多重试 3 次。\n- **修提示语位置与时机**（真机反馈）：\"三清一对齐\"这类时段提示语\n  不再挤在「下一节」行尾——上课前十分钟起（准备/倒计时窗口）提示语\n  整体让位；老师开了全程倒计时的时段，提示语上移到倒计时数字上方。\n- **修倒计时逐段勾选不生效**：更新面板里选的倒计时设置从 0.3.14 起\n  一直\"记下了但没上屏\"。现在勾选真正接管显示：勾了的时段按窗口出\n  倒计时，去勾的时段连收尾倒计时也不出。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.18/classbeat-0.3.18.zip",
-  "sha256": "1bc7c784e5fd514238059609f063030520802a14e8b39febda76337ae190f086",
-  "bytes": 11790758,
+  "notes": "- **修\"我没有看到重启服务\"**：这台机器的程序内更新把文件换成了\n  新版，但跑着的服务进程还是更早的旧版——旧版不认识「重启服务」\n  按钮，所以它按设计藏了起来。现在双击桌面图标打开时，启动器会\n  自己对比版本：发现服务比安装的旧，就自动停掉旧服务、按新文件\n  重新启动。也就是说「更新完 → 关掉程序 → 再双击桌面图标」就完整\n  换上新版，看门狗也一并交接，不用碰包里的任何文件；开机自启的\n  电脑会在第二天早上自动完成这次交接。\n- 更新面板在遇到这种\"文件新、进程旧\"的情况时，会直接告诉老师\n  下一步怎么做，不再只字不提。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.19/classbeat-0.3.19.zip",
+  "sha256": "6496cbfa26fde72ba13829482a4ad9ac4bdc38a95e2222850d07a1d268b18fea",
+  "bytes": 11792117,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "eff51237b9faa0f30057dfb1aa9267cd5bd027f3f8653f641664785ac67a563d",
+      "sha256": "5d90b3aac88eaadecc4519a7850275b00e9f8638c08f3819968022e0c9e4be4e",
       "bytes": 17039
     },
     {
@@ -111,8 +111,8 @@
     },
     {
       "path": "app/update.js",
-      "sha256": "aa2ee148d9addb41b3b5320fa248f195ff98a8df1cefe5818bf910c09f5d0448",
-      "bytes": 18543
+      "sha256": "6cbbc961c2f0da3b8e414f40c8d5897426ca53e8ebfbb70c7688464c87102c04",
+      "bytes": 19082
     },
     {
       "path": "app/vendor/qrcode.min.js",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "797906dea75079786943cd3e625734a1912fd892eb6d3f4a3959d585180ddd80",
+      "sha256": "9f3b7d822f34c2354d4e027615bd4c0a3d0d241192161c0aefaf84c91f284cd7",
       "bytes": 594
     },
     {
@@ -186,8 +186,8 @@
     },
     {
       "path": "tools/launcher/start-kiosk.ps1",
-      "sha256": "1dc8a729e188fd31d2de1e74f9afb2eb498b335641ab547997dc545c84a789a4",
-      "bytes": 19076
+      "sha256": "1acdf449df95c1e20ace2810dc53a7ad0f1e64f61658eae00199537597afa1e7",
+      "bytes": 22000
     },
     {
       "path": "tools/launcher/watchdog.ps1",
