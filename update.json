@@ -1,18 +1,18 @@
 {
   "schema": 1,
-  "version": "0.3.16",
-  "build": "de03d0c",
-  "publishedAt": "2026-11-20T08:03:15+08:00",
+  "version": "0.3.17",
+  "build": "8c16e96",
+  "publishedAt": "2026-11-20T10:42:59+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **修\"关闭后几秒又自动跳出来\"**：根因是有些机器还在跑更新前的\n  旧版看门狗进程——程序内更新只替换文件、不重启看门狗，老进程\n  内存里还是\"隔几秒就重拉\"的老逻辑。现在服务每次启动会自动检查：\n  发现跑旧脚本的看门狗就自动交接（旧进程退场、新进程接管，\n  交接时不抢屏）。装完这个版本后老看门狗会被自动换掉，不需要\n  重启电脑、不需要重装安装包。\n- 交接期间大屏不会被拉起；新看门狗沿用\"每时段只提醒一次\"的规矩。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.16/classbeat-0.3.16.zip",
-  "sha256": "4fcf1b245e12fe4ef2803aa968c34c4f0cdc1765d011341b0d2cf4ad64f6f49a",
-  "bytes": 11785106,
+  "notes": "- **更新完成后一键「重启服务」**：以前更新完提示\"需要重启才生效\"，\n  实际上得去找包里的启动文件——现在更新面板里直接给一个\n  「重启服务，立即生效」按钮，点一下服务自己换新代码重启，页面\n  自动重载，不用再碰包里的任何文件。\n- 大屏/编辑页在更新后如果没重启服务，跑的还是旧代码；按钮只在\n  服务支持一键重启时出现（老进程最后一次仍需手动重开桌面图标，\n  之后每次更新都能用这个按钮）。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.17/classbeat-0.3.17.zip",
+  "sha256": "ab4a0ec1dd56eb370e4000cdd9084c68ec68d5d7ac613a76016df3a891828142",
+  "bytes": 11788557,
   "files": [
     {
       "path": "app/backup.js",
-      "sha256": "6befee1ce4a73efeb6c60012b7ee95da19eb74610af4a0059393d6b9e7209e12",
-      "bytes": 9457
+      "sha256": "0c888fb9d163713283e7faaaf795a18972c6f1eceb8d7b5a16addc81ccd19558",
+      "bytes": 9888
     },
     {
       "path": "app/clock.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "dc7f54f6bab1e983d1da20b2f22099bdff733f4606616b267ef471333951437e",
+      "sha256": "13c142702fbe3cb10f3456c08324baf7ae3e0326a129e8f1cbeff1896ff4b3cd",
       "bytes": 17039
     },
     {
@@ -111,8 +111,8 @@
     },
     {
       "path": "app/update.js",
-      "sha256": "a7772f3563307a69c08d46b768022da3aba0699818014e5c0961a74d2e6bc218",
-      "bytes": 16017
+      "sha256": "aa2ee148d9addb41b3b5320fa248f195ff98a8df1cefe5818bf910c09f5d0448",
+      "bytes": 18543
     },
     {
       "path": "app/vendor/qrcode.min.js",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "29ed58285b5c483de70dae9798e278642246fb280443b978c4293a6ac61b0363",
+      "sha256": "d7ef7436b830f4e3918728c9c5d4877cfe5f0d18aa90c1313b026465989d2699",
       "bytes": 594
     },
     {
@@ -141,8 +141,8 @@
     },
     {
       "path": "server/rhythm_server.py",
-      "sha256": "80b9c5d7187618ac3f0eb97ad85fde2679880601717b8b8b73b1a3740555679a",
-      "bytes": 58090
+      "sha256": "e693011f856f375d40d57d24ef8b414906fd76212d998688aae68027dcd07cf6",
+      "bytes": 63315
     },
     {
       "path": "server/run.py",
@@ -161,8 +161,8 @@
     },
     {
       "path": "server/updater.py",
-      "sha256": "e03c2920c64e2d07f0e3b7560d1961ac0b8b9ef8ed84dd1b4f6465d1ac46dfb4",
-      "bytes": 27019
+      "sha256": "5f7f2841ec84c199bc8f6af0d2e9da790643366ec972bf0795b4fa6a397eca41",
+      "bytes": 27031
     },
     {
       "path": "tools/launcher/exit-kiosk.cmd",
