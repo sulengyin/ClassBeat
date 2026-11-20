@@ -756,6 +756,53 @@ check(!!document.getElementById("epTitle"), "验证码答对后进入面板");
 check(document.getElementById("epTitle").textContent.indexOf("·") > 0,
   "面板抬头带班名", document.getElementById("epTitle").textContent);
 
+/* 改课编辑器（0.3.22）：学科下拉直选，老师按课表自动带出，学生不打字。
+   单师科自动填那一位；双师科并列「A老师/B老师」（如心理/班队）。 */
+const editSrcNow = fs.readFileSync(path.join(ROOT, "app/edit.js"), "utf8");
+check(editSrcNow.includes("subjectTeachers") && editSrcNow.includes("join(\"/\")"),
+  "改课编辑器：学科老师绑定来自课表聚合，双师用斜杠并列");
+const tRows = document.querySelectorAll(".ep-row");
+check(tRows.length > 0, "今天页列出可改的课", String(tRows.length));
+tRows[0]._h.click();
+const dlgSelect = document.querySelectorAll(".ep-select")[0];
+check(!!dlgSelect && dlgSelect.children.length > 5,
+  "改课弹层里学科是下拉框，选项足够多",
+  dlgSelect ? dlgSelect.children.length + " 个选项" : "没有下拉框");
+const dlgTea = document.querySelectorAll(".ep-tea")[0];
+/* 第一行的学科与老师，从课表绑定关系里动态取，不写死 */
+const bindFor = (subject) => {
+  const set = [];
+  global.Runtime.config().schedule.entries.forEach(e => {
+    if (e.subject === subject && e.teacher && set.indexOf(e.teacher) < 0) set.push(e.teacher);
+  });
+  return set;
+};
+const rowSubject = dlgSelect.value;
+const bound = bindFor(rowSubject);
+check(!!dlgTea && dlgTea.value === bound.join("/"),
+  "打开弹层：老师按课表自动带出（" + rowSubject + "）",
+  "期望 " + bound.join("/") + "，实际 " + (dlgTea ? dlgTea.value : "无输入框"));
+/* 换一个两位老师执教的学科（如心理/班队），老师自动变成并列两人 */
+const dual = Object.keys(
+  global.Runtime.config().schedule.entries.reduce((m, e) => {
+    if (!e.subject || !e.teacher) return m;
+    (m[e.subject] = m[e.subject] || new Set()).add(e.teacher);
+    return m;
+  }, {})
+).find(s => bindFor(s).length >= 2);
+if (dual) {
+  dlgSelect.value = dual;
+  dlgSelect._h.change();
+  check(dlgTea.value === bindFor(dual).join("/"),
+    "换成「" + dual + "」：两位老师并列自动带出", dlgTea.value);
+}
+/* 保存走原有 override 通道 */
+document.querySelectorAll(".ep-lesson-save")[0]._h.click();
+const ovAfter = global.Store.getDayOverride(global.Store.dayKey());
+check(!!(ovAfter && ovAfter.lessons && Object.keys(ovAfter.lessons).length),
+  "改课保存走今日覆盖", JSON.stringify(ovAfter && ovAfter.lessons));
+global.Store.clearDayOverride(global.Store.dayKey());
+
 const tabs = document.querySelectorAll(".ep-tab");
 const hoursTab = tabs.filter(b => b.textContent === "作息")[0];
 check(!!hoursTab, "面板里有「作息」这一页");

@@ -25,6 +25,22 @@
     "书法", "道德与法治", "劳动", "信息科技", "班队", "自习"
   ];
 
+  /* 科目 → 任课老师：从整张课表聚合（真机反馈 2026-11-20：五年级学生
+     打字找字麻烦，改课时不要手输老师名字）。同一科由两位老师执教
+     （如心理/班队）就并列「张老师/李老师」，改课时自动带出。 */
+  function subjectTeachers() {
+    var map = {};
+    if (RT && RT.config) {
+      ((RT.config().schedule || {}).entries || []).forEach(function (e) {
+        if (!e.subject) return;
+        var t = (e.teacher || "").trim();
+        var list = map[e.subject] || (map[e.subject] = []);
+        if (t && list.indexOf(t) < 0) list.push(t);
+      });
+    }
+    return map;
+  }
+
   function h(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -437,26 +453,42 @@
     var wrap = h("div", "ep-dialog");
     wrap.appendChild(h("div", "ep-dialog-title", "第 " + b.periodNo + " 节"));
 
-    var sub = document.createElement("input");
-    sub.className = "ep-input";
-    sub.value = b.subject || "";
-    sub.placeholder = "科目";
-    sub.setAttribute("list", "subjList");
+    var bind = subjectTeachers();
+    /* 学科用下拉直接选：课表里真实出现过的学科排前面（都带着任课老师），
+       其余常用科补在后面；本节当前的学科永远在列。 */
+    var opts = [];
+    if (b.subject && opts.indexOf(b.subject) < 0) opts.push(b.subject);
+    Object.keys(bind).forEach(function (s) { if (opts.indexOf(s) < 0) opts.push(s); });
+    SUBJECTS.forEach(function (s) { if (opts.indexOf(s) < 0) opts.push(s); });
+    var sub = document.createElement("select");
+    sub.className = "ep-input ep-select";
+    opts.forEach(function (s) {
+      var o = document.createElement("option");
+      o.value = s;
+      o.textContent = s;
+      sub.appendChild(o);
+    });
+    sub.value = b.subject || opts[0] || "";
     wrap.appendChild(sub);
 
-    var dl = document.createElement("datalist");
-    dl.id = "subjList";
-    SUBJECTS.forEach(function (s) { var o = document.createElement("option"); o.value = s; dl.appendChild(o); });
-    wrap.appendChild(dl);
-
     var tea = document.createElement("input");
-    tea.className = "ep-input";
-    tea.value = b.teacher || "";
+    tea.className = "ep-input ep-tea";
     tea.placeholder = "任课老师（可留空）";
+    tea.title = "老师和科目按课表自动对应；代课等特殊情况可以手动改";
+    function fillTeacher() {
+      var list = bind[sub.value] || [];
+      tea.value = list.length ? list.join("/") : "";
+    }
+    fillTeacher();
+    if (!tea.value && b.teacher) tea.value = b.teacher;
+    sub.addEventListener("change", fillTeacher);
     wrap.appendChild(tea);
 
+    wrap.appendChild(h("p", "ep-note",
+      "老师和科目按课表自动对应，不用打字；代课等特殊情况手动改就行。"));
+
     var row = h("div", "ep-actrow");
-    var save = h("button", "ep-primary", "保存");
+    var save = h("button", "ep-primary ep-lesson-save", "保存");
     save.addEventListener("click", function () {
       var lessons = (S.getDayOverride(key) || {}).lessons || {};
       lessons[b.periodNo] = { subject: sub.value.trim(), teacher: tea.value.trim() };
