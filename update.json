@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.23",
-  "build": "6698e10",
-  "publishedAt": "2026-11-20T16:08:26+08:00",
+  "version": "0.3.24",
+  "build": "5ecb9e9",
+  "publishedAt": "2026-11-20T16:51:09+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **值日岗位按时段自由配置**（编辑 → 值日 →「哪些岗位整段常驻」）：\n  晨间自主管理、课间、午间这三个时段，想让哪些岗位整段挂在值日条\n  上，点选就行（自由多选）。选进来的岗位这一整段都在；没选的岗位\n  按各自原来设的触发方式出现，互不影响。\n- **岗位多了一行放不下时自动滚动**：值日条不再截成三条加\"还有 N 步\"，\n  全部岗位都上屏；写不下时整行文字从右往左慢慢循环滚动，不突然消失。\n  样式本身不变。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.23/classbeat-0.3.23.zip",
-  "sha256": "3123a87bedd1da16197081e3f1bff21d279e5b4209afef2712d47d7ed38536b1",
-  "bytes": 11800400,
+  "notes": "- **修\"值日组（自己商量）\"看不懂**：组岗位（值日组）整段常驻时，\n  格子上现在带着具体任务名——「值日组·扫地 待定」，不再只有组名\n  加一句\"自己商量\"。看到\"待定\"就说明这个组的成员还没填好。\n- **值日页的时段配置有了分隔**：晨间自主管理 / 课间 / 午间三段\n  各自有黄色时段名标题和分隔线，不用再靠找重复来判断哪行属于\n  哪个时段。\n- **组员没填会明说**：值日页岗位列表里，A/B 组成员为空的岗位会\n  显示「A/B 组（成员还没填）」，方便发现数据缺口。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.24/classbeat-0.3.24.zip",
+  "sha256": "43c68e3f0a00bc29531e8728d1ef30ab1b567c723b2868c45c4a1fd8ebe65939",
+  "bytes": 11801299,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "121821465cf6b9d44f8d0adb9096abc0cd03c0d0ed8573be74b592be1cfe7ee7",
+      "sha256": "16bf79e7e1fb7b02e4652fe7e69ba19c316d0066ebffaff548876ed67830314a",
       "bytes": 17039
     },
     {
@@ -36,13 +36,13 @@
     },
     {
       "path": "app/edit.css",
-      "sha256": "6e13a0a2b8fe656bac9ab9065ea761dbafbcce6a6960d25bd214c302b9db4afa",
-      "bytes": 16612
+      "sha256": "395d0a184a1bb4dc6e8c371ca9f66a8af0eb5b082266dd58c4820d70d5263de9",
+      "bytes": 17018
     },
     {
       "path": "app/edit.js",
-      "sha256": "cc71d938be1aae92b654e9aeaa44bcc746787ec4a7ba661d3fc36c02d964b764",
-      "bytes": 71257
+      "sha256": "e03458dc571e311e1a0499eab9e94f652d816589f19c1f4520f8834a53433487",
+      "bytes": 71663
     },
     {
       "path": "app/engine/schedule.js",
@@ -86,8 +86,8 @@
     },
     {
       "path": "app/screen.js",
-      "sha256": "63dac79df6eb38faa2126851819bc4650b8260b2e4144a0bb7ecb6e9bc813813",
-      "bytes": 44924
+      "sha256": "1af9fc8a72fada49e12e2b1f6e37c28c2179b4b04ab95721779130158031d07a",
+      "bytes": 45311
     },
     {
       "path": "app/setup.css",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "d404ec5b8037ecd54e5609277b34759c94666f1044d451bba918a043a6333bc5",
+      "sha256": "dac426cfe3c91efac33899b380fc2e7458feecfd6dc0bab3e7aa7a9f112fa2cb",
       "bytes": 594
     },
     {
