@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.17",
-  "build": "8c16e96",
-  "publishedAt": "2026-11-20T10:42:59+08:00",
+  "version": "0.3.18",
+  "build": "04af030",
+  "publishedAt": "2026-11-20T11:43:15+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **更新完成后一键「重启服务」**：以前更新完提示\"需要重启才生效\"，\n  实际上得去找包里的启动文件——现在更新面板里直接给一个\n  「重启服务，立即生效」按钮，点一下服务自己换新代码重启，页面\n  自动重载，不用再碰包里的任何文件。\n- 大屏/编辑页在更新后如果没重启服务，跑的还是旧代码；按钮只在\n  服务支持一键重启时出现（老进程最后一次仍需手动重开桌面图标，\n  之后每次更新都能用这个按钮）。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.17/classbeat-0.3.17.zip",
-  "sha256": "ab4a0ec1dd56eb370e4000cdd9084c68ec68d5d7ac613a76016df3a891828142",
-  "bytes": 11788557,
+  "notes": "- **修\"用 PPT / 希沃白板时课间、眼保健操没跳出来\"**：全屏应用占着\n  前台时，系统会把后台程序的置前请求拒掉。现在置前失败会自动升级\n  （借前台线程切换 → 系统内部切换 → 把挡在前面的窗口最小化），\n  确认大屏真的到前台才算成功；一个时段内最多重试 3 次。\n- **修提示语位置与时机**（真机反馈）：\"三清一对齐\"这类时段提示语\n  不再挤在「下一节」行尾——上课前十分钟起（准备/倒计时窗口）提示语\n  整体让位；老师开了全程倒计时的时段，提示语上移到倒计时数字上方。\n- **修倒计时逐段勾选不生效**：更新面板里选的倒计时设置从 0.3.14 起\n  一直\"记下了但没上屏\"。现在勾选真正接管显示：勾了的时段按窗口出\n  倒计时，去勾的时段连收尾倒计时也不出。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.18/classbeat-0.3.18.zip",
+  "sha256": "1bc7c784e5fd514238059609f063030520802a14e8b39febda76337ae190f086",
+  "bytes": 11790758,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "13c142702fbe3cb10f3456c08324baf7ae3e0326a129e8f1cbeff1896ff4b3cd",
+      "sha256": "eff51237b9faa0f30057dfb1aa9267cd5bd027f3f8653f641664785ac67a563d",
       "bytes": 17039
     },
     {
@@ -51,8 +51,8 @@
     },
     {
       "path": "app/index.html",
-      "sha256": "a02df62ea2b49dca8bd1f8f04ffe014c4e923de38e1c98df855019a31f68b1b1",
-      "bytes": 56478
+      "sha256": "7fc6fb7e770400cb8eee86c2d69c36b23253afc7b5a778f7f80ba9549f7eb92c",
+      "bytes": 56898
     },
     {
       "path": "app/phoneui.js",
@@ -76,8 +76,8 @@
     },
     {
       "path": "app/rhythm.js",
-      "sha256": "6c3b7331e9dc1bbc6989b031b70d86d276408f5e3a11309413ac7c1138cd3787",
-      "bytes": 21026
+      "sha256": "83f6a0c4534cf4f834f50b2b99a1829439c87887b0a143495d16c788f7250102",
+      "bytes": 21904
     },
     {
       "path": "app/runtime.js",
@@ -86,8 +86,8 @@
     },
     {
       "path": "app/screen.js",
-      "sha256": "8e8a5593c5f2ba3d3369db087d6a329e801088ee357504263d6af1b29f040352",
-      "bytes": 43428
+      "sha256": "6970238ce09611c7baa6b20d6652c2c16113be38f6ba578bf3bb36dcccbce6f7",
+      "bytes": 44250
     },
     {
       "path": "app/setup.css",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "d7ef7436b830f4e3918728c9c5d4877cfe5f0d18aa90c1313b026465989d2699",
+      "sha256": "797906dea75079786943cd3e625734a1912fd892eb6d3f4a3959d585180ddd80",
       "bytes": 594
     },
     {
@@ -191,13 +191,13 @@
     },
     {
       "path": "tools/launcher/watchdog.ps1",
-      "sha256": "36a1fb2fb5a2c95519f4b81a06a0f77ce9906cf9d7b8a45350ee6d35ab60549a",
-      "bytes": 16082
+      "sha256": "c2b000ec1bc3fd3476c2d7972f9cb301e7d96580333e7c7f06cc06680cbf37c5",
+      "bytes": 16985
     },
     {
       "path": "tools/launcher/win-titles.ps1",
-      "sha256": "ecce5fb67a566313b00cf326bc00229f70241f628547dc1bf6172a2e3b8745d1",
-      "bytes": 4177
+      "sha256": "43fd86db7eb7658103a282d5b0006e0a8e78a46c3b7b2ffaeed9ed01a585e544",
+      "bytes": 6321
     },
     {
       "path": "停止手机服务.bat",
