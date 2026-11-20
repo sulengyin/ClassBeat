@@ -176,7 +176,15 @@
       text = active && st.message ? st.message : "正在更新，请稍等…";
     }
     else if (state === "failed") text = "";
-    else if (state === "done") text = st.message || "更新完成。";
+    else if (state === "done") {
+      /* 跨代更新：跑着的服务还是旧代码，没有 restart 接口（canRestart
+         无此键）→ 按钮亮不起来。这时候把手动出路说清楚，别让老师
+         在面板里找按钮（真机 2026-11-20：更新到 0.3.18 后找不到重启）。 */
+      text = st.canRestart === true
+        ? (st.message || "更新完成。")
+        : "更新已完成。这一次服务还是旧程序：关掉大屏程序，再双击桌面"
+          + "图标打开就换上了；以后的更新会在这里直接给「重启服务」按钮。";
+    }
     else if (available && newLatest) text = "发现新版本 v" + newLatest + "。";
     else if (st.latest) text = "已经是最新版本。";
     else if (lg.available && lg.latest) {

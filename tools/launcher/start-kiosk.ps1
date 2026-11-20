@@ -292,6 +292,65 @@ if ($activePort -gt 0) {
   Write-Log ('端口 ' + $Port + ' 空闲，需要启动本地服务。')
 }
 
+# ---------- 2.5 服务比包旧？程序内更新只换文件不换进程 ----------
+# 更新把新版本文件写进磁盘，跑着的服务进程还是旧代码——0.3.17 之前的
+# 服务连「重启服务」接口都没有，跨代更新后面板上的按钮亮不起来
+# （真机 2026-11-20：更新到 0.3.18 后找不到重启服务）。
+# kiosk 启动时对比 /api/version 与包版本：服务旧就换新进程
+# （停旧 → 等端口释放 → 掉到下面的正常启动流程）。
+# 这样「更新完 → 关掉程序 → 双击桌面图标」就是完整重启，不用碰包内
+# 文件；开机自启的机器也会在第二天早上自动完成这次交接。
+if ($activePort -gt 0) {
+  $pkgVersion = $null
+  try {
+    $vj = Get-Content (Join-Path $root 'app\version.js') -Raw
+    if ($vj -match 'VERSION\s*=\s*"(\d+\.\d+\.\d+)"') { $pkgVersion = $Matches[1] }
+  } catch { }
+  if ($pkgVersion -ne $null) {
+    $srvVersion = $null
+    try {
+      $v = Invoke-RestMethod -Uri ('http://127.0.0.1:' + $activePort + '/api/version') -TimeoutSec 3
+      $srvVersion = [string]$v.version
+    } catch { }
+    $stale = $true
+    if ($srvVersion -match '^\d+\.\d+\.\d+$') {
+      try {
+        if ([version]$srvVersion -ge [version]$pkgVersion) { $stale = $false }
+      } catch { }
+    }   # 读不到版本号 / 不是语义版本：按旧处理，宁可多换一次
+    if ($stale) {
+      Write-Log ('服务版本 ' + $(if ($srvVersion) { $srvVersion } else { '未知' }) + ' 旧于包版本 ' + $pkgVersion + '（更新没换进程），自动重启服务…')
+      if ($DryRun) {
+        Write-Output ('[DRYRUN] 真跑时会停掉旧服务进程并按新文件重新启动（版本交接）。')
+      } else {
+        $owner = Get-PortOwner $activePort
+        if ($owner -ne $null -and $owner.Cmd -match 'rhythm_server\.py' -and $owner.Cmd -like ('*' + $root + '*')) {
+          try {
+            Stop-Process -Id $owner.Pid -Force -ErrorAction Stop
+            Write-Log ('已停旧服务进程 PID ' + $owner.Pid + '，等端口释放…')
+            $freed = $false
+            for ($i = 0; $i -lt 20; $i++) {
+              Start-Sleep -Milliseconds 500
+              if (-not (Test-PortOccupied $activePort)) { $freed = $true; break }
+            }
+            if ($freed) {
+              $activePort = 0   # 掉到下面的正常启动流程：起新服务、等就绪
+            } else {
+              Write-Log '端口 10 秒没释放，保留旧服务继续（总比没有强）。'
+            }
+          } catch {
+            Write-Log ('停旧服务进程失败：' + $_.Exception.Message + '，保留旧服务继续。')
+          }
+        } else {
+          Write-Log '端口上的服务不是本文件夹的进程，不动它；跳过自动重启。'
+        }
+      }
+    } else {
+      Write-Log ('服务版本 ' + $srvVersion + ' 与包一致，不用交接。')
+    }
+  }
+}
+
 # ---------- 3. 找 Python ----------
 function Find-Python {
   $cands = @(

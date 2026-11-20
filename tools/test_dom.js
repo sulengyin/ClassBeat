@@ -300,6 +300,14 @@ check(serverSrc.includes("canRestart") && serverSrc.includes("/api/update/restar
       && serverSrc.includes("--wait-port") && serverSrc.includes("_supervised_by_run_py"),
   "服务端：restart 路由 + canRestart 能力标记 + --wait-port 自重启");
 
+/* 跨代自愈（0.3.19）：服务比包旧时，启动器自动换新进程；面板给手动出路 */
+const kioskSrc = fs.readFileSync(path.join(ROOT, "tools/launcher/start-kiosk.ps1"), "utf8");
+check(updateSrc.includes("关掉大屏程序") && updateSrc.includes("双击桌面图标"),
+  "跨代更新：面板给手动出路指引");
+check(kioskSrc.includes("/api/version") && kioskSrc.includes("自动重启服务")
+      && kioskSrc.includes("rhythm_server"),
+  "跨代自愈：kiosk 启动检测服务比包旧并自动换新");
+
 /* boot 在加载时已跑（readyState=complete） */
 const band = document.getElementById("band");
 const hero = document.getElementById("heroMain");

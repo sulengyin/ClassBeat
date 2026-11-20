@@ -4,7 +4,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "0.3.18";
+  var VERSION = "0.3.19";
   var BUILD = "dev";
 
   root.AppVersion = {
