@@ -223,8 +223,29 @@
         return;
       }
 
-      out.push(b);
+      var copy = {};
+      for (var k in b) if (Object.prototype.hasOwnProperty.call(b, k)) copy[k] = b[k];
+      out.push(copy);
     });
+
+    /* noonBand 会把 meal/noon 块的起止重写掉；老师配置里三个分界点若
+       与块表错位（比如午间结束被拖到第一节课结束之后），重写出的午间
+       就会盖住正课——屏面 12:52 还在「午间休息、剩 48 分」就是这种
+       （真机 2026-11-20）。输出后按开始时间排序，把前块的结束夹到
+       后块的开始：宁可截短午间，也不能让正课被遮住。
+       拷贝再改，别污染老师的原配置对象。 */
+    out.sort(function (a, b) { return t2m(a.start) - t2m(b.start); });
+    for (var i = 0; i < out.length - 1; i += 1) {
+      /* 倒挂块（开始晚于结束）本身是非法脏数据，编辑面板/导入都会拦；
+         这里跳过它，别拿它的边界去截合法块。 */
+      if (t2m(out[i].end) <= t2m(out[i].start)) continue;
+      if (t2m(out[i + 1].end) <= t2m(out[i + 1].start)) continue;
+      var curEnd = t2m(out[i].end);
+      var nextStart = t2m(out[i + 1].start);
+      if (curEnd > nextStart) {
+        out[i] = Object.assign({}, out[i], { end: m2t(nextStart) });
+      }
+    }
 
     return out;
   }

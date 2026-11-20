@@ -264,6 +264,30 @@
           _ctx: { type: "reading", remain: first - minutes, dur: Math.max(first - earlyStart, 1) }
         };
       }
+      if (minutes < last) {
+        /* 两块之间的空档：作息没排到的时间，中午也可能是空档
+           （午间与第一节之间）。不能显示「放学了」——那会把全班吓到，
+           按课间对待，指向下一块（真机 2026-11-20）。 */
+        var nb = null;
+        for (var k = 0; k < t.length; k += 1) {
+          if (t2m(t[k].start) > minutes) { nb = t[k]; break; }
+        }
+        var gapRemain = nb ? t2m(nb.start) - minutes : 0;
+        return {
+          kind: "break",
+          title: (opts.texts && opts.texts.breakTitle) || "课间",
+          sub: nb && nb.type === "class" ? "下一节 " + (nb.subject || "")
+                 : (nb ? "下一节 " + (blockName(nb) || "") : ""),
+          note: "喝水、如厕，回来准备下节课",
+          meta: [], items: [],
+          countdown: countdownFor("break", gapRemain, mode, picks),
+          clock: m2t(minutes),
+          _next: nb ? prepNext(nb) : null,
+          _ctx: { type: "break", remain: gapRemain,
+                  dur: Math.max(gapRemain, 1),
+                  next: nb ? { type: nb.type, name: nb.name, subject: nb.subject } : null }
+        };
+      }
       return {
         kind: "closed",
         title: stageText(opts, "closed", "title", "放学了"),
@@ -282,7 +306,8 @@
                  clock: m2t(minutes), range: b.start + "–" + b.end,
                  _ctx: { type: b.type, remain: remain, dur: t2m(b.end) - t2m(b.start),
                          start: b.start, end: b.end, index: i,
-                         next: t[i + 1] ? { type: t[i + 1].type, name: t[i + 1].name } : null } };
+                         next: t[i + 1] ? { type: t[i + 1].type, name: t[i + 1].name,
+                                            subject: t[i + 1].subject } : null } };
 
     if (b.type === "reading") {
       var firstClass = t.filter(function (x) { return x.type === "class"; })[0];
@@ -359,10 +384,12 @@
   }
 
   /* 倒计时后面接的是什么，文案要说对：
-     "还有 3 分钟" 后面可能是上课，也可能是课间（午间之后就是课间）。 */
+     "还有 3 分钟" 后面可能是上课，也可能是课间（午间之后就是课间）。
+     正课要带课名（真机 2026-11-20：午间收尾只剩「0:48 后上课」，
+     老师不知道下一节是什么课），别的块有名字就带名字。 */
   function nextLabelOf(n) {
     if (!n) return "";
-    if (n.type === "class") return "后上课";
+    if (n.type === "class") return n.subject ? "后上" + n.subject + "课" : "后上课";
     if (n.type === "break") return "后课间";
     if (n.type === "meal") return "后午餐";
     if (n.type === "after") return "后课后服务";

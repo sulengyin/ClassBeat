@@ -609,6 +609,44 @@ check(bdTask.indexOf(bdNext.prep.items[0]) >= 0, "倒计时下仍列出要带的
 check(parseFloat(document.getElementById("heroTask").style.fontSize) >= 6,
   "倒计时下用品字够大，不是小字",
   document.getElementById("heroTask").style.fontSize);
+/* 真机反馈 2026-11-20：倒计时只有「后上课」不带课名，老师不知道下一节是什么 */
+check(document.getElementById("heroSub").textContent.indexOf(bdNext.subject) >= 0,
+  "倒计时文案带课名：后上X课",
+  document.getElementById("heroSub").textContent);
+
+/* 真机反馈 2026-11-20：noonBand 三个分界点与块表错位（午间结束被拖到
+   第一节结束之后）时，重写出的午间会盖住正课——引擎输出后要把前块
+   夹到后块的开始，宁可截短午间也不能遮住课。 */
+global.__rhythmDate = "2026-11-09";
+global.__rhythmTime = 12 * 60 + 52;
+/* 12:52 的下一节是下午第一节（不是上午的 mon1），从当天 timeline 动态取 */
+const pmFirst = global.Runtime.day("2026-11-09").timeline
+  .filter(b => b.type === "class" && b.start >= "13:00")[0].subject;
+const ttShift = JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable));
+ttShift.noonBand.noonEnd = "13:40";   /* 午间一直拖到第一节结束 */
+global.Runtime.patch({ timetable: ttShift });
+Screen.render();
+check(document.getElementById("bandText").textContent === "课间"
+      && document.getElementById("after").textContent.indexOf(pmFirst) >= 0,
+  "午间结束错拖到 13:40 时不得盖住第一节（12:52 已是课间、指向下一节）",
+  document.getElementById("bandText").textContent + " / "
+  + document.getElementById("after").textContent);
+global.Store.resetConfig();
+
+/* 两块之间的空档（比如午间与第一节之间没排课间）不能显示「放学了」，
+   按课间对待，指向下一块。 */
+const ttGap = JSON.parse(JSON.stringify(window.RHYTHM_DATA.timetable));
+ttGap.blocks = ttGap.blocks.filter(b => !(b.type === "break" && b.start === "12:50"));
+global.Runtime.patch({ timetable: ttGap });
+Screen.render();
+check(document.getElementById("bandText").textContent === "课间"
+      && heroText().indexOf("放学") < 0,
+  "块间空档按课间显示，不是「放学了」",
+  document.getElementById("bandText").textContent + " / " + heroText());
+check(document.getElementById("after").textContent.indexOf(pmFirst) >= 0,
+  "空档写清下一节是什么课", document.getElementById("after").textContent);
+global.Store.resetConfig();
+Screen.render();
 
 /* 真机反馈 2026-11-20：大课间提示语的三条规则。
    ① 准备窗口（上课前十分钟）起提示语整体让位，不再拼在「下一节」后面；
