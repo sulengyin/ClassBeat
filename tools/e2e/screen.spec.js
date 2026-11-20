@@ -37,8 +37,10 @@ test("主标题用 vmin 撑满，没被小屏压成小字", async ({ page }) => 
       text: el.textContent.trim(),
     };
   });
-  // 远看清：主标题至少占短边的 12%
-  expect(data.size, `字号 ${data.size}px / 短边 ${data.side}px`).toBeGreaterThan(data.side * 0.12);
+  // 远看清：主标题至少占短边的一成多。晨间大字进了贴纸卡（PR #20），
+  // 单行字号封顶 CARD_W/字数（6 字标题 = 11.67vmin），设计下限是
+  // READING_ONE=10vmin——阈值跟着放到 0.11，再小就是真的被压塌了。
+  expect(data.size, `字号 ${data.size}px / 短边 ${data.side}px`).toBeGreaterThan(data.side * 0.11);
 });
 
 test("深色模式是纯黑底、白字", async ({ page }) => {

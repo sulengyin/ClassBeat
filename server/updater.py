@@ -610,7 +610,7 @@ class UpdateManager:
             self.current_version = manifest["version"]
             self._trim_backups()
             self._set("done", 100,
-                      "已更新到 v%s，重启后完全生效" % manifest["version"], "")
+                      "已更新到 v%s，点「重启服务」立即生效" % manifest["version"], "")
             return self.status()
 
         except Exception as e:

@@ -28,6 +28,12 @@ async function openScreen(page, at) {
     errors.push("console: " + text);
   });
   if (at) await page.clock.install({ time: new Date(at) });
+  // 0.3.13 的首次引导只弹一次（记 cb-guide-v1）。e2e 每个用例都是全新
+  // 上下文，不预置的话引导层会挡住后面所有点击；引导本身有 test_dom 盯着，
+  // 这里假定「老师已经看过一遍」。
+  await page.addInitScript(() => {
+    try { localStorage.setItem("cb-guide-v1", "1"); } catch (e) { /* 隐私模式就算了 */ }
+  });
   await page.goto(SCREEN_PATH);
   // 用 Playwright 自己的轮询，不用页内 waitForFunction：
   // 时钟被 fake 之后，页内的定时器/Raf 都不走了，页内轮询会一直等下去。

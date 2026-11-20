@@ -18,6 +18,7 @@
   var latest = "";       /* 更新源报上来的新版本号 */
   var migrateOn = false; /* 是否在提示「旧地址的设置可以导过来」 */
   var timer = null;
+  var restarting = false; /* 「重启服务」已点下，等服务回来就整页重载 */
 
   /* 「版本与更新」面板的共享状态：大屏弹层和设置页共用一份。 */
   var ui = {
@@ -157,14 +158,15 @@
     var lg = ui.legacy || {};
     var state = st.state || "idle";
     var single = ui.single || st.selfUpdate === false;
-    var busy = !!ui.busy || !!st.busy;
+    var busy = !!ui.busy || !!st.busy || restarting;
     var version = st.version || st.currentVersion || V.version || "";
     var newLatest = st.latest || lg.latest || "";
     var available = st.available === true || (st.available === undefined && lg.available === true);
     var progress = Math.max(0, Math.min(100, Number(st.progress) || 0));
 
     var text = "";
-    if (ui.checking) text = "正在检查更新…";
+    if (restarting) text = "服务重启中，马上回来…";
+    else if (ui.checking) text = "正在检查更新…";
     else if (single) text = st.blockedReason
       || "这是单文件版，不能自己更新；请到下载页获取新版。";
     else if (busy) {
@@ -186,7 +188,9 @@
 
     var showBar = busy || state === "downloading" || state === "installing"
       || state === "verifying" || state === "rolling_back";
-    var restart = state === "done" && !busy;
+    /* 只有服务进程自己认得 /api/update/restart（canRestart 标记）才亮按钮：
+       程序内更新后跑着的还是旧代码，它没有这个接口，点了只会 404。 */
+    var restart = state === "done" && !busy && st.canRestart === true;
 
     return {
       version: version,
@@ -221,7 +225,7 @@
     part.error.textContent = vm.error;
     part.error.hidden = !vm.error;
 
-    part.restart.textContent = "更新已完成，需要重启服务才完全生效。";
+    part.restart.textContent = "重启服务，立即生效";
     part.restart.hidden = !vm.restart;
 
     part.check.hidden = !vm.canCheck;
@@ -265,7 +269,9 @@
     part.barWrap.appendChild(part.bar);
     part.notes = make("p", "up-notes");
     part.error = make("p", "up-error");
-    part.restart = make("p", "up-restart");
+    part.restart = make("button", "setup-btn primary", "重启服务，立即生效");
+    part.restart.type = "button";
+    part.restart.setAttribute("data-act", "restart");
     part.acts = make("div", "up-acts");
 
     part.check = make("button", "setup-btn ghost", "检查更新");
@@ -285,6 +291,7 @@
     part.check.addEventListener("click", function () { doAction("check"); });
     part.apply.addEventListener("click", function () { doAction("apply"); });
     part.rollback.addEventListener("click", function () { doAction("rollback"); });
+    part.restart.addEventListener("click", function () { doRestart(); });
 
     part.acts.appendChild(part.check);
     part.acts.appendChild(part.apply);
@@ -344,6 +351,62 @@
     });
   }
 
+  // ---------------------------------------------------------------- 重启服务
+
+  /* 更新完成后把新代码真正跑起来的最后一步。服务重启期间端口会
+     短暂失联：每秒探一次 /api/version，回来就整页重载加载新 UI。
+     超时（45 秒）就停手，告诉老师手动出路，不再干等。 */
+  function doRestart() {
+    if (ui.inflight || restarting) return;
+    ui.inflight = true;
+    restarting = true;
+    ui.error = "";
+    render();
+    ajax("/api/update/restart", "POST").then(function (res) {
+      ui.inflight = false;
+      if (!res.ok) {
+        restarting = false;
+        ui.error = (res.data && (res.data.error || res.data.message))
+          || "重启没成功，请稍后再试。";
+        render();
+        return;
+      }
+      waitServerBack(Date.now() + 45000);
+    }).catch(function () {
+      ui.inflight = false;
+      restarting = false;
+      ui.error = "重启没成功，请确认本机服务在运行后再试。";
+      render();
+    });
+  }
+
+  function waitServerBack(deadline) {
+    var base = originBase();
+    if (!base || !root.fetch) { giveUpRestart(); return; }
+    root.fetch(base + "/api/version", { cache: "no-store" })
+      .then(function (r) {
+        if (r && r.ok) {
+          /* 新服务站稳一下再整页重载，别抢在它回话之前 */
+          root.setTimeout(function () { root.location.reload(); }, 800);
+          return;
+        }
+        retryWait(deadline);
+      })
+      .catch(function () { retryWait(deadline); });
+  }
+
+  function retryWait(deadline) {
+    if (Date.now() > deadline) { giveUpRestart(); return; }
+    root.setTimeout(function () { waitServerBack(deadline); }, 1000);
+  }
+
+  function giveUpRestart() {
+    restarting = false;
+    ui.error = "服务重启没等到回音：等半分钟刷新一次页面；"
+      + "还不行就关掉程序，双击桌面图标重新打开。";
+    render();
+  }
+
   // ---------------------------------------------------------------- 刷新
 
   function reachable() {
@@ -363,7 +426,7 @@
   }
 
   function refresh() {
-    if (ui.refreshing) return;
+    if (ui.refreshing || restarting) return;
     ui.refreshing = true;
     Promise.all([
       ajax("/api/update/status").catch(function () { return null; }),

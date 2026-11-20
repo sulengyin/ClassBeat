@@ -106,7 +106,7 @@
         if (document.visibilityState === "hidden") tick();
       });
     } catch (e) { /* 没有 document：测试环境，忽略 */ }
-    if (mode === "http") bootRestore();
+    if (mode === "http" && !skipRestore()) bootRestore();
   }
 
   /* 本地班名（当前 origin 里生效的配置；空壳/样例包也有班名） */
@@ -126,7 +126,15 @@
        本机有快照 且 快照班名 ≠ 当前 origin 的班名
          → 说明这个 origin 不是老师配过的那份 → 静默恢复最新快照 → 刷新。
        班名一致（就是这个 origin 自己的配置）→ 一个字都不动。
-     恢复后 backup 循环会把配置写进新 origin，以后再漂移也照样能回来。 */
+     恢复后 backup 循环会把配置写进新 origin，以后再漂移也照样能回来。
+     ?nosync=1（测试把浏览器时钟钉死时）豁免：e2e 的页面都是全新
+     origin，服务端快照是上一轮测试留下的别的班名——不豁免的话，
+     开机 2 秒后页面会被静默恢复 + 刷新，打断正在跑的用例。 */
+  function skipRestore() {
+    try { return new URLSearchParams(root.location.search).get("nosync") === "1"; }
+    catch (e) { return false; }
+  }
+
   function bootRestore() {
     root.setTimeout(function () {
       list(function (items) {

@@ -57,6 +57,11 @@ PORT_SPAN = 10          # 8765 被别的软件占了就往后找，最多到 877
 
 CONF = {"port": DEFAULT_PORT, "klass": ""}
 
+# 服务自重启（0.3.17）用的两块小状态：SERVER 留着本进程的 HTTPServer
+# 引用（退出时 shutdown），RESTARTING 防止按钮连点拉起好几个副本。
+SERVER = {"srv": None}
+RESTARTING = {"on": False}
+
 # 自动更新只动程序文件，data/、assets/、server/messages.json 永远不碰。
 INSTALL_ROOT = os.path.abspath(os.path.join(BASE, ".."))
 UPDATER = None
@@ -267,6 +272,77 @@ def watchdog_handover():
             _wlog("新看门狗启动失败（不影响服务）：" + str(e))
     except Exception as e:
         _wlog("看门狗交接检查失败（不影响服务）：" + str(e))
+
+
+# ---------------------------------------------------------------- 服务自重启
+# 程序内更新只换了磁盘上的文件，跑着的还是旧代码。「重启服务」按钮就是
+# 把这一步交给老师：新进程用新代码接回同一个端口，大屏自动重载。
+
+def _supervised_by_run_py():
+    """本进程是不是 run.py 守护的孩子。
+
+    run.py 拉起服务后会在服务退出时按退出码决定要不要再拉（0 = 不拉）。
+    守护模式下让守护自己干重启这件事，别自作主张再 spawn 一个——
+    否则守护 3 秒后拉起的和孩子自己 spawn 的会抢同一个端口。
+    靠查父进程命令行认；父进程已不在（孤儿）就当没有守护。
+    """
+    if os.name != "nt":
+        return False
+    try:
+        ps = (
+            "$ErrorActionPreference='SilentlyContinue';"
+            "$me=Get-CimInstance Win32_Process -Filter 'ProcessId=%d';"
+            "if (-not $me) { 'no'; exit };"
+            "$pa=Get-CimInstance Win32_Process -Filter ('ProcessId='+$me.ParentProcessId);"
+            "if ($pa -and $pa.CommandLine -match 'run\\.py') { 'yes' } else { 'no' }"
+            % os.getpid()
+        )
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True, text=True, timeout=30,
+            creationflags=0x08000000,
+        )
+        return (r.stdout or "").strip() == "yes"
+    except Exception:
+        return False
+
+
+def _restart_server():
+    """重启服务的实际动作，在后台线程里跑（先把响应发回给页面）。
+
+    守护模式：以非零码退出，run.py 3 秒后用新代码拉起（退出码 0 守护会
+    收摊不拉，所以必须是 3）。
+    直启模式（start-kiosk / 手动）：没人拉我们，自己先拉起一个带
+    --wait-port 的副本——它在首端口上等本进程释放，接回同一个端口；
+    然后本进程正常退出。
+    任何一步失败都留在原地继续跑，总比黑屏强。
+    """
+    time.sleep(0.3)
+    try:
+        if _supervised_by_run_py():
+            _wlog("服务重启：守护模式下退出（code 3），交给守护进程换新代码拉起。")
+            os._exit(3)
+        args = [sys.executable, os.path.abspath(sys.argv[0])] + list(sys.argv[1:])
+        if "--wait-port" not in args:
+            args += ["--wait-port", "20"]
+        # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP：不继承控制台，
+        # python.exe / pythonw.exe 起出来都不带黑窗
+        flags = 0x00000008 | 0x00000200 if os.name == "nt" else 0
+        subprocess.Popen(
+            args, cwd=INSTALL_ROOT, creationflags=flags,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        _wlog("服务重启：新进程已拉起（--wait-port 20），本进程退出。")
+    except Exception as e:
+        _wlog("服务重启失败，本进程继续运行：" + str(e))
+        RESTARTING["on"] = False
+        return
+    srv = SERVER.get("srv")
+    if srv is not None:
+        threading.Thread(target=srv.shutdown, daemon=True).start()
+    else:
+        time.sleep(0.5)
+        os._exit(0)
 
 
 def _backup_path(day):
@@ -856,6 +932,10 @@ class Handler(BaseHTTPRequestHandler):
             # 只回本机信息，不回更新源地址。
             st = updater_manager().status()
             st["ok"] = True
+            # 能力标记（0.3.17）：这个进程认不认 /api/update/restart。
+            # 程序内更新后磁盘是新的、跑着的还是旧代码——旧进程没有这个键，
+            # 页面就藏起「重启服务」按钮，免得点了 404。
+            st["canRestart"] = True
             ver = app_version()
             st["version"] = ver["version"]
             st["build"] = ver["build"]
@@ -1178,6 +1258,17 @@ class Handler(BaseHTTPRequestHandler):
             _remote_clear(ok, why)
             return self._json({"ok": True})
 
+        if route == "/api/update/restart":
+            # 只动本机服务进程，只允许本机操作
+            if not self._loopback():
+                return self._err("只接受本机操作", 403)
+            if RESTARTING["on"]:
+                return self._json({"ok": True, "message": "已经在重启了"})
+            RESTARTING["on"] = True
+            threading.Thread(target=_restart_server, daemon=True).start()
+            return self._json({"ok": True, "message": "服务重启中，端口会短暂失联"},
+                              202)
+
         if route in ("/api/update/check", "/api/update/apply", "/api/update/rollback"):
             # 会改本机文件，只允许在本机操作；手机端推送更新留到后面的阶段。
             if not self._loopback():
@@ -1291,19 +1382,36 @@ class _Server(ThreadingHTTPServer):
     allow_reuse_address = os.name != "nt"
 
 
-def bind_server(host, port, span=PORT_SPAN):
+def bind_server(host, port, span=PORT_SPAN, wait=0):
     """从 port 起找一个能绑的端口，返回 (server, 实际端口)。
 
     教室电脑上「8765 已经被别的软件占了」并不少见（装了各种教学软件）。
     被占就往后挪一个，总比双击后一闪就没强；真的全被占才抛错。
     只吞「地址被占用」，端口越界、没权限这类错误照旧抛出去。
+
+    wait>0 时先在首端口上等这么久再顺延：服务自重启（0.3.17）的场景里，
+    端口是被「正在退出的自己」占着的，新副本要接回同一个端口——
+    一被占就顺延的话，大屏按老端口找过来就扑空了。
     """
     last = None
-    for p in range(port, port + max(1, span)):
+    deadline = time.time() + max(0.0, wait)
+    while True:
+        try:
+            srv = _Server((host, port), Handler)
+            srv.daemon_threads = True
+            # 传 0 时由系统分配，回报真实端口而不是 0
+            return srv, srv.server_address[1]
+        except OSError as e:
+            if not _addr_in_use(e):
+                raise
+            last = e
+        if time.time() >= deadline:
+            break
+        time.sleep(0.4)
+    for p in range(port + 1, port + max(1, span)):
         try:
             srv = _Server((host, p), Handler)
             srv.daemon_threads = True
-            # 传 0 时由系统分配，回报真实端口而不是 0
             return srv, srv.server_address[1]
         except OSError as e:
             if not _addr_in_use(e):
@@ -1398,6 +1506,8 @@ def main():
                     help="更新自检的 JSON 地址（校内共享盘/内网静态站）；不填就不查")
     ap.add_argument("--update-interval", dest="update_interval", type=int, default=1800,
                     help="多久查一次更新，秒；默认 30 分钟")
+    ap.add_argument("--wait-port", dest="wait_port", type=int, default=0,
+                    help="首端口被占时先等几秒再顺延（服务自重启用）；默认不等")
     a = ap.parse_args()
 
     UPDATE["url"] = (a.update_url or os.environ.get("CLASSBEAT_UPDATE_URL", "")
@@ -1410,8 +1520,9 @@ def main():
     CONF["klass"] = a.klass or detect_class()
     load_messages()
 
-    srv, port = bind_server(a.host, a.port)
+    srv, port = bind_server(a.host, a.port, wait=a.wait_port)
     CONF["port"] = port
+    SERVER["srv"] = srv
 
     # 过期看门狗自动交接（0.3.16）：后台线程做，别拖慢服务启动
     threading.Thread(target=watchdog_handover, daemon=True).start()

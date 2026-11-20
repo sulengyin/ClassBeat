@@ -1884,6 +1884,53 @@ confirm 弹窗），"全屏"的正解是启动载体（桌面图标→大屏全�
 **测试**：py_compile + 本机 PS 检测脚本冒烟（无看门狗时空输出）；
 PowerShell tool 验证 CIM/StartTime 查询可用。版本 0.3.16。
 
+### 2.56 更新面板一键「重启服务」（2026-11-20，老师问"退出再开算重启吗"）
+
+**背景**：老师问"点更新后提示需要重启，点退出再打开是否等于重启？"
+——不等价：退出程序特意保留服务，服务旧进程仍在跑旧代码；正确做法
+是「停止手机服务.bat」→ 桌面图标重开，但这违反了"不让用户碰包内
+文件"的原则。确认要做：更新面板里直接给「重启服务」按钮。
+
+**难点**：程序内更新后磁盘文件是新的、**跑着的还是旧代码**——旧进程
+没有 /api/update/restart 这个路由，点了只会 404。靠能力探测解决：
+`/api/update/status` 带 `canRestart: true`，旧进程没这个键 → 页面
+藏按钮；0.3.17+ 的进程有 → 按钮亮。跨代只此一次手动重开。
+
+**做法**：
+
+- **bind_server 加 wait 参数**（rhythm_server.py）：自重启场景端口是
+  "正在退出的自己"占的，新副本带 `--wait-port 20` 先在首端口上等
+  本进程释放，再轮询 0.4s 重试；等满才走原端口顺延——防止重启后
+  端口漂移、大屏按老端口找过来扑空。
+- **_restart_server（后台线程）**：先判 `_supervised_by_run_py()`
+  （PowerShell 查父进程命令行含 run.py）——守护模式下以 code 3 退出
+  （0 = 正常收摊守护不拉，必须非零），守护 3 秒后用新代码拉起；
+  直启模式自己 spawn 副本（sys.executable + sys.argv + --wait-port，
+  DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP 不弹黑窗），再
+  srv.shutdown() 正常退出。任何失败留在原地继续跑。
+- **POST /api/update/restart**：loopback 门禁；RESTARTING 防连点；
+  响应先行（202），动作在 daemon 线程。
+- **update.js**：part.restart 从 <p> 改成 primary 按钮；点击后
+  "服务重启中，马上回来…"，每秒探 /api/version，回来 0.8s 后整页
+  reload 加载新 UI；45s 超时给出手动出路（关掉程序双击桌面图标）。
+  restarting 期间 refresh() 让路，按钮全隐藏。
+- updater.py 完成文案改"点「重启服务」立即生效"。
+
+**测试**：test_dom 源码断言（canRestart / restart 路由 / 按钮文案）；
+py_compile；test_updater 全绿。版本 0.3.17。
+
+**顺手修的两个 e2e 稳定性问题**（全量跑测时暴露）：
+
+- screen.spec 的 vmin 阈值 0.12 是贴纸卡布局（PR #20，CARD_W=70）之前
+  定的——6 字晨间标题单行封顶 70/6=11.67vmin，永远差一点。阈值放到
+  0.11（设计下限 READING_ONE=10vmin 之上），"没被压塌"的守卫还在。
+- 11-19 的开机自动恢复（backup.js bootRestore）会在开机 2 秒后比对
+  服务端快照班名，不同就静默恢复 + reload。e2e 页面都是全新 origin，
+  快照是上一轮测试留下的别的班名 → soak 用例跑到一半页面被刷新，
+  evaluate 报 "context destroyed"，其它用例也偶发被搅。给 ?nosync=1
+  （测试钉钟模式）豁免 bootRestore；真机行为不变。
+- 本机全量 87/87 通过。
+
 ### 2.36 把包发出去：Release 资产（BUILDING 2026-11-09）
 
 **问题**：P5 做完后，老师已经能自己配班，但「怎么拿到这个包」仍然只有两条路——clone 仓库跑 `package.py`，或者等制作者私发 zip。仓库里 `dist/` 是 gitignore 的，公开仓库只有源码和 `sample/`。

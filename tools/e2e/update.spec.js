@@ -31,6 +31,7 @@ function status(over) {
     notes: "",
     publishedAt: "",
     selfUpdate: true,
+    canRestart: true,
     downloadPage: DOWNLOAD,
     hasBackup: false,
     last: {},
@@ -41,7 +42,7 @@ async function mock(page, state) {
   await page.route("**/api/update", (route) =>
     route.fulfill({ json: { ok: true, available: false, latest: "" } }));
   await page.route("**/api/update/status", (route) => route.fulfill({ json: state.value }));
-  for (const act of ["check", "apply", "rollback"]) {
+  for (const act of ["check", "apply", "rollback", "restart"]) {
     await page.route(`**/api/update/${act}`, (route) =>
       route.fulfill({ status: 202, json: { ok: true, state: "starting", message: "已开始" } }));
   }
@@ -110,7 +111,8 @@ test("更新中：进度自动刷新，完成后提示要重启服务", async ({
   await expect(page.locator('#updateBody [data-act="check"]')).toBeHidden();
   await expect(page.locator('#updateBody [data-act="apply"]')).toBeHidden();
 
-  /* 不做任何点击，只把服务端状态改成完成，等页面自己轮询到。 */
+  /* 不做任何点击，只把服务端状态改成完成，等页面自己轮询到。
+     第一次不给 canRestart：旧进程没有 restart 能力，按钮必须藏着。 */
   state.value = status({
     state: "done",
     progress: 100,
@@ -118,9 +120,32 @@ test("更新中：进度自动刷新，完成后提示要重启服务", async ({
     latest: "0.2.2",
     available: false,
     hasBackup: true,
+    canRestart: false,
   });
-  await expect(page.locator("#updateBody .up-restart")).toBeVisible({ timeout: 8000 });
-  await expect(page.locator("#updateBody .up-restart")).toContainText("重启服务");
+  await expect(page.locator("#updateBody [data-act=\"restart\"]")).toBeHidden({ timeout: 8000 });
+
+  /* 服务报告自己认得 restart 路由（0.3.17+ 进程）：按钮亮起；
+     点下后轮询 /api/version，服务一回来就整页重载加载新 UI。 */
+  state.value.canRestart = true;
+  let versionPolled = 0;
+  await page.route("**/api/version", (route) => {
+    versionPolled += 1;
+    return route.fulfill({ json: { ok: true, version: "0.2.2", build: "", startedAt: "" } });
+  });
+  await expect(page.locator("#updateBody [data-act=\"restart\"]")).toBeVisible({ timeout: 8000 });
+  await expect(page.locator("#updateBody [data-act=\"restart\"]")).toContainText("重启服务");
+  await page.locator('#updateBody [data-act="restart"]').click();
+  await expect(page.locator("#updateBody .up-state")).toContainText("服务重启中");
+  await expect.poll(() => versionPolled, { timeout: 15000 }).toBeGreaterThan(0);
+  /* 整页重载的可靠证据：mock 在导航后仍返回 done——同一页面里
+     "服务重启中"唯一的退场方式就是重载后重新 mount 拉到 done 态，
+     按钮也会重新亮起来。 */
+  await expect(page.locator("#updateBody .up-state"))
+    .toContainText("已更新到 v0.2.2。", { timeout: 15000 });
+  /* 重载后面板是关着的（模态状态不跨刷新保留）；重新打开，
+     done 态 + 服务支持重启 → 按钮应再次亮起。 */
+  await openPanel(page);
+  await expect(page.locator("#updateBody [data-act=\"restart\"]")).toBeVisible();
 
   expect(errors, "控制台不应有报错").toEqual([]);
 });
@@ -152,7 +177,7 @@ test("失败可回滚：给一句原因，点回滚后自动刷新到完成", as
     hasBackup: false,
   });
   await rollback.click();
-  await expect(page.locator("#updateBody .up-restart")).toBeVisible({ timeout: 8000 });
+  await expect(page.locator("#updateBody [data-act=\"restart\"]")).toBeVisible({ timeout: 8000 });
   await expect(page.locator("#updateBody .up-state")).toContainText("回到 v0.2.1");
   await expect(page.locator("#updateBody .up-error")).toBeHidden();
 

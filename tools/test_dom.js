@@ -290,6 +290,16 @@ global.fetch = realFetch;
 Update._renderTip();
 check(!updThrew && tipEl.hidden === true, "断网检查更新不抛错、不弹提示");
 
+/* 一键重启服务（0.3.17）：按钮只在服务认得 restart 路由时亮 */
+const updateSrc = fs.readFileSync(path.join(ROOT, "app/update.js"), "utf8");
+const serverSrc = fs.readFileSync(path.join(ROOT, "server/rhythm_server.py"), "utf8");
+check(updateSrc.includes("/api/update/restart") && updateSrc.includes("重启服务，立即生效")
+      && updateSrc.includes("canRestart") && updateSrc.includes("waitServerBack"),
+  "更新面板：重启按钮走能力探测 + 轮询恢复");
+check(serverSrc.includes("canRestart") && serverSrc.includes("/api/update/restart")
+      && serverSrc.includes("--wait-port") && serverSrc.includes("_supervised_by_run_py"),
+  "服务端：restart 路由 + canRestart 能力标记 + --wait-port 自重启");
+
 /* boot 在加载时已跑（readyState=complete） */
 const band = document.getElementById("band");
 const hero = document.getElementById("heroMain");
