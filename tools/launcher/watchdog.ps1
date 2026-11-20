@@ -301,6 +301,7 @@ if (-not $NoFirstScreen -and -not (Test-ShutdownOrLogoff) -and -not (Test-AppWin
 }
 
 $fired = @{}
+$tries = @{}   # 每个时段置前失败的次数：失败≠老师拒绝，可以再试
 $lastCacheKey = ''
 $moments = $null
 $lastSkipReason = ''
@@ -333,6 +334,7 @@ while ($true) {
       $moments = Get-CBPopMoments -Info $info -ForDay $today
       $lastCacheKey = $cacheKey
       $fired.Clear()
+      $tries.Clear()
       if ($moments -eq $null) {
         Write-Log '作息快照解析失败（没有 backups/config 或格式不对），今天不自动弹屏。'
       } elseif ($moments.Count -eq 0) {
@@ -359,17 +361,30 @@ while ($true) {
       }
     }
     if ($due -ne $null) {
-      $fired[$due.Key] = $true
-      if ($fired.Count -gt 120) { $fired.Clear() }   # 换天/异常多的兜底，防内存涨
       $present = Test-AppWindow
       if ($present) {
         $ok = Show-CBWindowByTitle -Pattern $TitlePattern
         if ($ok) {
+          $fired[$due.Key] = $true
+          if ($fired.Count -gt 120) { $fired.Clear() }   # 换天/异常多的兜底，防内存涨
           Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：大屏已在，已带到前台（本时段只提醒这一次）。')
         } else {
-          Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：大屏已在，置前没成功（前台锁），不影响页面内容。')
+          # 置前没成功不等于老师拒绝：PPT 放映 / 希沃白板全屏占前台时
+          # 第一轮常被前台锁拒掉（真机反馈 2026-11-20：课间/眼保健操
+          # 没跳出来）。本时段内最多再试 2 次，仍失败才记「放弃」，
+          # 还是按“每个时段只提醒一次”算，不打扰第二轮。
+          $n = [int]$tries[$due.Key] + 1
+          $tries[$due.Key] = $n
+          if ($n -ge 3) {
+            $fired[$due.Key] = $true
+            Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：置前 3 次都没成功（前台锁），本时段不再打扰。')
+          } else {
+            Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：置前没成功（前台锁），稍后重试（第 ' + $n + ' 次）。')
+          }
         }
       } else {
+        $fired[$due.Key] = $true
+        if ($fired.Count -gt 120) { $fired.Clear() }
         Write-Log ('提醒时段 ' + $due.Start + '-' + $due.End + '（' + $due.Name + '）：大屏不在，拉起（本时段只提醒这一次）。')
         Start-KioskHidden
       }

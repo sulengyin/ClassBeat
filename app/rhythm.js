@@ -393,13 +393,28 @@
     }
 
     var remain = ctx.remain || 0;
+    var picks = (opts && opts.cdPicks) || null;
+    var hasPick = !!(picks && Object.prototype.hasOwnProperty.call(picks, kind));
     var closing = isEyeExercise(card) ? 0 : (CLOSING[kind] || 0);
 
-    /* 三档全局开关：关掉就一律不切；全开就从进入这一段就开始倒计时 */
-    if (mode === "off") closing = 0;
+    /* 三档全局开关：关掉就一律不切；全开就从进入这一段就开始倒计时。
+       有逐段勾选时三档让位（勾选优先级更高，见 countdownFor）。 */
+    if (mode === "off" && !hasPick) closing = 0;
     if (mode === "all" && closing) closing = ctx.dur;
 
-    if (closing && remain <= closing) {
+    /* 老师逐段勾选（0.3.14 弹窗）：勾了就按 CD 窗口出倒计时，去勾就
+       连收尾倒计时一起静音。此前 card.countdown 算完没有消费方，
+       弹窗一直是「落盘不生效」——真机反馈 2026-11-20 才发现。 */
+    if (hasPick) {
+      if (card.countdown && card.countdown.visible) {
+        card.focus = "countdown";
+        card.timer = mmss(remain);
+        card.nextLabel = nextLabelOf(ctx.next);
+        /* 收尾只用琥珀，不用红——红留给老师手动发的紧急通知 */
+        if (card.tone === "green") card.tone = "amber";
+        card.hints = [];
+      }
+    } else if (closing && remain <= closing) {
       card.focus = "countdown";
       card.timer = mmss(remain);
       card.nextLabel = nextLabelOf(ctx.next);

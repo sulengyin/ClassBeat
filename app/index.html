@@ -316,6 +316,15 @@ body[data-focus="countdown"] .hero-main{color:var(--accent)}
   animation:after-in .5s var(--e-out) .06s backwards;
 }
 .after:empty{display:none}
+
+/* 时段提示语的上方位：倒计时接管主视觉时，提示语上移到数字上方
+   （贴着顶栏时段标签），不再垫在主视觉下面。平时为空不占位。 */
+.stage-tip{
+  position:relative;z-index:1;
+  font-size:4.2vmin;font-weight:700;color:var(--card-ink);
+  margin:0 0 1vmin;line-height:1.4;max-width:104vmin;
+}
+.stage-tip:empty{display:none}
 @keyframes after-in{from{opacity:0;transform:translateY(1vmin)}to{opacity:1;transform:none}}
 
 /* 晨间那句「戴好红领巾…」有时是正文（提醒贴纸与它重复时贴纸不出现），
@@ -1000,6 +1009,7 @@ body[data-demo="1"] .corner{bottom:8.6vmin}
 
   <div class="spine" id="spine"></div>
   <div class="band" id="band"><span class="dot"></span><span id="bandText"></span></div>
+  <p class="stage-tip" id="stageTip"></p>
   <h1 class="hero"><span class="hero-main" id="heroMain"></span><span class="hero-sub" id="heroSub"></span></h1>
   <p class="hero-task" id="heroTask"></p>
   <div class="after" id="after"></div>

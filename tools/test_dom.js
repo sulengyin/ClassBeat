@@ -127,7 +127,7 @@ const document = {
 const BTN_IDS = new Set(["warn-title", "btn-help", "btn-min", "btn-exit",
   "exitCancel", "exitGo", "guideSkip", "guideNext", "helpClose", "helpCloseBtn", "helpPhone",
   "cdAuto", "cdDone"]);
-["cls", "date", "clock", "sec", "main", "band", "bandText", "spine", "heroMain", "heroSub", "heroTask", "after", "chips",
+["cls", "date", "clock", "sec", "main", "band", "bandText", "stageTip", "spine", "heroMain", "heroSub", "heroTask", "after", "chips",
  "duty", "dutyDetail", "warn", "warn-title", "warn-text", "corner", "menu",
  "btn-cd", "btn-full", "btn-reduce", "btn-edit", "btn-gear", "btn-demo", "btn-theme", "btn-phone",
  "btn-update", "update-dot", "btn-help", "btn-min", "btn-exit",
@@ -601,6 +601,51 @@ check(bdTask.indexOf(bdNext.prep.items[0]) >= 0, "倒计时下仍列出要带的
 check(parseFloat(document.getElementById("heroTask").style.fontSize) >= 6,
   "倒计时下用品字够大，不是小字",
   document.getElementById("heroTask").style.fontSize);
+
+/* 真机反馈 2026-11-20：大课间提示语的三条规则。
+   ① 准备窗口（上课前十分钟）起提示语整体让位，不再拼在「下一节」后面；
+   ② 倒计时接管主视觉时提示语上移到数字上方（#stageTip）；
+   ③ 逐段勾选倒计时真正接管显示（0.3.14 弹窗的债：card.countdown 无人消费）。 */
+const ritualTip = (global.Runtime.day("2026-11-05").timeline
+  .filter(b => b.type === "ritual")[0] || {}).tip || "";
+check(ritualTip !== "", "夹具里有大课间提示语可用", ritualTip);
+check(document.getElementById("after").textContent.indexOf(ritualTip) < 0,
+  "大课间收尾：时段提示语不再垫在「下一节」后面",
+  document.getElementById("after").textContent);
+check(document.getElementById("stageTip").textContent === "",
+  "收尾在准备窗口内：提示语不上移（整体让位）");
+
+global.__rhythmTime = 9 * 60 + 10;   // 大课间前段：无倒计时、无准备窗口
+Screen.render();
+check(document.getElementById("after").textContent.indexOf(ritualTip) >= 0,
+  "大课间前段：提示语还是老位置（主视觉下面单独一行）",
+  document.getElementById("after").textContent);
+check(document.getElementById("stageTip").textContent === "",
+  "无倒计时时提示语不上移");
+
+global.Store.setPref("cdMode", "all");   // 全程倒计时：与提示语共存
+Screen.render();
+check(document.getElementById("stageTip").textContent.indexOf(ritualTip) === 0,
+  "倒计时接管时提示语上移到数字上方",
+  document.getElementById("stageTip").textContent);
+check(document.getElementById("after").textContent.indexOf(ritualTip) < 0,
+  "提示语上移后原位置不再重复");
+global.Store.setPref("cdMode", "auto");
+
+global.Store.setPref("cdPicks", { ritual: true });   // 勾选大课间倒计时
+global.__rhythmTime = 9 * 60 + 25;   // 剩 5 分钟：推荐（收尾 3 分钟）不到，勾选窗口到
+Screen.render();
+check(heroText().indexOf(":") >= 0,
+  "勾选大课间倒计时：收尾窗口外也出（勾选真正接管显示）", heroText());
+global.Store.setPref("cdPicks", null);
+
+global.Store.setPref("cdPicks", { break: false });   // 去勾课间
+global.__rhythmTime = 10 * 60 + 24;   // 课间最后 1 分钟：推荐会出，去勾后不出
+Screen.render();
+check(heroText().indexOf(":") < 0,
+  "去勾课间倒计时：连收尾倒计时也不出", heroText());
+global.Store.setPref("cdPicks", null);
+Screen.render();
 global.__rhythmDate = "2026-11-09";
 global.__rhythmTime = 8 * 60 + 10;
 Screen.render();

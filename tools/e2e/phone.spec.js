@@ -44,8 +44,14 @@ test("空着点发送只给提示，不会发出去", async ({ page, request }) 
   await page.locator("#send").click();
   await expect(page.locator("#toast")).toHaveText(/还没写内容/);
 
+  // 历史接口连「过了 until 的过期消息」一起返回（这是给历史列表用的）。
+  // 上一轮测试留下的过期消息不该让这条断言红——只数还在生效窗口内的。
+  const hub = await (await request.get("/api/ping")).json();
+  const nowHHMM = String(hub.time || "").slice(11, 16);
   const list = await (await request.get("/api/messages?n=50")).json();
-  expect(list.messages.filter((m) => !m.retractedAt)).toHaveLength(0);
+  const active = list.messages.filter((m) => !m.retractedAt
+    && (!m.until || m.until >= nowHHMM) && (!m.at || m.at <= nowHHMM));
+  expect(active).toHaveLength(0);
 });
 
 test("发一条能上屏，撤回能撤下来", async ({ page, request }) => {

@@ -205,9 +205,14 @@
     }
     if (s._next) {
       var nx = "下一节 " + s._next.subject + (s._next.teacher ? "　" + s._next.teacher : "");
-      /* 大课间、大扫除自己的提示不能丢，接在「下一节」后面 */
-      return (s.kind === "break" || !s.note) ? nx : nx + "　·　" + s.note;
+      /* 上课前十分钟起（准备/倒计时窗口），时段自己的提示语让位：
+         「三清一对齐」这种活动提示挤在「下一节」后面，真机反馈既挡
+         信息又过时——要做的事早就做了，这里只留「下一节」。 */
+      return nx;
     }
+    /* 倒计时接管主视觉（老师开了全程倒计时）时，提示语不垫在主视觉
+       下面当尾巴，上移到数字上方单独一行（#stageTip）。 */
+    if (s.focus === "countdown" && s.timer) return "";
     if (s.kind === "closed") return s.note || "整理好书包，明天见";
     /* 早读没有第二行就留白：别把「第 1 节 语文」顶上来冒充一句话 */
     if (s.reading) return s.note || "";
@@ -518,6 +523,13 @@
     var band = urgent ? "紧急通知" : bandText(s);
     setText(el.bandText, band);
     el.band.style.letterSpacing = urgent ? ".3em" : ".2em";
+
+    /* 时段提示语的专门位置：倒计时接管主视觉时（老师开了全程倒计时），
+       提示语上移到数字上方单独一行，不再垫在主视觉下面；
+       准备窗口（上课前十分钟）里已经整体让位（见 afterText）。 */
+    var stageTip = (!urgent && s.note && s.focus === "countdown" && s.timer && !s._next)
+      ? s.note : "";
+    setText(el.stageTip, stageTip);
 
     /* 主视觉 */
     var main, sub, after, size, task = "", promoted = null;
@@ -902,6 +914,7 @@
     el = {
       cls: $("cls"), date: $("date"), clock: $("clock"), sec: $("sec"),
       main: $("main"), band: $("band"), bandText: $("bandText"),
+      stageTip: $("stageTip"),
       spine: $("spine"), mark: null,
       heroMain: $("heroMain"), heroSub: $("heroSub"), heroTask: $("heroTask"),
       after: $("after"), chips: $("chips"), duty: $("duty"),
