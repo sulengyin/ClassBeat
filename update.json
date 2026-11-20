@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.21",
-  "build": "6f246b7",
-  "publishedAt": "2026-11-20T14:49:00+08:00",
+  "version": "0.3.22",
+  "build": "0531efd",
+  "publishedAt": "2026-11-20T15:35:35+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **作息保护**：编辑面板里，正课、眼保健操、课间这三类段的时间现在\n  默认锁住——它们来自老师上传的作息表，不该随手就能改。需要调整时\n  点一下作息页上方的「解锁」按钮（只对这次编辑有效，退出面板自动\n  恢复锁定）。午间、课后服务等其余段落照旧随时可改。\n- 锁定期间，「插一段课间」「删一段」「恢复出厂作息」这些会连带动到\n  正课时间的操作也会一并锁住，并提示先解锁。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.21/classbeat-0.3.21.zip",
-  "sha256": "2b358a534d95ae8c3c7ecb034e09eb6501d216363ec76981dd8545a49d6e08a7",
-  "bytes": 11796033,
+  "notes": "- **改课不用打字了**（编辑 → 今天 → 今天改哪一节）：学科改成下拉\n  直选，任课老师按课表自动带出——点选学科，老师名字自己出现。\n  同一门课由两位老师执教的（比如心理/班队），自动并列显示成\n  「张老师/李老师」。代课等特殊情况仍可手动改老师名。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.22/classbeat-0.3.22.zip",
+  "sha256": "6dc78281aaf62955cca8fb053ac7ca646461bcc61ef87978148ff80eb4de653e",
+  "bytes": 11797167,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "f27092b80ccdbf2ef99e23507e63ef1518199f928e00ac537767f82607034703",
+      "sha256": "a6fe5875ad3dfcfe378233b7324f69356c5c4709e06ee144c303f96de812b677",
       "bytes": 17039
     },
     {
@@ -41,8 +41,8 @@
     },
     {
       "path": "app/edit.js",
-      "sha256": "9b3c4c9191aabc2c8eac852680e8d7dec21ee5036e29143fe980e149df64c574",
-      "bytes": 67663
+      "sha256": "c30ad36f6f2926d51410b6b9de5203a173c9341d802c549f38eac7fa2bb120b7",
+      "bytes": 69170
     },
     {
       "path": "app/engine/schedule.js",
@@ -121,7 +121,7 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "0c2fcf917cd27d68dc28cb351584d0d0eea04705619dd9a3b651a372891d8bfd",
+      "sha256": "fceb7a9483cfb9445efede03ff377ec0d6cf28a67094349b42a2d9981b2ce3d1",
       "bytes": 594
     },
     {
