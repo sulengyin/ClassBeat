@@ -765,6 +765,37 @@ check(rows.length >= 10, "作息表按段列出", rows.length + " 段");
 check(document.querySelectorAll(".tt-time").length === rows.length * 2,
   "每段两个时间框", String(document.querySelectorAll(".tt-time").length));
 
+/* 作息保护（0.3.21）：正课/眼保健操/课间默认锁住，点解锁才可改；
+   午间、课后服务等其余段落照旧自由改。 */
+const editSrc = fs.readFileSync(path.join(ROOT, "app/edit.js"), "utf8");
+check(editSrc.includes("timeLocked") && editSrc.includes("hoursUnlocked = false"),
+  "作息保护：锁定判定与默认锁定都在源码里");
+let unlockBtn = document.querySelectorAll(".tt-unlock")[0];
+check(!!unlockBtn && unlockBtn.textContent.indexOf("已按作息表锁住") >= 0,
+  "作息页有保护开关，默认锁定", unlockBtn ? unlockBtn.textContent : "缺失");
+const findRow = (label) => Array.from(document.querySelectorAll(".tt-row")).find(r => {
+  const tag = r.querySelector(".tt-tag");
+  return tag && tag.textContent.indexOf(label) >= 0;
+});
+let classTimes = (findRow("正课") || {}).querySelectorAll
+  ? findRow("正课").querySelectorAll(".tt-time") : [];
+check(classTimes.length === 2 && classTimes[0].readOnly && classTimes[1].readOnly,
+  "默认：正课时间框锁住，改不了");
+let noonTimes = (findRow("午间") || {}).querySelectorAll
+  ? findRow("午间").querySelectorAll(".tt-time") : [];
+check(noonTimes.length === 2 && !noonTimes[0].readOnly,
+  "默认：午间时间框不锁，可以自由改");
+unlockBtn._h.click();
+unlockBtn = document.querySelectorAll(".tt-unlock")[0];
+classTimes = (findRow("正课") || { querySelectorAll: () => [] }).querySelectorAll(".tt-time");
+check(unlockBtn.textContent.indexOf("已解锁") >= 0
+      && classTimes.length === 2 && !classTimes[0].readOnly,
+  "点解锁后：正课时间框可编辑");
+unlockBtn._h.click();
+classTimes = (findRow("正课") || { querySelectorAll: () => [] }).querySelectorAll(".tt-time");
+check(classTimes.length === 2 && classTimes[0].readOnly,
+  "再点一下：恢复锁定");
+
 /* 改第一段（晨间自主管理）的开始时间：不点保存——输入框 change 就该立刻生效。
    第一段前面没有别的段，改开始时间不会破坏首尾相接。 */
 const beforeTime = global.Runtime.day("2026-11-09").timeline[0].start;

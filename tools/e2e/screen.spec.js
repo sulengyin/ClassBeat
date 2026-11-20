@@ -403,6 +403,15 @@ test("作息边界联动 + 时段改名后文字同步（真机 2026-11-19 ②�
   await page.locator(".ep-tab", { hasText: "作息" }).click();
   await expect(page.locator(".tt-row").first()).toBeVisible();
 
+  // 作息保护（0.3.21）：正课/眼操/课间默认锁住；联动改边界前先解锁
+  const guard = page.locator(".tt-unlock");
+  await expect(guard).toContainText("已按作息表锁住");
+  const classRow = page.locator(".tt-row", { has: page.locator(".tt-tag", { hasText: "正课" }) }).first();
+  await expect(classRow.locator(".tt-time").first()).toHaveAttribute("readonly", "");
+  await guard.click();
+  await expect(guard).toContainText("已解锁");
+  await expect(classRow.locator(".tt-time").first()).not.toHaveAttribute("readonly", "");
+
   // 找一个非锁定（类型/名称可改）又不是第一行的段来操作
   const rows = page.locator(".tt-row");
   const total = await rows.count();

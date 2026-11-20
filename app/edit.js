@@ -37,6 +37,7 @@
     ensureDom();
     rootEl.classList.add("show");
     document.body.classList.add("editing");
+    hoursUnlocked = false;   /* 每次进来默认锁定：正课/眼操/课间的时间要特意解锁才能改 */
     if (Date.now() < unlockedTill) showPanel();
     else showGate();
   }
@@ -776,6 +777,16 @@
     { key: "after",  label: "课后服务" }
   ];
 
+  /* 作息保护（真机反馈 2026-11-20：正课/眼操/课间的时间来自老师上传的
+     作息表，不该随手能改）：这三类段的时间在面板里默认锁住，点「解锁」
+     才能动，退出面板自动恢复锁定。午间、课后服务等其余段落照旧自由改。
+     集会不算眼操，不在锁定范围。 */
+  var hoursUnlocked = false;
+  function timeLocked(b) {
+    return b.type === "class" || b.type === "break"
+      || (b.type === "ritual" && /眼保健操/.test(b.name || ""));
+  }
+
   function pad2(n) { return (n < 10 ? "0" : "") + n; }
   function toMin(t) { var p = String(t).split(":"); return (+p[0]) * 60 + (+p[1]); }
   function toTime(m) { return pad2(Math.floor(m / 60)) + ":" + pad2(m % 60); }
@@ -876,6 +887,23 @@
     var blocks = tt.blocks || [];
     var rows = h("div", "ep-rows tt-rows");
 
+    /* 作息保护开关：默认锁住正课/眼操/课间的时间，解锁只对本次编辑有效 */
+    var guard = h("div", "tt-guard");
+    var unlockBtn = h("button", "ep-ghost tt-unlock",
+      hoursUnlocked ? "已解锁——退出面板自动恢复保护"
+                    : "正课 / 眼保健操 / 课间已按作息表锁住，点此解锁");
+    unlockBtn.addEventListener("click", function () {
+      hoursUnlocked = !hoursUnlocked;
+      flash(hoursUnlocked ? "已解锁：现在可以改这三类段的时间了"
+                          : "已恢复锁定");
+      renderBody();
+    });
+    guard.appendChild(unlockBtn);
+    guard.appendChild(h("span", "tt-guard-note",
+      hoursUnlocked ? "改完请核对首尾相接，屏上立刻生效。"
+                    : "这些时间来自老师上传的作息表；午间、课后服务等其余段落随时可改。"));
+    sec.appendChild(guard);
+
     blocks.forEach(function (b, idx) {
       var row = h("div", "tt-row");
       var st = document.createElement("input");
@@ -884,6 +912,7 @@
       en.type = "time"; en.className = "tt-time"; en.value = b.end || "";
 
       var meta = TT_TYPES.filter(function (t) { return t.key === b.type; })[0];
+      var locked = !hoursUnlocked && timeLocked(b);
       var name = document.createElement("input");
       name.type = "text"; name.className = "tt-name";
       /* 旧配置里这一段还叫「早读」，输入框先显示新名；没真改名字就不回写。 */
@@ -895,12 +924,21 @@
       row.appendChild(h("span", "tt-dash", "—"));
       row.appendChild(en);
 
+      if (locked) {
+        st.readOnly = true;
+        en.readOnly = true;
+        st.classList.add("tt-locked");
+        en.classList.add("tt-locked");
+        st.title = en.title = "这一段时间来自作息表，点上方「解锁」才能改";
+      }
+
       /* 正课 / 午餐 / 午间跟课表绑着，类型不能动；
+         锁定中的课间/眼操也换成标签——先改类型再改时间就绕过锁了。
          其余段落让老师自己选，作息里多一段早读就能直接改出来。 */
       var curType = b.type;
       var curLabel = meta ? meta.label : "";
-      if (meta && meta.locked) {
-        row.appendChild(h("span", "tt-tag", meta.label));
+      if ((meta && meta.locked) || locked) {
+        row.appendChild(h("span", "tt-tag", meta ? meta.label : ""));
       } else {
         var sel = document.createElement("select");
         sel.className = "tt-type";
@@ -941,10 +979,14 @@
         var newName = (typed && typed !== shownName) ? typed : (cur.name || "");
         var next = blocks.map(function (x, i) {
           if (i !== idx) {
-            if (stChanged && i === idx - 1 && x.end !== st.value) {
+            /* 联动边界时不许越界去改锁定段（未解锁时）：改了就报
+               「没接上」，老师看到提示要么改回，要么点解锁。 */
+            if (stChanged && i === idx - 1 && x.end !== st.value
+                && (hoursUnlocked || !timeLocked(x))) {
               return Object.assign({}, x, { end: st.value });
             }
-            if (enChanged && i === idx + 1 && x.start !== en.value) {
+            if (enChanged && i === idx + 1 && x.start !== en.value
+                && (hoursUnlocked || !timeLocked(x))) {
               return Object.assign({}, x, { start: en.value });
             }
             return x;
@@ -990,20 +1032,30 @@
 
       var ins = h("button", "tt-mini", "＋");
       ins.title = "在后面插一段 10 分钟的课间";
-      ins.addEventListener("click", function () {
+      if (!hoursUnlocked) {
+        ins.disabled = true;
+        ins.classList.add("off");
+        ins.title = "插入会让后面的正课整体后移，请先点上方「解锁」";
+      } else {
+        ins.addEventListener("click", function () {
         var next = insertAfter(blocks, idx, 10);
         var bad = hoursProblem(next);
         if (bad) { flash(bad); return; }
         saveHours(next);
         flash("插了一段课间，后面整体后移 10 分钟");
         renderBody();
-      });
+        });
+      }
       row.appendChild(ins);
 
       var del = h("button", "tt-mini", "删");
       if (meta && meta.locked) {
         del.disabled = true;
         del.title = "这一段跟课表绑着，不能删";
+        del.classList.add("off");
+      } else if (!hoursUnlocked) {
+        del.disabled = true;
+        del.title = "删除会让后面的正课整体前移，请先点上方「解锁」";
         del.classList.add("off");
       } else {
         del.addEventListener("click", function () {
@@ -1024,6 +1076,11 @@
 
     var actions = h("div", "tt-actions");
     var reset = h("button", "ep-ghost", "恢复出厂作息");
+    if (!hoursUnlocked) {
+      reset.disabled = true;
+      reset.title = "恢复出厂会重排全部时间，请先点上方「解锁」";
+      reset.classList.add("off");
+    }
     reset.addEventListener("click", function () {
       S.patchConfig({ timetable: null });
       flash("已恢复出厂作息");

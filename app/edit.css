@@ -264,5 +264,10 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
         border-radius:1vmin;border:.24vmin solid #6B5641;background:#2C2017;
         color:#C1B09A;cursor:pointer}
 .tt-mini.off{opacity:.28;cursor:not-allowed}
+/* 作息保护：锁定的正课/眼操/课间时间框变暗，一眼看出"这些不该随手改" */
+.tt-time.tt-locked{color:#8A7660;background:#1C130D;border-color:#4A3B2C;cursor:not-allowed}
+.tt-guard{display:flex;align-items:center;gap:1.2vmin;margin:.4vmin 0 1.4vmin;flex-wrap:wrap}
+.tt-guard-note{font-size:2vmin;color:#A8957E;line-height:1.6;flex:1;min-width:40vmin}
 .tt-actions{display:flex;gap:1.2vmin;margin-top:1.6vmin}
+.ep-ghost.off{opacity:.28;cursor:not-allowed}
 .tt-sum{font-size:2.1vmin;color:#A8957E;line-height:1.7;margin-top:1.2vmin}
