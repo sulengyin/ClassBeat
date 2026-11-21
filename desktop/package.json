@@ -1,0 +1,17 @@
+{
+  "name": "classbeat-desktop",
+  "private": true,
+  "version": "0.4.1",
+  "description": "ClassBeat 班级节律屏 · 桌面壳（Tauri 2）",
+  "scripts": {
+    "stage": "python scripts/stage_resources.py",
+    "verify": "python scripts/verify_package.py",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:nsis": "tauri build --bundles nsis",
+    "build:msi": "tauri build --bundles msi"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

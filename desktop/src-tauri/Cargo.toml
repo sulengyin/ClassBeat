@@ -1,0 +1,49 @@
+[package]
+name = "classbeat"
+version = "0.4.1"
+edition = "2021"
+rust-version = "1.77"
+description = "ClassBeat 班级节律屏 · 桌面壳（Tauri 2）"
+license = "MIT"
+
+[lib]
+name = "classbeat_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-ico"] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target."cfg(windows)".dependencies]
+# 07 文档写的是 0.58；这里用 0.62——本机 crates 缓存里已有，且
+# MessageBoxW / RegisterHotKey / SetThreadExecutionState 的签名与 08 §8.2 一致。
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Power",
+  "Win32_System_Registry",
+  "Win32_Security",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Input_KeyboardAndMouse",
+] }
+
+[features]
+default = ["updater"]
+# 更新链路（tauri-plugin-updater）。没有签名密钥时可关掉：
+#   cargo tauri build --no-default-features
+updater = ["dep:tauri-plugin-updater"]
+
+[dependencies.tauri-plugin-updater]
+version = "2"
+optional = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

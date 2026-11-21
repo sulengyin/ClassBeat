@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "ClassBeat 桌面壳的能力集合：只开核心事件与窗口，不开文件系统与 shell",
+  "windows": ["screen", "phone", "error"],
+  "permissions": [
+    "core:default"
+  ]
+}

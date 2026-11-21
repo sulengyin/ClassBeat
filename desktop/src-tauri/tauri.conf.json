@@ -1,0 +1,67 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ClassBeat",
+  "version": "0.4.1",
+  "identifier": "cn.classbeat.app",
+  "build": {
+    "frontendDist": "../web",
+    "devUrl": null,
+    "beforeDevCommand": null,
+    "beforeBuildCommand": null
+  },
+  "app": {
+    "windows": [],
+    "withGlobalTauri": false,
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "icon": [
+      "icons/classbeat.ico"
+    ],
+    "publisher": "ClassBeat",
+    "copyright": "MIT",
+    "shortDescription": "班级节律屏",
+    "longDescription": "教室里那块大屏：告诉学生现在该干什么。",
+    "category": "Education",
+    "resources": [
+      "resources/**/*"
+    ],
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "SimpChinese"
+        ],
+        "displayLanguageSelector": false,
+        "installerHooks": "installer/hooks.nsh"
+      },
+      "wix": {
+        "language": "zh-CN"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/sulengyin/ClassBeat/releases/latest/download/latest.json",
+        "https://classbeat.example.com/update/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2RDUzMEYzNEM0RUQ1QzMKUldURDFVNU04ekRWVmkzU2djcU5FazRZYWtoSVk1WGNYckpMTStNNGtFbjZURnI0Z2s4d0N4QWcK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

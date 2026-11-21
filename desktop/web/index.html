@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassBeat</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #f6f5f0; color: #2c2c2a;
+    font-family: system-ui, "Microsoft YaHei", sans-serif;
+  }
+  main { width: min(680px, calc(100% - 48px)); }
+  h1 { margin: 0 0 8px; font-size: 20px; font-weight: 500; }
+  p.lead { margin: 0 0 20px; font-size: 14px; color: #5f5e5a; line-height: 1.7; }
+  pre {
+    white-space: pre-wrap; word-break: break-word; margin: 0 0 20px;
+    padding: 16px; border: 1px solid #d3d1c7; border-radius: 12px;
+    background: #fff; font: 13px/1.7 ui-monospace, Consolas, monospace; color: #444441;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: #5f5e5a; }
+  .row span { padding: 6px 10px; background: #fff; border: 1px solid #e2e0d8; border-radius: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ClassBeat 正在准备教室大屏</h1>
+  <p class="lead">
+    这个窗口只在后台服务没起来的时候出现。正常情况下你会直接看到大屏，
+    不会有这一页。<br>
+    先看下面这段原因，再把日志文件发给维护者即可。
+  </p>
+  <pre id="msg">（没有拿到具体原因）</pre>
+  <div class="row">
+    <span>日志：%APPDATA%\ClassBeat\logs\app.log</span>
+    <span>数据：%APPDATA%\ClassBeat</span>
+    <span>热键：Ctrl+Alt+Q 退出 · Ctrl+Alt+M 最小化</span>
+  </div>
+</main>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search).get("msg");
+    if (q) document.getElementById("msg").textContent = q;
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+/src-tauri/target/
+/src-tauri/gen/
+/node_modules/
+/dist/
+*.log
+
+# 由 scripts/stage_resources.py 生成
+/src-tauri/resources/*
+!/src-tauri/resources/.gitkeep
+
+# 构建机本地覆盖（如 crates.io 不可达时换镜像源），不进仓库
+/src-tauri/.cargo/config.toml
