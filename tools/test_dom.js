@@ -1005,6 +1005,78 @@ check(Array.from(document.querySelectorAll(".ep-note"))
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 global.Store.patchConfig({ students: window.RHYTHM_DATA.students });
 
+/* 组不消失（0.3.25 真机反馈："之前分好的组后来没了"）：
+   memberIds 跟名单对不上（名单重录、学生 id 变更）时组 chip 仍显示，
+   并提示有几人对不上，不让老师以为组被丢了。 */
+const stud0 = window.RHYTHM_DATA.students[0];
+global.Store.patchConfig({ peopleGroups: [{ id: "g-test", name: "擦黑板组",
+  memberIds: [stud0.id, "ghost-id-404"], order: 0 }] });
+const warnLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+warnLine.children[0]._h.click();
+const warnChip = document.querySelectorAll(".ep-group-chip")
+  .filter(c => c.textContent === "擦黑板组")[0];
+check(!!warnChip && warnChip.classList.contains("ep-group-warn"),
+  "成员 id 失配的组仍在「点组带出」里显示，并带警示标记");
+check(warnChip && warnChip.title.indexOf("另有 1 人已不在名单里") >= 0,
+  "失配组 chip 悬停提示有几人不在名单", warnChip ? warnChip.title : "");
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+global.Store.patchConfig({ peopleGroups: null });
+
+/* 屏面人名解析（0.3.25 真机反馈："点进去除了人名还有英文字母串"）：
+   岗位成员里存了学生 id 时，上屏前用名册解析成人名。 */
+const rolesBackup = JSON.parse(JSON.stringify(global.Runtime.config().roles));
+const rolesMutated = JSON.parse(JSON.stringify(global.Runtime.config().roles));
+const r07 = rolesMutated.roles.find(r => r.id === unsetRole.id);
+r07.people = ["s01"];
+global.Store.patchConfig({
+  roles: rolesMutated,
+  dutyPresents: { break: [unsetRole.id], reading: [], noon: [] }
+});
+global.__rhythmDate = "2026-11-09";
+global.__rhythmTime = 10 * 60 + 24;
+global.Screen.render();
+const idTxt = document.getElementById("duty").textContent;
+check(idTxt.indexOf("赵子墨") >= 0 && idTxt.indexOf("s01") < 0,
+  "岗位成员存学生 id 时屏面显示人名而非字母串", idTxt);
+const idDetail = document.querySelectorAll("#duty .duty")[0];
+check(idDetail && idDetail.dataset.people === "赵子墨",
+  "点开详情的人名列表同样解析成人名", idDetail ? idDetail.dataset.people : "缺失");
+global.Store.patchConfig({ roles: rolesBackup, dutyPresents: null });
+global.Screen.render();
+
+/* 常驻区标注 + 长期固定（0.3.25 同步问题）：没选人的岗位在
+   「哪些岗位整段常驻」里当场标出来，不让老师勾完才发现大屏是「待定」；
+   换人弹窗给「长期固定」出口，选的人不再只对今天生效。 */
+const rolesEmpty = JSON.parse(JSON.stringify(global.Runtime.config().roles));
+rolesEmpty.roles.find(r => r.id === unsetRole.id).people = [];
+global.Store.patchConfig({ roles: rolesEmpty });
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
+const warnOpt = document.querySelectorAll(".ep-opt-warn")[0];
+check(!!warnOpt && warnOpt.textContent.indexOf("还没选人") >= 0,
+  "常驻区当场标出没选人的岗位（还没选人）", warnOpt ? warnOpt.textContent : "缺失");
+global.Store.patchConfig({ roles: rolesBackup });
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
+const linePersist = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+linePersist.children[0]._h.click();
+const dlgNotes25 = Array.from(document.querySelectorAll(".ep-note"))
+  .map(n => n.textContent);
+check(dlgNotes25.some(t => t.indexOf("只换今天") >= 0 && t.indexOf("长期固定") >= 0),
+  "换人弹窗写清「默认只换今天 / 长期固定」语义");
+const rolesBeforePersist = JSON.parse(JSON.stringify(global.Runtime.config().roles));
+const pick25 = document.querySelectorAll(".ep-person")
+  .filter(b => !b.classList.contains("on"))[0];
+const pickName25 = pick25.textContent;
+pick25._h.click();
+document.querySelector(".ep-persist")._h.click();
+const r14p = global.Runtime.config().roles.roles.find(r => r.name === "擦窗户");
+check(!!r14p && r14p.people.indexOf(pickName25) >= 0,
+  "「长期固定」把人写进岗位配置（不是今天覆盖）",
+  r14p ? r14p.people.join("、") : "缺失");
+global.Store.patchConfig({ roles: rolesBeforePersist });
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+
 /* 回归：单选岗位点一下就该选定，不该再要求点「就是 TA」二次确认 */
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 const energyLine = document.querySelectorAll(".ep-rowline")

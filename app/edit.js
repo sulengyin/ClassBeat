@@ -1137,6 +1137,27 @@
     return DATA.roles || { roles: [] };
   }
 
+  /* 岗位现在挂的是什么人：今天的换人优先，其次岗位配置里的
+     people / peopleMap / groups（A/B 轮换时算总人数）。
+     空数组 = 大屏会显示「待定」——常驻区靠它标注提醒老师
+     （真机反馈 2026-11-20：勾了常驻的岗位却显示待选）。 */
+  function rolePeopleNow(role, key) {
+    var ov = (S.getDayOverride(key) || {}).roles || {};
+    if (ov[role.id] && ov[role.id].people) return ov[role.id].people;
+    if (role.people) return role.people;
+    if (role.peopleMap) {
+      return Object.keys(role.peopleMap).map(function (k) { return role.peopleMap[k]; });
+    }
+    if (role.groups) {
+      var all = [];
+      Object.keys(role.groups).forEach(function (k) {
+        all = all.concat(role.groups[k] || []);
+      });
+      return all;
+    }
+    return [];
+  }
+
   function renderDuty(ov, key) {
     var sec = h("section", "ep-sec");
     sec.appendChild(h("h3", null, "换人只改这一条"));
@@ -1184,14 +1205,14 @@
       list.appendChild(line);
     });
     sec.appendChild(list);
-    renderDutyPresents(doc);
+    renderDutyPresents(doc, key);
     bodyEl.appendChild(sec);
   }
 
   /* 时段常驻（0.3.23）：课间 / 晨间自主管理 / 午间各配哪些岗位整段挂在
      值日条上，自由多选。选进来的岗位不再按各自设的触发方式另算
      （一个岗位一种呈现方式）；没选的岗位照旧。 */
-  function renderDutyPresents(doc) {
+  function renderDutyPresents(doc, key) {
     var roles = (doc.roles || []).slice().sort(function (a, b) {
       return (typeof a.order === "number" ? a.order : 0) - (typeof b.order === "number" ? b.order : 0);
     });
@@ -1199,7 +1220,7 @@
     var presSec = h("section", "ep-sec");
     presSec.appendChild(h("h3", null, "哪些岗位整段常驻"));
     presSec.appendChild(h("p", "ep-note",
-      "点选岗位，让它在晨间自主管理 / 课间 / 午间这一整段都挂在值日条上；岗位多到一行放不下会自动滚动。没选的岗位按各自设的触发方式出现，互不影响。"));
+      "点选岗位，让它在晨间自主管理 / 课间 / 午间这一整段都挂在值日条上；岗位多到一行放不下会自动滚动。没选的岗位按各自设的触发方式出现，互不影响。还没选人的岗位挂上大屏会显示「待定」——先到「值日」页点岗位把人选好。"));
 
     var pres = (RT && RT.config) ? (RT.config().dutyPresents || {}) : {};
     [
@@ -1214,7 +1235,11 @@
       var opts = h("div", "ep-opts");
       roles.forEach(function (r) {
         var on = (pres[slot.key] || []).indexOf(r.id) >= 0;
-        var b = h("button", "ep-opt" + (on ? " on" : ""), r.name);
+        /* 人员状态直接标在选项上：没选人的岗位勾了常驻，
+           大屏只会显示「待定」，当场告诉老师先去选人 */
+        var empty = !rolePeopleNow(r, key).length;
+        var b = h("button", "ep-opt" + (on ? " on" : "") + (empty ? " ep-opt-warn" : ""),
+          r.name + (empty ? "（还没选人）" : ""));
         b.addEventListener("click", function () {
           var cur = ((RT.config().dutyPresents || {})[slot.key] || []).slice();
           var at = cur.indexOf(r.id);
@@ -1318,12 +1343,17 @@
     }
     var byId = rosterNameIndex(roster);
     (S.peopleGroups ? S.peopleGroups() : []).forEach(function (g) {
-      var names = [];
+      /* 组永远显示：就算成员 id 跟名单对不上了（名单重录、学生 id 变更），
+         也不能把老师分好的组整个藏起来——数据还在，藏了像「丢了」。 */
+      var names = [], missing = 0;
       (g.memberIds || []).forEach(function (id) {
         var n = byId[id];
-        if (n && names.indexOf(n) < 0) names.push(n);
+        if (n) { if (names.indexOf(n) < 0) names.push(n); }
+        else missing++;
       });
-      if (names.length) out.push({ id: g.id, name: g.name, source: "manual", names: names });
+      if (names.length || missing) {
+        out.push({ id: g.id, name: g.name, source: "manual", names: names, missing: missing });
+      }
     });
     return out;
   }
@@ -1375,6 +1405,19 @@
     if (!rosterStudents().length) {
       wrap.appendChild(h("p", "ep-note",
         "还没录入班级名单：候选只显示这个岗位现有的人；要完整名单，去「⋯ 菜单 → 配置班级」补录。"));
+    }
+
+    /* 换人语义先说清楚（真机反馈 2026-11-20：老师选好了人，
+       常驻岗位大屏却显示「待定」——原因就是换人只改今天，
+       岗位配置里其实没人，老师以为选一次就一直有效）。 */
+    if (multi && !role.groups && !role.peopleMap && !role.rotation) {
+      wrap.appendChild(h("p", "ep-note",
+        "这里选的人默认只换今天；要一直显示这些人，点下面的「长期固定」。"));
+    } else if (multi) {
+      wrap.appendChild(h("p", "ep-note",
+        "这个岗位按组或按星期轮换，人员由轮换表决定；这里的换人只改今天。"));
+    } else {
+      wrap.appendChild(h("p", "ep-note", "点谁就是谁：只换今天这一天。"));
     }
 
     var selected = [];
@@ -1442,6 +1485,10 @@
         var box = h("span", "ep-group");
         var b = h("button", "ep-group-chip", g.name);
         b.title = "点一下把这组 " + g.names.length + " 人全选上：" + g.names.join("、");
+        if (g.missing) {
+          b.title += "；另有 " + g.missing + " 人已不在名单里（名单重录或学生 id 变更会导致这样），可在下方重新勾人后点「保存修改」补齐。";
+          b.classList.add("ep-group-warn");
+        }
         b.addEventListener("click", function () {
           selected = g.names.slice();
           g.names.forEach(function (n) { S.markPicked(n); });
@@ -1565,6 +1612,26 @@
         commit(selected);
       });
       row.appendChild(saveBtn);
+      /* 长期固定：把现在勾的人写进岗位配置（不是今天的临时换人），
+         解决「选过人但常驻/下次开机显示待定」的不同步。只给
+         直接按 people 出人的岗位用——A/B 组、按星期轮换的岗位
+         人员由轮换表决定，写了也不生效，所以不出现。 */
+      if (!role.groups && !role.peopleMap && !role.rotation) {
+        var persistBtn = h("button", "ep-ghost ep-persist", "长期固定");
+        persistBtn.title = "把现在勾选的人写进岗位配置，以后每天都显示他们";
+        persistBtn.addEventListener("click", function () {
+          if (!selected.length) { flash("先选人"); return; }
+          var docRoles = JSON.parse(JSON.stringify(roleDoc()));
+          var target = (docRoles.roles || []).filter(function (x) { return x.id === role.id; })[0];
+          if (!target) { flash("找不到岗位配置"); return; }
+          target.people = selected.slice();
+          S.patchConfig({ roles: docRoles });
+          flash("「" + role.name + "」已长期固定给 " + selected.join("、"));
+          wrap.remove();
+          renderBody(role.id);
+        });
+        row.appendChild(persistBtn);
+      }
     }
     var clear = h("button", "ep-ghost", "恢复原样");
     clear.addEventListener("click", function () {

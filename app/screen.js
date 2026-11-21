@@ -338,6 +338,25 @@
   }
 
   /* ---------- 值日条 ---------- */
+  /* 岗位成员里若存的是学生 id（导入模板/手工配置可能直接带学号），
+     上屏前用名册解析成人名；解析不出就原样保留。
+     名册缓存一次，签名不变不重建（真机反馈 2026-11-20：
+     人名里混着英文字母串） */
+  var nameMap = null, nameMapKey = "";
+  function personName(n) {
+    var students = (S && S.config && S.config().students) || [];
+    var key = students.length + ":" + students.map(function (s) { return s && s.id; }).join(",");
+    if (nameMap === null || nameMapKey !== key) {
+      nameMap = {};
+      nameMapKey = key;
+      students.forEach(function (s) {
+        if (s && s.id) nameMap[String(s.id)] = s.name;
+      });
+    }
+    var out = nameMap[String(n)];
+    return out || n;
+  }
+
   function renderDuty(day, minutes) {
     var res = R.dutiesAt(day, minutes);
     var sig = JSON.stringify(res.items.map(function (d) {
@@ -386,13 +405,13 @@
         who.textContent = "自己商量";
         who.classList.add("none");
       } else if (d.people && d.people.length) {
-        who.textContent = d.people.join("、");
+        who.textContent = d.people.map(personName).join("、");
       }
       if (who.textContent) item.appendChild(who);
 
       /* 组员可以点开看，只读（PLAN 2.18）。学生能点，但点了只能看。 */
       if (!d.unknown && d.people && d.people.length) {
-        item.dataset.people = d.people.join("、");
+        item.dataset.people = d.people.map(personName).join("、");
         item.dataset.task = d.tasks && d.tasks.length ? d.tasks.join("、") : d.name;
         item.addEventListener("click", function () { showDetail(item); });
       }

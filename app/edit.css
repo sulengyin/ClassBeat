@@ -122,6 +122,9 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
         border:.26vmin solid #6B5641;background:#3D2D20;color:#DCCDB6;cursor:pointer}
 .ep-opt.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10}
 .ep-opt.urgent.on{background:#DE3B34;border-color:#F1E3C6;color:#FFF6F3}
+/* 常驻区：还没选人的岗位用虚线框标出，提醒先去选人再勾常驻 */
+.ep-opt.ep-opt-warn{border-style:dashed;border-color:#B0803C;color:#F2C879}
+.ep-opt.ep-opt-warn.on{background:#3D2D20;color:#F2C879;border-color:#B0803C}
 
 .ep-recall{display:flex;flex-wrap:wrap;gap:.9vmin;margin-top:1.5vmin;align-items:center}
 .ep-recall-label{font-size:2vmin;color:#8E7B66;letter-spacing:.14em}
@@ -195,6 +198,7 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
                border-radius:1vmin;border:.24vmin solid #6B5641;background:#3D2D20;
                color:#E2D4BC;cursor:pointer}
 .ep-group-chip:hover{background:#4A3728;border-color:#A08A6E}
+.ep-group-chip.ep-group-warn{border-style:dashed;border-color:#B0803C;color:#F2C879}
 .ep-group-del{font:inherit;font-size:2vmin;line-height:1;padding:.7vmin .9vmin;
               border-radius:1vmin;border:.24vmin solid #6E3A32;background:transparent;
               color:#F08A7E;cursor:pointer}
