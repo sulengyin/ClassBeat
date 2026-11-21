@@ -2,7 +2,10 @@
 
 const { expect } = require("@playwright/test");
 
-const SCREEN_PATH = "/app/index.html?hub=127.0.0.1:8765&nosync=1";
+// 大屏页要连的 hub：端口跟 playwright.config.js 的 webServer 一致。
+// 默认 8765；本机被占时用 CB_PORT=8766 覆盖，别再把这个数改死在这里。
+const PORT = process.env.CB_PORT || "8765";
+const SCREEN_PATH = `/app/index.html?hub=127.0.0.1:${PORT}&nosync=1`;
 
 /** 把服务端攒下的旧消息全部撤回，免得上一轮的通知串到这一轮。 */
 async function clearHub(request) {

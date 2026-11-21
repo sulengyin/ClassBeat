@@ -9,6 +9,13 @@
 
 const { defineConfig, devices } = require("@playwright/test");
 
+// 服务端口：默认 8765（产品默认值，配置里别再写别的数）。
+// 本机 8765 被别的进程占着时（比如旧版残留的 pythonw），
+// 用 CB_PORT=8766 npx playwright test 临时绕开——别把改过的端口提交上来，
+// 那会让别人的机器和 CI 都对不上。
+const PORT = process.env.CB_PORT || "8765";
+const BASE_URL = `http://127.0.0.1:${PORT}`;
+
 module.exports = defineConfig({
   testDir: "./tools/e2e",
   timeout: 60_000,
@@ -27,7 +34,7 @@ module.exports = defineConfig({
       ]
     : [["list"], ["html", { open: "never" }], ["json", { outputFile: "e2e-results.json" }]],
   use: {
-    baseURL: "http://127.0.0.1:8765",
+    baseURL: BASE_URL,
     timezoneId: "Asia/Shanghai",
     locale: "zh-CN",
     screenshot: "only-on-failure",
@@ -35,10 +42,10 @@ module.exports = defineConfig({
     video: process.env.CI ? "retain-on-failure" : "off",
   },
   webServer: {
-    command: "python3 server/rhythm_server.py --port 8765",
+    command: `python3 server/rhythm_server.py --port ${PORT}`,
     // 服务端和浏览器必须同一个时区，否则「这条消息过期没有」两边会差 8 小时
     env: { TZ: "Asia/Shanghai" },
-    url: "http://127.0.0.1:8765/api/ping",
+    url: `${BASE_URL}/api/ping`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
     stdout: "pipe",
