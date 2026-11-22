@@ -1,0 +1,30 @@
+[package]
+name = "classbeat-tools"
+version = "0.5.0"
+edition = "2021"
+rust-version = "1.77"
+description = "ClassBeat 构建与验收工具（取代 desktop/scripts/*.py 与 tools/bundle.py）"
+license = "MIT"
+
+[[bin]]
+name = "classbeat-tools"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+sha2 = "0.10"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_UI_WindowsAndMessaging",
+] }

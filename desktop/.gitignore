@@ -1,10 +1,12 @@
 /src-tauri/target/
 /src-tauri/gen/
+/server-rs/target/
+/tools-rs/target/
 /node_modules/
 /dist/
 *.log
 
-# 由 scripts/stage_resources.py 生成
+# 由 classbeat-tools stage 生成
 /src-tauri/resources/*
 !/src-tauri/resources/.gitkeep
 

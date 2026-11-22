@@ -1,11 +1,11 @@
 {
   "name": "classbeat-desktop",
   "private": true,
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "ClassBeat 班级节律屏 · 桌面壳（Tauri 2）",
   "scripts": {
-    "stage": "python scripts/stage_resources.py",
-    "verify": "python scripts/verify_package.py",
+    "stage": "cargo run --quiet --release --manifest-path tools-rs/Cargo.toml -- stage --data sample",
+    "verify": "cargo run --quiet --release --manifest-path tools-rs/Cargo.toml -- verify",
     "dev": "tauri dev",
     "build": "tauri build",
     "build:nsis": "tauri build --bundles nsis",

@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 /// 托盘、注册表、快捷方式里显示的产品名。
 pub const APP_NAME: &str = "ClassBeat";
 /// 大屏窗口标题。**必须包含「班级节律屏」**：页面上的「最小化 / 退出大屏」
-/// 走的是 server/rhythm_server.py 的窗口枚举（按标题认窗口），壳把标题定死，
-/// 那条链路就能原样继续工作，前端一个字都不用改。
+/// 走的是服务的窗口枚举（按标题认窗口），壳把标题定死，那条链路就能原样
+/// 继续工作，前端一个字都不用改。
 pub const KIOSK_TITLE: &str = "班级节律屏";
 
 pub const DEFAULT_PORT: u16 = 8765;
@@ -55,8 +55,10 @@ impl Paths {
     pub fn server_dir(&self) -> PathBuf {
         self.install_root.join("server")
     }
-    pub fn pythonw(&self) -> PathBuf {
-        self.install_root.join("python").join("pythonw.exe")
+    /// 服务本体。Rust 版是一个独立小进程（8xx KB），取代了原来 22 MB 的
+    /// 捆绑 Python 运行时；壳仍然用「起服务 → ping 探活 → 挂了重启」这套结构。
+    pub fn server_exe(&self) -> PathBuf {
+        self.server_dir().join("classbeat-server.exe")
     }
     pub fn backups(&self) -> PathBuf {
         self.data.join("backups")

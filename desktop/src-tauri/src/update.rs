@@ -149,9 +149,9 @@ mod imp {
     }
 
     async fn run(app: AppHandle, interactive: bool) -> Result<(), String> {
-        // 安装器要覆盖 $INSTDIR 里的 python.exe / resources，而 updater 插件装完是
+        // 安装器要覆盖 $INSTDIR 里的服务程序与 resources，而 updater 插件装完是
         // 直接 std::process::exit(0)（绕过 Drop 也绕过我们自己的 shutdown），
-        // 所以必须在安装前把 pythonw 停掉，否则 NSIS 会卡在"文件正在使用"。
+        // 所以必须在安装前把服务停掉，否则 NSIS 会卡在"文件正在使用"。
         let app_for_exit = app.clone();
         let updater = app
             .updater_builder()

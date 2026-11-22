@@ -149,6 +149,18 @@
     !insertmacro CB_LOG "主程序已就位"
   cb_main_done:
 
+  ; ---- 5.2 清掉 0.4.x 残留的 Python ----
+  ; NSIS 是覆盖安装：新包里没有的文件它**不会删**。0.4.x 的
+  ; resources\python 是 22 MB 的捆绑运行时，不清就会一直躺在老师机器上
+  ; （本机实测：0.5.0 装完安装目录 29 MB，其中 22 MB 是这个目录）。
+  ; 上面 §2 的整目录删除只认 0.3.x 的布局（$INSTDIR\server\），
+  ; 0.4.x 起服务在 $INSTDIR\resources\server\，所以那条判断命中不了。
+  ; 只删 python 与 .py，不碰 app/、data/、sample/ 与 build-info.json。
+  RMDir /r "$INSTDIR\resources\python"
+  Delete "$INSTDIR\resources\server\*.py"
+  RMDir /r "$INSTDIR\resources\server\__pycache__"
+  !insertmacro CB_LOG "已清理 0.4.x 残留的 Python 运行时与脚本"
+
   ; ---- 5.5 旧版进程没停干净（权限不足）时必须提示 ----
   ; 谁写这个标记：stop-legacy.ps1 在 Stop-Process 报"拒绝访问"时写。
   ; 为什么不靠日志：老师不会去看 $TEMP 里的日志，他看到的现象是"装完了却打不开、

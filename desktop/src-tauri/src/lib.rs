@@ -5,10 +5,10 @@
 //!
 //! 启动顺序：
 //!   解析路径 → 建日志 → 托盘 → 热键 → 防休眠 → 旧数据接管
-//!   → 起服务（隐藏 pythonw）→ 等到 /api/ping 通 → 开大屏窗口
+//!   → 起服务（隐藏 classbeat-server.exe）→ 等到 /api/ping 通 → 开大屏窗口
 //!
 //! 退出顺序：
-//!   置 quitting → 杀 pythonw → app.exit(0)
+//!   置 quitting → 停服务进程 → app.exit(0)
 
 mod autostart;
 mod commands;

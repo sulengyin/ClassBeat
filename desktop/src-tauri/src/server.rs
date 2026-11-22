@@ -1,9 +1,11 @@
 //! 服务的启动、健康检查与重启。
 //!
 //! 旧的 watchdog.ps1（395 行）干的所有事，这里只有三件：
-//!   1. 用隐藏窗口起 pythonw（用户看不见任何控制台）；
+//!   1. 用隐藏窗口起 classbeat-server.exe（用户看不见任何控制台）；
 //!   2. 轮询 /api/ping，确认服务真的在（不是"进程在"就算数）；
-//!   3. 挂了就重启，连续失败就放慢，但绝不放弃——和 run.py 的语义一致。
+//!   3. 挂了就重启，连续失败就放慢，但绝不放弃。
+//!
+//! 服务本体是 Rust（`desktop/server-rs`），不再是捆绑的 Python 运行时。
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -60,33 +62,25 @@ fn start(app: &AppHandle) -> Result<u16, String> {
     };
     let _ = paths.ensure();
 
-    let pythonw = std::env::var("CLASSBEAT_PYTHONW")
+    let server_exe = std::env::var("CLASSBEAT_SERVER")
         .ok()
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| paths.pythonw());
-    if !pythonw.is_file() {
+        .unwrap_or_else(|| paths.server_exe());
+    if !server_exe.is_file() {
         return Err(format!(
-            "缺少内置运行时：{}\n\n先运行 desktop/scripts/stage_resources.py 把 app/、server/、python 运行时装进 desktop/src-tauri/resources，再重新构建。",
-            pythonw.display()
+            "缺少服务程序：{}\n\n先跑 classbeat-tools stage 把 app/ 与服务程序装进 desktop/src-tauri/resources，再重新构建。",
+            server_exe.display()
         ));
-    }
-    let script = paths.server_dir().join("rhythm_server.py");
-    if !script.is_file() {
-        return Err(format!("缺少服务脚本：{}", script.display()));
     }
 
     let port = config::pick_port();
-    let mut cmd = Command::new(&pythonw);
-    cmd.arg(&script)
-        .arg("--port")
+    let mut cmd = Command::new(&server_exe);
+    cmd.arg("--port")
         .arg(port.to_string())
         .arg("--host")
         .arg("0.0.0.0")
-        // 壳模式：不跑 PowerShell 看门狗交接、不抢程序内更新（见 docs/04-服务适配契约.md §4.1）
-        .env("CLASSBEAT_SHELL", "1")
+        // 数据落在 %APPDATA%\ClassBeat：程序目录可能只读（perMachine）
         .env("CLASSBEAT_DATA_DIR", &paths.data)
-        // 程序目录可能只读（perMachine）：不许 Python 往里写 __pycache__
-        .env("PYTHONDONTWRITEBYTECODE", "1")
         .current_dir(paths.server_dir())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -99,7 +93,7 @@ fn start(app: &AppHandle) -> Result<u16, String> {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let child = cmd.spawn().map_err(|e| format!("拉起 pythonw 失败：{e}"))?;
+    let child = cmd.spawn().map_err(|e| format!("拉起服务失败：{e}"))?;
     if let Ok(mut slot) = app.state::<AppState>().server.child.lock() {
         *slot = Some(child);
     }
@@ -206,7 +200,7 @@ fn kill_child(app: &AppHandle) {
     }
 }
 
-/// 退出：先停服务再让进程走，别留孤儿 pythonw。
+/// 退出：先停服务再让进程走，别留孤儿进程。
 pub fn stop(app: &AppHandle) {
     if let Some(st) = app.try_state::<AppState>() {
         st.server.stopping.store(true, Ordering::SeqCst);
