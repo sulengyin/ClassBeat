@@ -54,6 +54,10 @@ pub fn run(exe: Option<&str>) -> Result<(), String> {
     }
 
     println!("== 启动 ==");
+    // 装完包之后安装器通常已经拉起过一次应用。这时再起第二个会被单实例挡住，
+    // 我们记下的 pid 当场就没了，D2/D6 两条会假 FAIL。所以先把它请走再测。
+    clear_running_instances();
+
     let mut child: Child = Command::new(&exe)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -519,6 +523,38 @@ fn session_locked() -> bool {
 #[cfg(not(windows))]
 fn session_locked() -> bool {
     true
+}
+
+/// 把已经在跑的实例结束掉——装完包之后安装器会自动拉起一次，
+/// 这时候再起第二个会被单实例挡住，我们记下的 pid 当场就没了，D2/D6 会假 FAIL。
+/// 先杀壳再杀服务：反过来的话壳会在中间把服务又拉起来。
+fn clear_running_instances() {
+    let shells = pids_by_name("classbeat.exe");
+    if shells.is_empty() {
+        return;
+    }
+    println!("  （先清掉已在运行的 {} 个实例：{shells:?}）", shells.len());
+    for p in &shells {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/PID", &p.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    std::thread::sleep(Duration::from_secs(1));
+    for p in pids_by_name("classbeat-server.exe") {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/PID", &p.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    // 等端口彻底放掉，否则新起的服务顺延到 8766，屏上二维码地址也跟着变
+    let t0 = Instant::now();
+    while t0.elapsed() < Duration::from_secs(5) && !pids_by_name("classbeat-server.exe").is_empty() {
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    std::thread::sleep(Duration::from_millis(800));
 }
 
 /// 给外部（文档里的手工验收）留个提示：界面上的「退出」确认框按钮是 IDYES。
