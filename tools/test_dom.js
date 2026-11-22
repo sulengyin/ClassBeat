@@ -252,7 +252,9 @@ const versionDefs = fs.readdirSync(path.join(ROOT, "app"))
 check(versionDefs.length === 0, "版本号只在 app/version.js 定义", versionDefs.join(",") || "无");
 const pageHtml = fs.readFileSync(path.join(ROOT, "app/index.html"), "utf8");
 check((pageHtml.match(/src="version\.js"/g) || []).length === 1, "index.html 只引入一次 version.js");
-check(/stamped_version_js/.test(fs.readFileSync(path.join(ROOT, "tools/package.py"), "utf8")),
+/* 单文件演示版由 Rust 打包器出（0.5.3 起 tools/package.py 退役），
+   它必须把真实版本与构建号写进去，别让老师看到 v0.0.0 · dev */
+check(/stamp_version/.test(fs.readFileSync(path.join(ROOT, "desktop/tools-rs/src/single.rs"), "utf8")),
   "打包脚本会把版本与构建号写进发布包");
 
 const tipEl = document.getElementById("tip");
@@ -292,21 +294,22 @@ check(!updThrew && tipEl.hidden === true, "断网检查更新不抛错、不弹�
 
 /* 一键重启服务（0.3.17）：按钮只在服务认得 restart 路由时亮 */
 const updateSrc = fs.readFileSync(path.join(ROOT, "app/update.js"), "utf8");
-const serverSrc = fs.readFileSync(path.join(ROOT, "server/rhythm_server.py"), "utf8");
+/* 0.5.3 起服务是 Rust：能力标记与重启路由去 desktop/server-rs 里核对 */
+const serverSrc = fs.readFileSync(path.join(ROOT, "desktop/server-rs/src/routes.rs"), "utf8")
+  + fs.readFileSync(path.join(ROOT, "desktop/server-rs/src/main.rs"), "utf8");
 check(updateSrc.includes("/api/update/restart") && updateSrc.includes("重启服务，立即生效")
       && updateSrc.includes("canRestart") && updateSrc.includes("waitServerBack"),
   "更新面板：重启按钮走能力探测 + 轮询恢复");
 check(serverSrc.includes("canRestart") && serverSrc.includes("/api/update/restart")
-      && serverSrc.includes("--wait-port") && serverSrc.includes("_supervised_by_run_py"),
+      && serverSrc.includes("--wait-port"),
   "服务端：restart 路由 + canRestart 能力标记 + --wait-port 自重启");
 
-/* 跨代自愈（0.3.19）：服务比包旧时，启动器自动换新进程；面板给手动出路 */
-const kioskSrc = fs.readFileSync(path.join(ROOT, "tools/launcher/start-kiosk.ps1"), "utf8");
+/* 跨代更新还给手动出路。
+   0.3.x 时这条出路是「kiosk 启动脚本发现服务比包旧就换新进程」；0.5.x 起
+   没有启动脚本了，换新由桌面壳统一管（托盘 → 检查更新），页面只负责在
+   面板里把「关掉大屏程序 / 双击桌面图标」说清楚。 */
 check(updateSrc.includes("关掉大屏程序") && updateSrc.includes("双击桌面图标"),
   "跨代更新：面板给手动出路指引");
-check(kioskSrc.includes("/api/version") && kioskSrc.includes("自动重启服务")
-      && kioskSrc.includes("rhythm_server"),
-  "跨代自愈：kiosk 启动检测服务比包旧并自动换新");
 
 /* boot 在加载时已跑（readyState=complete） */
 const band = document.getElementById("band");

@@ -8,6 +8,8 @@
 // 这一项能挡住视口/触摸/字号问题，但挡不住鸿蒙特有的渲染差异，别当成真机结论。
 
 const { defineConfig, devices } = require("@playwright/test");
+const fs = require("fs");
+const path = require("path");
 
 // 服务端口：默认 8765（产品默认值，配置里别再写别的数）。
 // 本机 8765 被别的进程占着时（比如旧版残留的 pythonw），
@@ -15,6 +17,29 @@ const { defineConfig, devices } = require("@playwright/test");
 // 那会让别人的机器和 CI 都对不上。
 const PORT = process.env.CB_PORT || "8765";
 const BASE_URL = `http://127.0.0.1:${PORT}`;
+
+// 被测服务：0.5.3 起就是 Rust 的 classbeat-server（Python 版已退役）。
+// 跑测试前先编一次：
+//   cargo build --release --manifest-path desktop/server-rs/Cargo.toml
+// 想指到别处的二进制就设 CLASSBEAT_SERVER。
+// `--base server` 是关键：服务把 base 当静态根（手机页、sw.js、图标在这儿），
+// 并把它的父目录当安装根（大屏页面在 ./app）——和装完之后的布局一致。
+const SERVER_BIN =
+  process.env.CLASSBEAT_SERVER ||
+  path.join(
+    __dirname,
+    "desktop",
+    "server-rs",
+    "target",
+    "release",
+    process.platform === "win32" ? "classbeat-server.exe" : "classbeat-server"
+  );
+if (!process.env.CLASSBEAT_SERVER && !fs.existsSync(SERVER_BIN)) {
+  console.warn(
+    `[playwright] 找不到 ${SERVER_BIN}\n` +
+      "先跑：cargo build --release --manifest-path desktop/server-rs/Cargo.toml"
+  );
+}
 
 module.exports = defineConfig({
   testDir: "./tools/e2e",
@@ -42,7 +67,7 @@ module.exports = defineConfig({
     video: process.env.CI ? "retain-on-failure" : "off",
   },
   webServer: {
-    command: `python3 server/rhythm_server.py --port ${PORT}`,
+    command: `"${SERVER_BIN}" --port ${PORT} --base server`,
     // 服务端和浏览器必须同一个时区，否则「这条消息过期没有」两边会差 8 小时
     env: { TZ: "Asia/Shanghai" },
     url: `${BASE_URL}/api/ping`,

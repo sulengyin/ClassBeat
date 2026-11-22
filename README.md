@@ -49,7 +49,7 @@
 | **手机推消息** | 大屏出二维码，手机扫一下就发；一句话上屏，可设时长、可撤回 |
 | **手机上改教室** | 手机页可装进手机桌面（PWA）；班名、作息时间、课表、提醒文字、常用话术在手机上改，屏上几十秒生效；名册不出大屏 |
 | **整屏可改** | 验证码进入编辑态，改文字、改今天、换人、调课、调作息，改动只在本机 |
-| **全屏 + 自动恢复** | 「大屏全屏.bat」无地址栏无关闭按钮，重复双击不开第二个；页面被误关看门狗自动拉起；「退出大屏.bat」随时回桌面；「安装开机自启.bat」每天开机自动就绪（学校每天关机也适用） |
+| **全屏 + 自动恢复** | 装好打开就是全屏，没有地址栏也没有关闭按钮；重复点图标不会开第二个；页面被误关会自动拉回来、服务崩了会自动重启；开机自启可关（学校每天关机也适用） |
 
 深色模式是纯黑底白字，给拉窗帘的教室用。
 
@@ -58,12 +58,16 @@
 ## 目录
 
 ```
-app/        大屏本体（页面本身不带数据，要先跑 bundle.py 生成 data.js）
-server/     局域网消息服务（Python，可选）
-tools/      构建 / 校验 / 测试 / 打包
-sample/     示例班级数据（化名，公开仓库用这份）
-data/       你自己的班级数据（不入库）
-docs/       说明与决策记录
+app/                 大屏本体（页面本身不带数据，要先跑 bundle 生成 data.js）
+desktop/             桌面版：Tauri 壳 + Rust 服务 + Rust 构建工具
+  src-tauri/           窗口 / 托盘 / 单实例 / 自启 / 更新器
+  server-rs/           局域网服务（classbeat-server.exe）
+  tools-rs/            装配、自检、验收、更新清单、单文件打包
+server/              手机页静态资源（phone.html、sw.js、图标）；服务本体在 server-rs
+tools/               校验与测试脚本（Python 只当参考实现与运维脚本用）
+sample/              示例班级数据（化名，公开仓库用这份）
+data/                你自己的班级数据（不入库）
+docs/                说明与决策记录
 ```
 
 `docs/PLAN.md` 是设计与取舍的完整记录（含阶段计划、未做项和每次真机反馈）。
@@ -72,7 +76,8 @@ docs/       说明与决策记录
 
 ## 先跑起来
 
-需要一个 Python 3（只用标准库）和 Node（跑前端测试时才需要）。
+只想看大屏：需要一个 Python 3（只用标准库）生成配置文件，然后直接开页面。
+要改桌面版（窗口壳 / 服务 / 打包）：再加 Rust 1.77+ 与 Node。
 
 ```bash
 git clone <this-repo> ClassBeat
@@ -86,16 +91,31 @@ open app/index.html          # macOS
 start app\index.html         # Windows
 ```
 
+桌面版一条命令出门（编工具 → 装配资源 → 自检 → 签名打包，产物在
+`desktop/src-tauri/target/release/bundle/nsis`）：
+
+```
+desktop\scripts\build_windows.ps1
+```
+
 想验证一切正常：
 
 ```bash
-node tools/test_rhythm.js    # 节律逻辑
-node tools/test_clock.js     # 北京时间与校时
-node tools/test_store.js     # 本地存储
-node tools/test_dom.js       # 页面起得来、不白屏
-python3 tools/check_p1.py    # 数据自洽
+node tools/test_rhythm.js      # 节律逻辑
+node tools/test_clock.js       # 北京时间与校时
+node tools/test_store.js       # 本地存储
+node tools/test_dom.js         # 页面起得来、不白屏
+node tools/test_engine.js      # 前端引擎与 Python 参考实现 132 天对拍
+python3 tools/check_p1.py      # 数据自洽
 python3 tools/test_calendar.py # 校历与值日轮岗
-python3 tools/test_server.py # 消息服务
+```
+
+服务和桌面外壳的检查（Rust）：
+
+```
+cargo build --release --manifest-path desktop/server-rs/Cargo.toml
+desktop\tools-rs\target\release\classbeat-tools.exe verify   装配不变量
+desktop\tools-rs\target\release\classbeat-tools.exe accept   运行期 17 项（装完才能跑）
 ```
 
 ---
@@ -198,10 +218,10 @@ python3 tools/backup.py
 
 | 层 | 命令 | 管什么 |
 |---|---|---|
-| 逻辑 | `node tools/test_rhythm.js` 等 | 时段判断、岗位、存储、校时、消息服务、端口顺延、配置模板与导入导出，502 项，秒级 |
+| 逻辑 | `node tools/test_rhythm.js` 等 | 时段判断、岗位、存储、校时、端口顺延、配置模板与导入导出，683 项，秒级 |
 | 引擎对拍 | `node tools/test_engine.js` | `app/engine/schedule.js` 与 Python 编译器 132 天逐字段一致（基准在 `tools/golden/`） |
 | 换学校 | `python3 tools/test_variants.py` | 4 套作息 × 5 套岗位 × 4 份校历 = 80 套配置，每套连编 70 天 |
-| 真浏览器 | `npx playwright test` | 21 个用例 / 7 个视口项目：一体机 1920/1366、iPad、iPhone、iPhone SE、安卓、鸿蒙视口 |
+| 真浏览器 | `npx playwright test` | 87 个用例 / 7 个视口项目：一体机 1920/1366、iPad、iPhone、iPhone SE、安卓、鸿蒙视口（被测服务是 `classbeat-server.exe`，先编一次） |
 
 换学校那一层不去猜「真实学校长什么样」，而是程序化生成不同作息（8:00/8:20/8:30 上课、
 35/40/45 分钟一节、有无课后服务、短课间），配上不同岗位与校历，逐套检查：
@@ -237,16 +257,15 @@ npx playwright test
 
 ## 手机推消息
 
-服务和大屏分开跑，大屏不需要装任何东西：
+服务和大屏分开跑，装好桌面版就已经在跑（`classbeat-server.exe`，`%LOCALAPPDATA%\ClassBeat`）。
+开发者想单独起一个排错用：
 
-```bash
-python3 server/run.py          # 守护模式：崩了自动拉起，已经在跑就不再开第二个
-python3 server/rhythm_server.py --port 8765   # 直接跑，排错时看输出用这个
+```
+cargo run --release --manifest-path desktop/server-rs/Cargo.toml -- --port 8765 --base server
 ```
 
-打包给老师的版本里双击「启动手机服务.bat」即可：走 `pythonw` 无窗口启动，
-日志落在 `server/server.log`，停止用「停止手机服务.bat」。
-8765 被别的软件占了会自动顺延到 8766、8767…（最多到 8774），
+日志落在数据目录的 `server.log`（桌面版在 `%APPDATA%\ClassBeat\`），
+退出用托盘菜单或 `Ctrl+Alt+Q`。8765 被别的软件占了会自动顺延到 8766、8767…（最多到 8774），
 大屏从 8765 起挨个问，找到就切过去，不用改地址。
 
 手机连同一个 WiFi，打开 `http://<电脑IP>:8765`。
@@ -278,20 +297,26 @@ python3 server/rhythm_server.py --port 8765   # 直接跑，排错时看输出�
 
 ## 现状
 
-`v0.5.1`（当前发布版）：桌面版是 Tauri 2 安装包，本地服务与构建工具都已换成 Rust，
+`v0.5.2`（当前发布版）：桌面版是 Tauri 2 安装包，本地服务与构建工具都已换成 Rust，
 装完就能用——不需要 Python、不需要命令行、不需要管理员权限，安装包 2.2 MiB（0.4.x 是 10.9 MiB）。
-这一版还顺手修了三件老师能直接看见的事：右下角 `⋯` 改成悬浮展开菜单（常用三项从左侧滑出）、
-打开即全屏、图标重绘。更新链路也补齐了：Release 里现在同时挂安装包、签名和 `latest.json`，
-老版本点「检查更新」能自动升上来（此前只挂 zip，更新器取不到清单，必然失败）。
+这一版修了三件老师能直接看见的事：右下角 `⋯` 改成悬浮展开菜单（常用三项从左侧滑出）、
+打开即全屏、图标重绘；外加「面板上那两个版本号别再打架」。更新链路也补齐了：Release 里同时挂
+安装包、签名和 `latest.json`，老版本点「检查更新」能自动升上来（此前只挂 zip，更新器取不到清单，
+必然失败）。
 
-大屏和设置页都能看到当前版本、新版本说明、下载进度与失败原因；健康检查不过会自动回到上一版，
-程序文件整体备份后再按白名单替换，不碰班级数据。
+更新由桌面外壳（`tauri-plugin-updater` + minisign 签名）负责：下载 → 校验签名 → NSIS 被动安装，
+班级数据全程不参与，所以升完还是自己的班。
+
+**0.5.3（开发中）只保留两种形态**：桌面安装包、单文件演示版。老的「解压即用 zip + pythonw +
+PowerShell 看门狗 + 页面内自己下载安装」那套已退役——它和桌面版是两套并行实现，改一条规则要同步
+两遍，还因为自解压 exe 招惹杀毒软件误报。现在整个仓库只剩一个服务实现（Rust）、一份打包链
+（`classbeat-tools`）。沿革与取舍见 `desktop/docs/13-语言分工与架构审查.md`。
 
 第一次打开会自动进向导：班级 → 作息模板 → 5×7 课表 → 岗位和文案。岗位表、作息表、课表都能从
-Excel / Word 里粘；配好可导出 JSON 搬到另一台电脑。完整安装包与单文件版都挂在
+Excel / Word 里粘；配好可导出 JSON 搬到另一台电脑。安装包与单文件版都挂在
 [Releases](https://github.com/sulengyin/ClassBeat/releases) 上，由 `.github/workflows/release.yml`
-在打标签时自动构建（`desktop` job 负责 Windows 安装包与更新清单）。这个包已经在教室的 Windows
-一体机上实际跑过，可以正常使用。
+在打标签时自动构建（一个 `desktop` job 负责 Windows 安装包、更新清单与单文件版）。
+这个包已经在教室的 Windows 一体机上实际跑过，可以正常使用。
 
 **还没做的**：P4 要求在真实班级连续跑满两周，仍在进行；「角色区分（学生只读 / 看护老师仅当天）」
 也还没做，依赖对使用场景的进一步确认；安装包还没有 Authenticode 代码签名，部分安全软件会提示

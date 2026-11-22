@@ -1,10 +1,10 @@
 /* 版本号的唯一定义处。
-   打包脚本（tools/package.py）会按 --version 与 git 提交号重写下面两行，
-   生成到发布包里；其它文件不要再写死版本号，服务端也从这里读。 */
+   打包时按 --version 与 git 提交号重写下面两行（classbeat-tools stage 改 BUILD，
+   single 两个都写），生成到发布包里；其它文件不要再写死版本号，服务端也从这里读。 */
 (function (root) {
   "use strict";
 
-  var VERSION = "0.3.27";
+  var VERSION = "0.3.28";
   var BUILD = "dev";
 
   root.AppVersion = {

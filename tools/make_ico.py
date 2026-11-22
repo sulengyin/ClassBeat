@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成大屏桌面图标的 .ico（tools/launcher/classbeat.ico）。
+"""生成桌面版图标的 .ico（desktop/src-tauri/icons/classbeat.ico）。
 
 两种来源：
     python3 tools/make_ico.py                     # 程序化贴纸时钟（默认，CI 可跑）
@@ -10,8 +10,11 @@
 平均缩到 7 档，PNG 负载装进 ICO 容器；同时重生成手机 PWA 图标
 （server/icons/icon-192.png 与 icon-512.png，2026-11-17 起与大屏
 桌面图标同一套品牌 logo）。品牌图换新时：
-    python3 tools/make_ico.py --png tools/launcher/logo-source.png
+    python3 tools/make_ico.py --png tools/assets/logo-source.png
 logo 源图与 ico 都入库，CI 打包只读 ico，不重生成。
+
+0.5.3 起 tools/launcher 整个目录随老形态（pythonw + 看门狗）退役，
+ico 只写桌面壳这一份：托盘、任务栏、桌面快捷方式、卸载列表读的是同一个文件。
 """
 
 import ctypes
@@ -24,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from make_icons import build, png_bytes
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "tools", "launcher", "classbeat.ico")
+OUT = os.path.join(ROOT, "desktop", "src-tauri", "icons", "classbeat.ico")
 PWA_OUT = os.path.join(ROOT, "server", "icons")
 PWA_SIZES = (192, 512)
 

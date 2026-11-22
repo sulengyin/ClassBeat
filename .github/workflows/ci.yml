@@ -62,12 +62,14 @@ jobs:
       - name: 校历与轮岗
         run: python3 tools/test_calendar.py
 
-      - name: 消息服务
-        run: python3 tools/test_server.py
-
-      # 启动器三件套 + 逃生门进了发布包，清单是逐文件手列的，漏一个老师就拿不到
-      - name: 打包清单
-        run: python3 tools/test_package.py
+      # 下面这些 Python 只当「参考实现」用，不进发布包：
+      #   tools/build_day.py   把一天编译成时间线，引擎对拍（test_engine.js）的基准由它冻出来
+      #   tools/check_p1.py    规则自洽性（轮换、午间槽位、未知项不猜）
+      #   tools/test_calendar.py / test_variants.py  校历与换学校矩阵
+      #
+      # 以前这里还跑 test_server.py（Python 服务）与 test_package.py（打包清单）——
+      # 0.5.3 起 Python 服务与解压包形态退役，那两套用例已随代码删除。
+      # 现在「服务」的回归由 desktop 的 tools-rs / server-rs 自己带（verify + accept）。
 
       # 真实班级数据一旦入库就收不回来，这里守住最后一道
       - name: 隐私检查
@@ -143,6 +145,17 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit != 'true'
         timeout-minutes: 12
         run: npx playwright install chromium webkit
+
+      # 被测服务是 Rust 的 classbeat-server（0.5.3 起 Python 版已退役），
+      # playwright.config.js 会直接拉起这个二进制，所以先编出来。
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/server-rs -> target
+
+      - name: 编被测服务
+        run: cargo build --release --manifest-path desktop/server-rs/Cargo.toml
 
       - name: 生成示例数据
         run: python3 tools/bundle.py --data sample

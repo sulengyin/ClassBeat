@@ -1,7 +1,13 @@
 name: Release
 
 # 手动跑 = 只验证「这份代码能不能打出完整的包」，产物进 artifact；
-# 打 tag（v*）= 同上，并把 zip 和单文件版挂到 GitHub Release。
+# 打 tag（v*）= 同上，并把安装包 / 签名 / latest.json / 单文件演示版挂到 GitHub Release。
+#
+# 0.5.3 起只有一条发布线：Tauri 桌面安装包。
+# 老形态（解压即用的 zip + pythonw + PowerShell 看门狗 + 自解压安装器 + 页面内更新器）
+# 已退役，连同 `server/*.py`、`tools/package.py`、`tools/build_installer.py`、
+# `tools/make_update.py`、`tools/launcher/` 一起删除——那两个 job 也一并去掉。
+# 想给不想装软件的机器看效果，用同一次构建出来的单文件版（classbeat-tools single）。
 #
 # 仓库里没有 data/，一律用 sample/ 的化名班级构建。包名会带「五1班」，
 # 老师装上后首次打开自动进配置向导，改成自己的班即可。
@@ -18,141 +24,12 @@ env:
   TZ: Asia/Shanghai          # 包名里的日期用北京时间，不要跟着 runner 走 UTC
 
 jobs:
-  package:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      # 免安装运行时约 11 MB，从 python.org 下载。缓存住，
-      # 手动验证时不用每次都等这一下。
-      - name: 缓存免安装 Python
-        uses: actions/cache@v6
-        with:
-          path: tools/vendor
-          key: python-embed-3.12.10
-
-      - name: 用示例班级构建配置
-        run: python3 tools/bundle.py --data sample
-
-      - name: 打包（含免安装 Python）
-        run: python3 tools/package.py
-
-      # 更新清单只对正式 tag 有意义：下载地址要用 tag 才拼得出来。
-      # 生成后会按安装器的同一套规则自校验，坏清单不会流到 Release。
-      - name: 生成更新清单
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          set -e
-          zip=$(ls dist/*.zip | head -1)
-          python3 tools/make_update.py \
-            --zip "$zip" \
-            --tag "$GITHUB_REF_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --notes-file CHANGELOG.md \
-            --min-version 0.3.8
-          test -s dist/update.json
-
-      # 简易安装器（PLAN 2.45 ③）：py7zr 打包 + 7zSD.sfx 三段拼接，
-      # 与操作系统无关，Ubuntu 上就能出 exe；真机行为由 Smoke 的
-      # windows-smoke「安装器真实安装验证」把关。
-      - name: 构建简易安装器
-        run: |
-          set -e
-          python3 -m pip install py7zr
-          python3 tools/build_installer.py
-          test -s dist/classbeat-setup-*.exe
-          ls -lh dist/classbeat-setup-*.exe
-
-      - name: 检查产物
-        run: |
-          set -e
-          ls -lh dist
-          zip=$(ls dist/*.zip | head -1)
-          unzip -l "$zip" | grep -q "server/python/python.exe"
-          unzip -l "$zip" | grep -q "启动手机服务.bat"
-          unzip -l "$zip" | grep -q "app/setup.js"
-          unzip -l "$zip" | grep -q "MANIFEST.txt"
-          # 包里绝不能带真实班级数据或运行期文件
-          if unzip -l "$zip" | grep -Eq "/(data/|server/messages\.json|server/server\.log|server/service\.pid)"; then
-            echo "包里混进了不该发布的文件："
-            unzip -l "$zip" | grep -E "/(data/|server/messages\.json|server/server\.log|server/service\.pid)"
-            exit 1
-          fi
-          setup=$(ls dist/classbeat-setup-*.exe | head -1)
-          echo "setup=$setup" >> "$GITHUB_ENV"
-          echo "zip=$zip" >> "$GITHUB_ENV"
-          if [ -f dist/update.json ]; then
-            python3 tools/make_update.py --check-only --dist dist
-          fi
-          echo "已确认：$zip 自带运行时、手机服务、配置向导、MANIFEST"
-
-      # update.json 提交回仓库 main 分支（2026-11-18 加速域名方案）：
-      # 包内更新源 = 加速前缀 + raw.githubusercontent.com/.../main/update.json，
-      # 这个 raw 地址永远指向最新版。直连 GitHub 不稳，加速前缀由
-      # update-source.txt 配置，程序自动推导；仓库里这份清单本身不用改。
-      - name: 更新清单提交回仓库
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          content=$(base64 -w0 dist/update.json)
-          sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/update.json?ref=main" \
-            --jq '.sha' 2>/dev/null || echo "")
-          if [ -n "$sha" ]; then
-            gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/update.json" \
-              -f message="update.json: $GITHUB_REF_NAME（by release.yml）" \
-              -f content="$content" -f branch=main -f sha="$sha" --jq '.commit.sha'
-          else
-            gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/update.json" \
-              -f message="update.json: $GITHUB_REF_NAME（by release.yml）" \
-              -f content="$content" -f branch=main --jq '.commit.sha'
-          fi
-          echo "update.json 已提交到 main；raw 地址："
-          echo "  https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/update.json"
-
-      - name: 上传产物
-        uses: actions/upload-artifact@v7
-        with:
-          name: classbeat-package
-          path: |
-            dist/*.zip
-            dist/classbeat-setup-*.exe
-            dist/*-single.html
-          retention-days: 30
-
-      - name: 上传更新清单
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v7
-        with:
-          name: classbeat-update-manifest
-          path: dist/update.json
-          retention-days: 30
-
-      - name: 发布到 Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            "$setup" "$zip" dist/*-single.html dist/update.json \
-            --title "ClassBeat $GITHUB_REF_NAME" \
-            --notes "桌面版（推荐）：下载 ClassBeat_版本号_x64-setup.exe 双击安装——不需要管理员密码，装到本机用户目录，班级数据保留，装完自动建桌面图标、打开即全屏；已经在用旧版的不用重新下载，大屏右下角「⋯」→ 更新里点「检查更新」就能升上来（0.5.1 起 Release 里同时挂了安装包、签名和 latest.json，更新器才取得到）。只想看看效果：下载 classbeat-版本号-single.html 双击打开，不用安装（单文件版不能自更新）。老形态的 classbeat-版本号.zip（解压后双击「打开大屏.bat」）仍在，给不想安装的机器用。附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」，包内目录仍是中文；完整说明见仓库 CHANGELOG.md。" \
-            --generate-notes \
-            --verify-tag
-
   # ------------------------------------------------------------------
-  # 桌面版：Tauri 安装包 + 更新清单（0.5.1 补上）
+  # 桌面版：Tauri 安装包 + 更新清单 + 单文件演示版
   #
-  # 为什么必须有这一段：桌面版靠 tauri-plugin-updater + latest.json 更新，
-  # 而此前流水线只出「解压即用」的 zip/setup，GitHub 上
-  # releases/latest/download/latest.json 是 404——0.4.x 老用户点「检查更新」
-  # 永远失败，只能手动下载重装。这里把安装包、.sig、latest.json 一起挂到
-  # 同一个 Release，老用户才能顺着更新器一路升上来。
+  # 为什么必须有 latest.json：桌面版靠 tauri-plugin-updater + latest.json 更新。
+  # 少了它，releases/latest/download/latest.json 就是 404，老版本点「检查更新」
+  # 永远失败，只能手动下载重装。
   #
   # 需要两个仓库 secret（Settings → Secrets → Actions）：
   #   TAURI_SIGNING_PRIVATE_KEY           更新签名私钥全文（minisign）
@@ -162,7 +39,6 @@ jobs:
   # ------------------------------------------------------------------
   desktop:
     runs-on: windows-latest
-    needs: package
     steps:
       - uses: actions/checkout@v7
 
@@ -199,6 +75,11 @@ jobs:
       - name: 装配资源（示例班级）
         run: desktop/tools-rs/target/release/classbeat-tools.exe stage --data sample
 
+      # 装配后复核：有几条不变量只有把资源铺好才看得到（版本双轨、资源里无 .py、
+      # build-info 与 tauri.conf 一致）。和 build_windows.ps1 的顺序保持一致。
+      - name: 装配后自检
+        run: desktop/tools-rs/target/release/classbeat-tools.exe verify
+
       - name: 前端工具链
         working-directory: desktop
         run: npm ci
@@ -212,6 +93,9 @@ jobs:
 
       # latest.json 的形状由 classbeat-tools 保证：它挑 .nsis.zip 优先、
       # 缺 .sig 直接失败，签名原文写进 platforms.windows-x86_64.signature。
+      # notes 交给 --notes-file：大屏面板是 textContent 渲染，直接塞
+      # `head -30 CHANGELOG.md` 会显示成 "## 0.5.2 — 日期 - 条目 - 条目"，
+      # 工具取第一节、去掉 Markdown 记号、按「；」连成一句话再入库。
       - name: 生成更新清单
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -224,10 +108,24 @@ jobs:
             --version "$version" \
             --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME" \
             --out desktop/dist/desktop/latest.json \
-            --notes "$(head -30 CHANGELOG.md)"
+            --notes-file CHANGELOG.md
           cat desktop/dist/desktop/latest.json
 
-      - name: 上传桌面产物
+      # 单文件演示版：整个大屏内联成一个 html，双击就开，不用安装。
+      # 数据用 sample 的化名班级；版本号取 app/version.js（界面版本），
+      # 构建号取当前提交，和安装版显示的是同一套。
+      - name: 出单文件演示版
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -e
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p desktop/dist/desktop
+          desktop/tools-rs/target/release/classbeat-tools.exe single \
+            --data sample \
+            --out "desktop/dist/desktop/classbeat-$version-single.html"
+
+      - name: 上传产物
         uses: actions/upload-artifact@v7
         with:
           name: classbeat-desktop
@@ -236,23 +134,23 @@ jobs:
             desktop/src-tauri/target/release/bundle/nsis/*.sig
             desktop/src-tauri/target/release/bundle/msi/*.msi
             desktop/dist/desktop/latest.json
+            desktop/dist/desktop/*-single.html
           retention-days: 30
 
-      # 和上面的 ubuntu job 并行跑，Release 可能还没建好：重试几轮再传。
-      - name: 挂到同一个 Release
+      - name: 发布到 Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -e
-          for i in 1 2 3 4 5 6; do
-            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then break; fi
-            echo "等 Release 建好（第 $i 次）…"; sleep 15
-          done
-          gh release upload "$GITHUB_REF_NAME" \
-            desktop/src-tauri/target/release/bundle/nsis/ClassBeat_*_x64-setup.exe \
-            desktop/src-tauri/target/release/bundle/nsis/ClassBeat_*_x64-setup.exe.sig \
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            desktop/src-tauri/target/release/bundle/nsis/ClassBeat_"$version"_x64-setup.exe \
+            desktop/src-tauri/target/release/bundle/nsis/ClassBeat_"$version"_x64-setup.exe.sig \
             desktop/dist/desktop/latest.json \
-            --clobber
+            "desktop/dist/desktop/classbeat-$version-single.html" \
+            --title "ClassBeat $GITHUB_REF_NAME" \
+            --notes "桌面版（推荐）：下载 ClassBeat_${version}_x64-setup.exe 双击安装——不需要管理员密码，装到本机用户目录，班级数据保留，装完自动建桌面图标、打开即全屏。已经在用旧版的不用重新下载，大屏右下角「⋯」→ 更新里点「检查更新」就能升上来（更新器读的是同一次发布的 latest.json）。只想看看效果：下载 classbeat-${version}-single.html 双击打开，不用安装（单文件版没有手机发消息，也不能自更新）。附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」，包内目录仍是中文；完整说明见仓库 CHANGELOG.md。" \
+            --verify-tag
           echo "更新器入口：https://github.com/$GITHUB_REPOSITORY/releases/latest/download/latest.json"

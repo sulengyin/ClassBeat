@@ -8,8 +8,10 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{json, Map, Value};
 
-pub fn run(data_arg: Option<&str>, out_arg: Option<&str>, repo: &Path) -> Result<(), String> {
-    let data_dir: PathBuf = match data_arg {
+/// 数据目录：`--data` 优先（相对仓库根解析），否则 `data/`，没有就 `sample/`。
+/// 公开仓库里没有 `data/`（真实班级数据不入库），所以 CI 一律走 `sample/`。
+pub fn resolve_data_dir(arg: Option<&str>, repo: &Path) -> Result<PathBuf, String> {
+    let dir = match arg {
         Some(d) => {
             let p = PathBuf::from(d);
             if p.is_absolute() {
@@ -27,18 +29,24 @@ pub fn run(data_arg: Option<&str>, out_arg: Option<&str>, repo: &Path) -> Result
             }
         }
     };
-    if !data_dir.join("students.json").is_file() {
-        return Err(format!("数据目录里没有 students.json：{}", data_dir.display()));
+    if !dir.join("students.json").is_file() {
+        return Err(format!("数据目录里没有 students.json：{}", dir.display()));
     }
+    Ok(dir)
+}
 
-    let students = read(&data_dir, "students.json", None)?;
-    let roles = read(&data_dir, "roles.json", None)?;
-    let content = read(&data_dir, "content.json", None)?;
-    let timetable = read(&data_dir, "timetable.json", None)?;
-    let schedule = read(&data_dir, "schedule.json", None)?;
-    let noon = read(&data_dir, "noon.json", None)?;
+/// 把一份数据目录拼成 `window.RHYTHM_DATA` 的 payload。
+/// 单独拆出来是给 `single`（单文件 HTML）复用：两个产物必须来自同一份数据形状，
+/// 否则单文件版和安装版会看到不一样的班级。
+pub fn build_payload(data_dir: &Path) -> Result<Value, String> {
+    let students = read(data_dir, "students.json", None)?;
+    let roles = read(data_dir, "roles.json", None)?;
+    let content = read(data_dir, "content.json", None)?;
+    let timetable = read(data_dir, "timetable.json", None)?;
+    let schedule = read(data_dir, "schedule.json", None)?;
+    let noon = read(data_dir, "noon.json", None)?;
     // 校历可选：没有就当成「周一到周五都上学、不放假」
-    let calendar = read(&data_dir, "calendar.json", Some(json!({"days": {}})))?;
+    let calendar = read(data_dir, "calendar.json", Some(json!({"days": {}})))?;
 
     let school = timetable
         .get("school")
@@ -97,6 +105,21 @@ pub fn run(data_arg: Option<&str>, out_arg: Option<&str>, repo: &Path) -> Result
         }
     }
 
+    Ok(Value::Object(payload))
+}
+
+/// `window.RHYTHM_DATA=…;` —— 大屏在 file:// 下不能 fetch，配置必须内联成脚本。
+pub fn render_data_js(payload: &Value) -> Result<String, String> {
+    let body = serde_json::to_string(payload).map_err(|e| format!("序列化失败：{e}"))?;
+    Ok(format!(
+        "/* 由 classbeat-tools bundle 生成，不要手改 */\nwindow.RHYTHM_DATA={body};\n"
+    ))
+}
+
+pub fn run(data_arg: Option<&str>, out_arg: Option<&str>, repo: &Path) -> Result<(), String> {
+    let data_dir = resolve_data_dir(data_arg, repo)?;
+    let payload = build_payload(&data_dir)?;
+
     let out = match out_arg {
         Some(o) => {
             let p = PathBuf::from(o);
@@ -111,9 +134,7 @@ pub fn run(data_arg: Option<&str>, out_arg: Option<&str>, repo: &Path) -> Result
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent).ok();
     }
-    let body = serde_json::to_string(&Value::Object(payload))
-        .map_err(|e| format!("序列化失败：{e}"))?;
-    let text = format!("/* 由 classbeat-tools bundle 生成，不要手改 */\nwindow.RHYTHM_DATA={body};\n");
+    let text = render_data_js(&payload)?;
     std::fs::write(&out, text.as_bytes()).map_err(|e| format!("写不进 {}：{e}", out.display()))?;
     let size = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0) as f64 / 1024.0;
     println!(

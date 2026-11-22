@@ -20,10 +20,14 @@ desktop/
 └── scripts/       ← PowerShell 入口（build_windows.ps1 / dev.ps1）
 ```
 
-`app/`（大屏页面）与 `server/phone.html` 等业务静态资源一字未改；
-Rust 服务是按端点逐条对齐 Python 版重写的，等价性证据见
-[`docs/11-功能等价对比.md`](docs/11-功能等价对比.md) 与
+`app/`（大屏页面）与 `server/phone.html` 等业务静态资源一字未改（`server/` 里
+现在只剩手机页与图标，服务本体在 `server-rs`）；Rust 服务是按端点逐条对齐 Python 版
+重写的，等价性证据见 [`docs/11-功能等价对比.md`](docs/11-功能等价对比.md) 与
 [`docs/12-服务从Python迁到Rust.md`](docs/12-服务从Python迁到Rust.md)。
+
+**0.5.3 起只有一条发布线**：桌面安装包 + 单文件演示版。老的「解压即用 zip + pythonw +
+看门狗 + 自解压安装器 + 页面内更新器」已退役（约 8,700 行），判定标准与沿革见
+[`docs/13-语言分工与架构审查.md`](docs/13-语言分工与架构审查.md)。
 
 ## 怎么构建
 

@@ -186,13 +186,19 @@ RMDir /r "$INSTDIR\resources\server\__pycache__"
 `classbeat-tools verify` 里加了一条断言钉住这段代码还在，且装配结果里 `.py` 数量为 0、
 `resources/python` 不存在。重装后安装目录 29 MB → **6.59 MB**，与预期一致。
 
-**② 旧版脚本不能直接删干净。**
-`server/*.py`（`rhythm_server.py` / `updater.py` / `run.py` / `update_manifest.py`）和 `tools/*.py`
-仍然留在仓库里：它们是"解压即用"的单文件版历史工具，还有老师在用，只是**不再参与桌面版构建、不进安装包**。
-桌面版这边被删掉的只有 `desktop/scripts/` 下被 `classbeat-tools` 取代的 4 个：
-`stage_resources.py`、`verify_package.py`、`make_latest.py`、`accept_runtime.py`。
-`tools/bundle.py` 保留（单文件版还要用），`data.js` 的生成逻辑在 `tools-rs/src/bundle.rs` 里另写了一份。
-仓库里 `.py` 总数从 32 降到 28，剩下 28 个全是业务侧/测试侧的，与桌面版构建无关。
+**② 旧版脚本当时没有删干净（0.5.3 才收尾）。**
+0.5.0 迁移时 `server/*.py`（`rhythm_server.py` / `updater.py` / `run.py` / `update_manifest.py`）
+和 `tools/*.py` 都还留在仓库里，理由是"解压即用的单文件版还有老师在用，只是不再进安装包"。
+桌面版这边当时只删了 `desktop/scripts/` 下被 `classbeat-tools` 取代的 4 个脚本。
+
+**0.5.3 把这些全清了。** 判定标准是「老形态是不是第二个产品」——它是（自己一套更新器、
+一套启动器、一套打包链），所以整体退役：`server/*.py`、`tools/package.py`、
+`build_installer.py`、`make_update.py`、`smoke_windows.py`、`tools/launcher/`、
+`tools/installer/`、`update.json`、`desktop/scripts/*.py` 共约 8,700 行 / 29 个文件。
+单文件演示版的打包搬到 `classbeat-tools single`（Rust），所以 `tools/package.py` 不留。
+`tools/bundle.py` 仍保留（JS 测试的 CI job 里没有 Rust 工具链），它和 `tools-rs/src/bundle.rs`
+是**唯一的双实现**，约定输出除 `generatedAt` 外必须一致——细节与待办见
+[`13-语言分工与架构审查.md`](13-语言分工与架构审查.md)。
 
 ## 12.8 还没做 / 已知不追平
 

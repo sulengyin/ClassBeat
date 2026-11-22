@@ -1,13 +1,16 @@
 name: Smoke
 
-# 真机前的「能排除的都排除」（2026-11-18，19 号教室验收前加跑几轮）。
+# 真机前的「能排除的都排除」。CI 的 unit/e2e 全在 Linux 上，有些问题只在
+# 多轮重复运行时才露头（2026-11-19 的 ⑰「Windows 上 SO_REUSEADDR 劫持让
+# 端口顺延失效」就是「虚拟机全绿、真机才炸」的漏网之鱼）。
 #
-# 为什么有这个工作流：CI 的 unit/e2e 全在 Linux 上，⑰（Windows 上
-# SO_REUSEADDR 劫持让端口顺延失效）就是「虚拟机全绿、真机才炸」的
-# 漏网之鱼。这里用 windows-latest runner 把发布包解包当真实安装跑：
-# 服务就绪、大屏页面、程序内更新整链（包内 update-source.txt →
-# 加速域名 → GitHub raw 清单）、第二个实例请求同端口必须被挤到下一
-# 个端口。再配一个 Linux 多轮回归找偶发。
+# 0.5.3 起这里**只留多轮回归**：原来那个 windows-smoke job 是解包老 zip、
+# 用包内 python.exe 起 Python 服务、再 DryRun 看门狗与自解压安装器——
+# 那些东西连同 `server/*.py`、`tools/launcher/`、`tools/package.py`、
+# `tools/smoke_windows.py` 一起退役了，已经没有可解包的包。
+# 桌面版的 Windows 侧把关改由 release.yml 的 desktop job 承担：
+#   装配 → verify（文件/模块/配置/钩子/装配不变量）→ tauri build → make-latest；
+# 真机上的安装、更新、误关与自愈由 `classbeat-tools accept` 在教室里跑（17 项）。
 #
 # 触发：main 更新 + 手动（Actions 页面 Run workflow）。普通 PR 不跑，
 # 避免把 CI 的等待时间再拉长一截。
@@ -19,180 +22,8 @@ on:
 
 env:
   TZ: Asia/Shanghai
-  # runner 的 Windows 控制台是 cp1252，中文 print 直接 UnicodeEncodeError
-  # （2026-11-18 第一轮冒烟抓到的：unit/e2e 在 Linux 上永远碰不到）
-  PYTHONUTF8: "1"
 
 jobs:
-  # 真实 Windows 环境 + 真实发布包 + 真实更新链路
-  windows-smoke:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: 缓存免安装 Python
-        uses: actions/cache@v6
-        with:
-          path: tools/vendor
-          key: python-embed-3.12.10
-
-      - name: 构建发布包
-        run: |
-          python tools/bundle.py --data sample
-          python tools/package.py
-
-      - name: 解包（当作老师拿到手的安装）
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path smoketest -Force | Out-Null
-          $zip = Get-ChildItem dist\classbeat-*.zip | Where-Object { $_.Name -notmatch 'single' } | Select-Object -First 1
-          Expand-Archive -Path $zip.FullName -DestinationPath smoketest -Force
-          $top = Get-ChildItem smoketest | Select-Object -First 1
-          "PKG=$($top.FullName)" >> $env:GITHUB_ENV
-          Write-Output "解包到 $($top.FullName)"
-
-      # 用包内自带的 python.exe 跑服务——和教室一体机上的形态完全一致
-      - name: 冒烟（服务/页面/更新链路/端口顺延）
-        shell: pwsh
-        run: |
-          $pkgPy = Join-Path $env:PKG 'server\python\python.exe'
-          if (Test-Path $pkgPy) {
-            python tools\smoke_windows.py --pkg "$env:PKG" --python "$pkgPy"
-          } else {
-            Write-Output "包内没有自带 Python 运行时，用 runner 的 Python 跑"
-            python tools\smoke_windows.py --pkg "$env:PKG"
-          }
-
-      # 启动器脚本在真 Windows PowerShell 里走一遍推演（不真开窗口）
-      - name: 启动器 DryRun
-        shell: pwsh
-        run: |
-          & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:PKG 'tools\launcher\start-kiosk.ps1') -DryRun
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:PKG 'tools\launcher\install-autostart.ps1') -DryRun
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          Write-Output "启动器两件套 DryRun 通过"
-
-      # 窗口枚举助手（2026-11-19 真机反馈 ①：主窗口误判让大屏不断跳出）：
-      # DryRun 路径碰不到单实例判据，这里直接点源助手验证能编译、能枚举
-      - name: 窗口枚举助手验证
-        shell: pwsh
-        run: |
-          . (Join-Path $env:PKG 'tools\launcher\win-titles.ps1')
-          $titles = Get-CBWinTitles
-          if ($null -eq $titles) { Write-Output "::error::窗口枚举不可用"; exit 1 }
-          Write-Output ("枚举到 " + $titles.Count + " 个可见窗口标题")
-          if ($titles.Count -lt 1) { Write-Output "::error::一个窗口都没枚举到"; exit 1 }
-          $hit = Test-CBWindowTitle '不存在的标题字符串'
-          if ($hit -ne $false) { Write-Output "::error::按标题匹配应返回 false，实际 $hit"; exit 1 }
-          Write-Output "窗口枚举助手验证通过"
-
-      # 节律时刻弹屏（PLAN 2.48 ①）：看门狗从配置快照解析"今天哪些时刻
-      # 要弹屏"。本地安全钩子禁 powershell 派生验证，放 runner 上真跑：
-      # 造一份假快照，断言周一出 2 个时刻、假日周六 0 个、调休周日 2 个。
-      - name: 节律时刻解析自检
-        shell: pwsh
-        run: |
-          $tmp = Join-Path $env:RUNNER_TEMP 'cb-schedule-selftest'
-          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-          $snap = @'
-          {"config":{"timetable":{"blocks":[{"start":"07:30","end":"08:10","type":"reading","name":"晨间自主管理"},{"start":"08:10","end":"08:20","type":"break","name":"课间"},{"start":"09:00","end":"09:30","type":"ritual","name":"大课间"},{"start":"11:40","end":"12:10","type":"meal","name":"午餐"}]},"calendar":{"days":{"2026-11-21":{"kind":"holiday","name":"运动会"},"2026-11-22":{"kind":"school","asWeekday":5,"name":"调休上课"}}}}}
-          '@
-          [System.IO.File]::WriteAllText((Join-Path $tmp 'rhythm-2026-11-19.json'), $snap, (New-Object System.Text.UTF8Encoding($false)))
-          function Invoke-SelfTest([string]$day) {
-            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File tools\launcher\watchdog.ps1 -SelfTest -BackupDir $tmp -TodayStr $day 2>&1
-            Write-Output ($out -join "`n")
-            return @{ Code = $LASTEXITCODE; Text = ($out | Out-String) }
-          }
-          $mon = Invoke-SelfTest '2026-11-23'
-          if ($mon.Code -ne 0 -or $mon.Text -notmatch 'count=2') { Write-Output "::error::周一应解析出 2 个节律时刻"; exit 1 }
-          # 课间 08:10-08:20 → minutes=490 end=500：提醒的生效范围是整个时段
-          if ($mon.Text -notmatch 'minutes=490 end=500 type=break') { Write-Output "::error::时段端点解析不对"; exit 1 }
-          $hol = Invoke-SelfTest '2026-11-21'
-          if ($hol.Code -ne 0 -or $hol.Text -notmatch 'count=0') { Write-Output "::error::假日周六应为 0 个时刻"; exit 1 }
-          $sun = Invoke-SelfTest '2026-11-22'
-          if ($sun.Code -ne 0 -or $sun.Text -notmatch 'count=2') { Write-Output "::error::调休周日应出 2 个时刻"; exit 1 }
-          Write-Output "节律时刻解析自检通过"
-
-      # 简易安装器（PLAN 2.45 ③）：真 Windows 上构建 + 真实跑一遍。
-      # 本地开发机沙箱会拦截「未签名 exe 派生 powershell」，只能在这里验。
-      - name: 构建简易安装器
-        shell: pwsh
-        run: |
-          python -m pip install py7zr
-          $target = Join-Path $env:RUNNER_TEMP 'cb-install-target'
-          New-Item -ItemType Directory -Path (Join-Path $target 'data') -Force | Out-Null
-          Set-Content -Path (Join-Path $target 'data\marker.txt') -Value 'keepme'
-          Set-Content -Path (Join-Path $target 'update-source.txt') -Value 'my own source'
-          python tools\build_installer.py --install-args "-TargetDir $target -NoAutostart"
-          "CBTARGET=$target" >> $env:GITHUB_ENV
-          # 归档内容自证：runner 自带的 7-Zip CLI 能列出 server/python/python.exe
-          $sz = 'C:\Program Files\7-Zip\7z.exe'
-          if (Test-Path $sz) {
-            $found = & $sz l (Get-ChildItem dist\classbeat-setup-*.exe).FullName |
-              Select-String 'server\\python\\python\.exe'
-            if (-not $found) { Write-Output "::error::安装器归档里没有 python.exe"; exit 1 }
-            Write-Output "归档含 python.exe：$($found.Line.Trim())"
-          }
-
-      - name: 安装器真实安装验证
-        shell: pwsh
-        run: |
-          $setup = Get-ChildItem dist\classbeat-setup-*.exe | Select-Object -First 1
-          Write-Output "运行 $($setup.Name)"
-          # 7zSD 是 GUI 子系统程序，& 不会等它跑完（$LASTEXITCODE 不会被
-          # 设置，2026-11-19 第一轮冒烟踩到），必须 Start-Process + WaitForExit；
-          # -y 让 SFX 出错时不弹框直接给退出码（第三轮冒烟抓到过弹框挂死）；
-          # 再挂有界超时，超时抓现场
-          $p = Start-Process -FilePath $setup.FullName -ArgumentList "-y" -PassThru
-          if (-not $p.WaitForExit(180000)) {
-            Write-Output "::warning::安装器 180 秒没退出，抓现场："
-            Get-Process | Where-Object { $_.ProcessName -match 'classbeat|powershell|pwsh' } |
-              Select-Object Id, ProcessName, MainWindowTitle | Format-Table | Out-String | Write-Output
-            if (Test-Path $env:CBTARGET) {
-              Get-ChildItem $env:CBTARGET -ErrorAction SilentlyContinue |
-                Select-Object -ExpandProperty Name | Write-Output }
-            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-            exit 1
-          }
-          if ($p.ExitCode -ne 0) { Write-Output "::error::安装器退出码 $($p.ExitCode)"; exit 1 }
-          # 黑匣子：install.ps1 的控制台输出不进 job 日志，读它的 transcript
-          $log = Join-Path $env:TEMP 'classbeat-install.log'
-          if (Test-Path $log) {
-            Write-Output "--- install.ps1 transcript ---"
-            Get-Content $log | Write-Output
-            Write-Output "--- transcript 结束 ---"
-          } else {
-            Write-Output "::warning::没有 install.ps1 transcript，安装脚本可能没跑起来"
-          }
-          $t = $env:CBTARGET
-          if ((Get-Content (Join-Path $t 'data\marker.txt')) -ne 'keepme') {
-            Write-Output "::error::老师数据 marker.txt 被覆盖"; exit 1 }
-          if ((Get-Content (Join-Path $t 'update-source.txt')) -ne 'my own source') {
-            Write-Output "::error::自定义更新源被覆盖"; exit 1 }
-          foreach ($f in @('server\python\python.exe', 'app\index.html',
-                           'tools\launcher\install-autostart.ps1',
-                           '安装开机自启.bat', '启动手机服务.bat', 'install.ps1')) {
-            if (-not (Test-Path (Join-Path $t $f))) {
-              Write-Output "::error::安装后缺文件：$f；抓现场："
-              Get-ChildItem $t -Recurse -ErrorAction SilentlyContinue |
-                Select-Object -First 60 -ExpandProperty FullName | Write-Output
-              Get-ChildItem $env:TEMP -Filter '7zS*' -ErrorAction SilentlyContinue |
-                ForEach-Object { Write-Output ("残留解压临时目录: " + $_.FullName)
-                  (Get-ChildItem $_.FullName -Recurse -ErrorAction SilentlyContinue).Count }
-              exit 1 }
-          }
-          Write-Output "安装器验证通过：旧数据/更新源保留，程序文件齐全"
-
-      - name: 冒烟结果汇总
-        if: always()
-        run: echo "Windows 冒烟结束。"
-
   # Linux 多轮回归：同一套套件连跑几轮，抓偶发
   regress-rounds:
     runs-on: ubuntu-24.04
@@ -240,12 +71,31 @@ jobs:
       - name: 生成示例数据
         run: python3 tools/bundle.py --data sample
 
-      # 服务端套件连跑 3 轮（⑰ 曾经就是本地必现、CI 才漏掉的类型）
-      - name: 服务端回归 ×3
+      # 被测服务是 Rust 的 classbeat-server（0.5.3 起 Python 版已退役），
+      # playwright.config.js 会直接拉起这个二进制，所以先编出来。
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/server-rs -> target
+
+      - name: 编被测服务
+        run: cargo build --release --manifest-path desktop/server-rs/Cargo.toml
+
+
+      # 逻辑层连跑 3 轮：这类套件单轮很难暴露时序问题，跑三轮才有点意义
+      - name: 逻辑层回归 ×3
         run: |
           for i in 1 2 3; do
             echo "===== 第 $i 轮 ====="
-            python3 tools/test_server.py || exit 1
+            node tools/test_rhythm.js   || exit 1
+            node tools/test_clock.js    || exit 1
+            node tools/test_store.js    || exit 1
+            node tools/test_dom.js      || exit 1
+            node tools/test_remote.js   || exit 1
+            node tools/test_setup.js    || exit 1
+            node tools/test_engine.js   || exit 1
+            node tools/test_backup.js   || exit 1
           done
 
       # 真浏览器 e2e 连跑 2 轮

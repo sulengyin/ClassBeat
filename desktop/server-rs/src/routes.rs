@@ -28,6 +28,13 @@ const BODY_MAX: usize = 8 * 1024 * 1024;
 const BACKUP_MAX_BODY: i64 = 512 * 1024;
 const MESSAGE_MAX_BODY: i64 = 4096;
 
+/// 桌面版没有「页面里自己更新」这条路：程序文件由壳的更新器（托盘 → 检查更新，
+/// 或 Ctrl+Alt+U）维护。这句话同时出现在 `/api/update/status` 的 blockedReason
+/// 和 `/api/update/apply` 的 409 里，所以只留一份，避免两处说法不一样
+/// （0.5.1 就出现过一处写「由 ClassBeat 应用统一更新」、另一处写「由程序自己更新」）。
+const DESKTOP_UPDATE_HINT: &str =
+    "桌面版由程序自己更新：点托盘图标 → 检查更新（或按 Ctrl+Alt+U），装完班级数据不变。";
+
 pub async fn handle(
     State(st): State<Arc<AppState>>,
     req: Request<Body>,
@@ -443,7 +450,7 @@ async fn handle_post(
         }
         // 壳版的程序文件由安装器（tauri-plugin-updater）维护，服务不做程序内更新。
         // 三个端点保留是为了前端的旧分支不 404，语义与 Python 壳模式一致。
-        let hint = "桌面版由 ClassBeat 应用统一更新：点托盘图标 → 检查更新（或按 Ctrl+Alt+U）";
+        let hint = DESKTOP_UPDATE_HINT;
         return match route {
             "/api/update/check" => resp::json(
                 &json!({"ok": false, "error": "还没有配置更新源，暂时不能在线更新", "state": "failed"}),
@@ -605,10 +612,7 @@ fn update_status(st: &Arc<AppState>) -> Response<Body> {
     m.insert("latest".into(), json!(""));
     m.insert("available".into(), json!(false));
     m.insert("canApply".into(), json!(false));
-    m.insert(
-        "blockedReason".into(),
-        json!("桌面版由程序自己更新：点托盘图标 → 检查更新（或按 Ctrl+Alt+U），装完班级数据不变。"),
-    );
+    m.insert("blockedReason".into(), json!(DESKTOP_UPDATE_HINT));
     m.insert("notes".into(), json!(""));
     m.insert("publishedAt".into(), json!(""));
     m.insert("selfUpdate".into(), json!(false));

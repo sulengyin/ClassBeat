@@ -16,13 +16,26 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "tools"))
 
-from build_day import DATA, set_data  # noqa: E402
+
+def resolve_data() -> Path:
+    """默认数据目录：环境变量 > data/（有真名单才算）> sample/。
+
+    这段以前是 `from build_day import DATA`。build_day 是把一天编译成时间线的
+    参考实现（473 行），而这里只需要「去哪儿读配置」这点信息——为它把整个
+    参考编译器拉进 CI 的打包步骤，等于让改作息规则的人也牵动打包脚本。
+    """
+    env = os.environ.get("CLASSBEAT_DATA")
+    if env:
+        return Path(env)
+    real = ROOT / "data"
+    return real if (real / "students.json").exists() else ROOT / "sample"
+
 
 
 def read(data_dir: Path, name: str, default=None):
@@ -40,9 +53,7 @@ def main() -> None:
     ap.add_argument("--out", help="输出路径，默认 app/data.js")
     args = ap.parse_args()
 
-    data_dir = Path(args.data).resolve() if args.data else DATA
-    if args.data:
-        set_data(data_dir)
+    data_dir = Path(args.data).resolve() if args.data else resolve_data()
     if not (data_dir / "students.json").exists():
         sys.exit(f"数据目录里没有 students.json：{data_dir}")
 
