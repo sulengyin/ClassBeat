@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "version": "0.3.24",
-  "build": "5ecb9e9",
-  "publishedAt": "2026-11-20T16:51:09+08:00",
+  "version": "0.3.26",
+  "build": "3832b4f",
+  "publishedAt": "2026-11-22T22:21:16+08:00",
   "minVersion": "0.3.8",
-  "notes": "- **修\"值日组（自己商量）\"看不懂**：组岗位（值日组）整段常驻时，\n  格子上现在带着具体任务名——「值日组·扫地 待定」，不再只有组名\n  加一句\"自己商量\"。看到\"待定\"就说明这个组的成员还没填好。\n- **值日页的时段配置有了分隔**：晨间自主管理 / 课间 / 午间三段\n  各自有黄色时段名标题和分隔线，不用再靠找重复来判断哪行属于\n  哪个时段。\n- **组员没填会明说**：值日页岗位列表里，A/B 组成员为空的岗位会\n  显示「A/B 组（成员还没填）」，方便发现数据缺口。",
-  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.3.24/classbeat-0.3.24.zip",
-  "sha256": "43c68e3f0a00bc29531e8728d1ef30ab1b567c723b2868c45c4a1fd8ebe65939",
-  "bytes": 11801299,
+  "notes": "- **右下角改成\"悬浮展开菜单\"**：鼠标移到 `⋯` 上，常用三件事（最小化、\n  手机扫码、编辑）从左侧平着滑出来，其余功能在 `上方` 展开成两列；点一下\n  可以钉住不收起，再点收起，按 Esc 也能收起；点完菜单项立刻收起，不会\n  被鼠标\"弹\"回来。触控一体机上用指尖按也一样——点开的瞬间不会先闪一下。\n- **打开就是全屏**：以前启动会先闪一个 1280×720 的小窗再变大，现在直接以\n  全屏出现。想窗口化仍可按 `F11`（或右上角菜单里的全屏项）。\n- **图标重画了**：奶油纸卡 + 琥珀色圆环 + 墨色指针，小到 16px 的托盘图标\n  和任务栏图标也还认得出是什么。桌面快捷方式、卸载列表、浏览器标签页\n  用的是同一套。\n- **更新面板能分清\"安装包版本\"和\"界面版本\"**：以前面板只显示界面版本\n  （`v0.3.25`），装的却是另一个版本的安装包，看着像没更新成功。现在标题\n  写安装包版本，后面括注界面版本。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.5.1/classbeat-0.3.26.zip",
+  "sha256": "1a431ba679a03c2805b91b00d5ddf56b7170d129886849a3dff5314c49ac0fd7",
+  "bytes": 11572375,
   "files": [
     {
       "path": "app/backup.js",
@@ -26,7 +26,7 @@
     },
     {
       "path": "app/data.js",
-      "sha256": "16bf79e7e1fb7b02e4652fe7e69ba19c316d0066ebffaff548876ed67830314a",
+      "sha256": "7f81441edc2ce8d20282a021e3471a8d23c1224312dcd18f44f5c234a1e9d725",
       "bytes": 17039
     },
     {
@@ -36,13 +36,13 @@
     },
     {
       "path": "app/edit.css",
-      "sha256": "395d0a184a1bb4dc6e8c371ca9f66a8af0eb5b082266dd58c4820d70d5263de9",
-      "bytes": 17018
+      "sha256": "91514bc114ddbb29dd217a87682aec00fe76fc06966bae48b5032195142018bb",
+      "bytes": 17348
     },
     {
       "path": "app/edit.js",
-      "sha256": "e03458dc571e311e1a0499eab9e94f652d816589f19c1f4520f8834a53433487",
-      "bytes": 71663
+      "sha256": "105523f6e594686fa4ec5b76b0131876ce036ac87d75e06142fa9131efccb615",
+      "bytes": 75461
     },
     {
       "path": "app/engine/schedule.js",
@@ -51,8 +51,8 @@
     },
     {
       "path": "app/index.html",
-      "sha256": "d79bd7421e433d5aeedd2e4bde866ac9b11426ae8c42445d5127c8c56c715dc4",
-      "bytes": 57413
+      "sha256": "7af4ea1483feda9640586aafdf6970e77e1728582b47eeb2de4fe7da898da175",
+      "bytes": 62230
     },
     {
       "path": "app/phoneui.js",
@@ -86,8 +86,8 @@
     },
     {
       "path": "app/screen.js",
-      "sha256": "1af9fc8a72fada49e12e2b1f6e37c28c2179b4b04ab95721779130158031d07a",
-      "bytes": 45311
+      "sha256": "92fa31a963002b4444034e285f85152e914cfca618286118212acf4ae77fe203",
+      "bytes": 48924
     },
     {
       "path": "app/setup.css",
@@ -111,8 +111,8 @@
     },
     {
       "path": "app/update.js",
-      "sha256": "6cbbc961c2f0da3b8e414f40c8d5897426ca53e8ebfbb70c7688464c87102c04",
-      "bytes": 19082
+      "sha256": "c9a9911097c9487e8e08beacdde29f5e27d01cbfb5620677652a92b926ef8d89",
+      "bytes": 19944
     },
     {
       "path": "app/vendor/qrcode.min.js",
@@ -121,18 +121,18 @@
     },
     {
       "path": "app/version.js",
-      "sha256": "dac426cfe3c91efac33899b380fc2e7458feecfd6dc0bab3e7aa7a9f112fa2cb",
+      "sha256": "1ef337ceddff875a1c23f54343f773933d7fffc20edb074ef7da0362a078b175",
       "bytes": 594
     },
     {
       "path": "server/icons/icon-192.png",
-      "sha256": "03c3be6e408a4498c9baab27b400824c7d6681e3a6f77519ccf7f742f524bb9b",
-      "bytes": 33256
+      "sha256": "ac7361e9568075b36203015ef5ca77b9a9176a10849847f1e6174422f8e3e2b6",
+      "bytes": 3956
     },
     {
       "path": "server/icons/icon-512.png",
-      "sha256": "37b67836222ad77b7b8e63bcc3cfae1f5edc23249a0faf4a8a1e780f9608d6c3",
-      "bytes": 146478
+      "sha256": "d5567f73625e798262809dd6749c9f09fc75f891e11e8d62d3fa1a4828b06054",
+      "bytes": 9152
     },
     {
       "path": "server/phone.html",
