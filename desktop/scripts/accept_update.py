@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
-"""验收 E 的更新器端到端自测。
+"""验收 E 的更新器端到端自测（版本可参数化，能反复对不同更新源跑）。
 
 前置（否则跑不出意义）：
-  1. 本机已装某个版本，且它的 tauri.conf.json 里 endpoints 指向
-     http://127.0.0.1:8799/latest.json（用 `--config` 覆盖构建，别改生产配置）；
-  2. 在 8799 上起一个静态服务，目录里放**新版**安装包 + 它的 .sig + latest.json
+  1. 本机已装**旧版**，且它的 tauri.conf.json 里 endpoints 指向本机静态服务
+     （用 `npx tauri build --config ...` 覆盖，别改生产配置）；
+     注意：release 构建**硬拒 http 端点**（"must use a secure protocol like https"，
+     插件在初始化阶段就 panic，表现是"双击没反应/闪退"），所以本地源必须同时带
+     `"dangerousInsecureTransportProtocol": true`。这一项只进测试构建，生产配置不许有。
+  2. 在某端口起静态服务，目录里放**新版**安装包 + 它的 .sig + latest.json
      （latest.json 用 desktop/scripts/make_latest.py 生成）；
   3. 新版必须是已签名的 formal 构建。调试构建会被 Defender 按启发式拦掉，
      现象是"装完版本没变"，别拿它验这一条。
 
 用法：
     python -m http.server 8799 --bind 127.0.0.1     # 在放产物的目录里
-    python desktop/scripts/accept_update.py
+    python desktop/scripts/accept_update.py --old 0.4.1 --new 0.4.2 --port 8799
+
+本地源测试构建的完整命令（版本、两个端点按需要改，注意是一条命令）：
+
+    npx tauri build --bundles nsis --config '{"plugins":{"updater":{"endpoints":["http://127.0.0.1:8799/latest.json","http://127.0.0.1:8798/latest.json"],"dangerousInsecureTransportProtocol":true}}}'
 """
 
+import argparse
 import ctypes
-import ctypes.wintypes as wt
 import json
 import os
 import subprocess
@@ -47,12 +54,23 @@ def find_port(timeout=40):
         for p in range(8765, 8780):
             try:
                 d = ping(p, 0.4)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 continue
             if d.get("shell") is True:
                 return p
         time.sleep(0.4)
     return None
+
+
+def screen_locked():
+    """锁屏 / 安全桌面时合成按键到不了应用，热键类用例必然假红。"""
+    if u.GetForegroundWindow() != 0:
+        return False
+    h = u.OpenInputDesktop(0, False, 0x0100)
+    if h:
+        u.CloseDesktop(h)
+        return False
+    return True
 
 
 def win(title):
@@ -92,8 +110,10 @@ def reg_version():
                     break
                 i += 1
                 try:
-                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                        r"Software\Microsoft\Windows\CurrentVersion\Uninstall\\" + name) as s:
+                    with winreg.OpenKey(
+                        winreg.HKEY_CURRENT_USER,
+                        r"Software\Microsoft\Windows\CurrentVersion\Uninstall\\" + name,
+                    ) as s:
                         dn = winreg.QueryValueEx(s, "DisplayName")[0]
                         if "classbeat" in str(dn).lower():
                             return winreg.QueryValueEx(s, "DisplayVersion")[0]
@@ -113,10 +133,28 @@ def log_tail(n=4000):
 
 
 def main():
-    print("== 更新前状态 ==")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--old", default="0.4.1", help="更新前应装的版本")
+    ap.add_argument("--new", default="0.4.2", help="更新后应变的版本")
+    ap.add_argument("--port", type=int, default=8799, help="本地静态源端口（只用于提示文案）")
+    ap.add_argument("--keep-running", action="store_true", help="结束时不要退出应用")
+    args = ap.parse_args()
+
+    if screen_locked():
+        print("检测到屏幕已锁定：合成按键到不了应用，热键类用例会假红。")
+        print("请解锁屏幕后重跑（本脚本不动任何东西，可以放心重来）。")
+        return 2
+
+    print(f"== 更新前状态（源端口 {args.port}）==")
     v0 = reg_version()
-    add("已装 0.4.0", v0 == "0.4.0", f"registry={v0}")
-    before = log_tail()
+    add(f"更新前是 {args.old}", v0 == args.old, f"registry={v0}")
+    b0 = None
+    p0 = find_port(3)
+    if p0:
+        try:
+            b0 = ping(p0).get("build")
+        except Exception:  # noqa: BLE001
+            pass
 
     print("== 启动 + 触发检查更新 ==")
     p = subprocess.Popen([EXE])
@@ -135,9 +173,7 @@ def main():
 
     print("== 确认安装 ==")
     u.PostMessageW(dlg, WM_COMMAND, 6, 0)  # IDYES
-    t0 = time.time()
 
-    # 壳在安装前会先停服务、把包留底、然后交给 NSIS（被动安装）并退出
     passed = False
     deadline = time.time() + 180
     while time.time() < deadline:
@@ -165,18 +201,27 @@ def main():
     deadline = time.time() + 240
     while time.time() < deadline:
         nv = reg_version()
-        if nv == "0.4.1":
+        if nv == args.new:
             newv = nv
-            # 再等应用自己起来
             if find_port(20):
                 break
         time.sleep(3)
-    add("E2 装完版本变成 0.4.1", newv == "0.4.1", f"registry={newv}")
+    add(f"E2 装完版本变成 {args.new}", newv == args.new, f"registry={newv}")
     add("E2 装完自动回到大屏（服务在听）", find_port(30) is not None)
 
     tail = log_tail(6000)
-    add("重启后是 0.4.1 的壳", "壳 0.4.1 启动" in tail,
-        [l for l in tail.splitlines() if "壳 0.4.1" in l][-1][:80] if "壳 0.4.1" in tail else "")
+    add(f"重启后是 {args.new} 的壳", f"壳 {args.new} 启动" in tail,
+        [l for l in tail.splitlines() if f"壳 {args.new}" in l][-1][:80]
+        if f"壳 {args.new}" in tail else "")
+
+    p1 = find_port(5)
+    if p1:
+        try:
+            d = ping(p1)
+            add("业务包与构建号跟着更新", d.get("build") not in (None, "", "dev", b0),
+                f"build {b0} → {d.get('build')}；class={d.get('class')}")
+        except Exception as e:  # noqa: BLE001
+            add("业务包与构建号跟着更新", False, str(e))
 
     print("== E3 数据与回滚素材 ==")
     snaps = []
@@ -186,19 +231,19 @@ def main():
     add("E3 班级数据还在", bool(snaps), ",".join(sorted(snaps)[-2:]))
     inst = os.path.join(DATA, "backups", "installers")
     kept = os.listdir(inst) if os.path.isdir(inst) else []
-    add("E3 backups/installers 留着安装包", any("0.4.1" in f for f in kept), str(kept))
+    add("E3 backups/installers 留着安装包", any(args.new in f for f in kept), str(kept))
 
-    # 收尾：让应用退出，免得影响后续手工操作
-    print("== 收尾：Ctrl+Alt+Q 退出 ==")
-    hotkey(0x51)
-    d = wait_window("退出 ClassBeat", 10)
-    if d:
-        u.PostMessageW(d, WM_COMMAND, 6, 0)
-        time.sleep(4)
-    add("退出正常", not find_port(8))
+    if not args.keep_running:
+        print("== 收尾：Ctrl+Alt+Q 退出 ==")
+        hotkey(0x51)
+        d = wait_window("退出 ClassBeat", 10)
+        if d:
+            u.PostMessageW(d, WM_COMMAND, 6, 0)
+            time.sleep(4)
+        add("退出正常", not find_port(8))
 
     print()
-    bad = sum(1 for _, ok, _ in results if not ok)
+    bad = sum(1 for _, ok, _ in results if ok is False)
     print(f"共 {len(results)} 项，失败 {bad} 项")
     return 0 if bad == 0 else 1
 

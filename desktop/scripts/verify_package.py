@@ -191,16 +191,29 @@ def check_staged_build() -> None:
 
 
 def check_repo_untouched() -> None:
-    """打包脚本只能动 desktop/ 与 resources/，不该改仓库里的业务代码。"""
-    r = subprocess.run(["git", "status", "--porcelain"], cwd=REPO,
-                       capture_output=True, text=True)
+    """打包脚本只能动 desktop/ 与 resources/，不该改仓库里的业务代码。
+
+    注意 `core.quotePath`：git 默认把中文文件名转义成 "desktop/docs/05-\\346..."，
+    带引号的路径拿 startswith("desktop/") 比会永远不匹配 —— 于是自己的文档改动
+    被报成"仓库外有未提交改动"。关掉转义再比。
+    """
+    r = subprocess.run(["git", "-c", "core.quotePath=false", "status", "--porcelain"],
+                       cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
     if r.returncode != 0:
         notes.append("不在 git 仓库里，跳过「业务代码是否被改动」检查")
         return
-    changed = [
-        line[3:].strip() for line in r.stdout.splitlines()
-        if line[3:].strip() and not line[3:].strip().startswith("desktop/")
-    ]
+
+    def path_of(line: str) -> str:
+        p = line[3:].strip()
+        if len(p) > 1 and p[0] == '"' and p[-1] == '"':  # 少数情况下仍带引号
+            p = p[1:-1]
+        if " -> " in p:  # 重命名/移动条目形如 "old -> new"
+            p = p.split(" -> ")[-1].strip().strip('"')
+        return p
+
+    changed = [p for p in (path_of(l) for l in r.stdout.splitlines() if l.strip()) if p]
+    changed = [c for c in changed if not c.startswith("desktop/")]
     changed = [c for c in changed if not c.startswith("app/data.js")]
     if changed:
         warnings.append(
