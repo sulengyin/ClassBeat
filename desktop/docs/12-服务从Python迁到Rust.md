@@ -156,7 +156,7 @@ Rust 侧是 `Server: RhythmHub/1.0`——版本号本来就是平台信息，不
 
 | 组 | 查什么 | 结果 |
 |---|---|---|
-| 启动 | 进程树只有 `classbeat.exe` + `classbeat-server.exe`（没有 `conhost`、没有 Python）；全屏无边框无菜单；`/api/ping` 自报 `shell=true`、`class=五（1）班`、`build=f24c3b9`、`port=8765`；窗口标题「班级节律屏」 | 过 |
+| 启动 | 进程树只有 `classbeat.exe` + `classbeat-server.exe`（没有 `conhost`、没有 Python）；全屏无边框无菜单；`/api/ping` 自报 `shell=true`、`class=五（1）班`、`build=f24c3b9`（装配那一刻的提交号；之后又有了工具与文档提交，下一个包会刷新）、`port=8765`；窗口标题「班级节律屏」 | 过 |
 | D2 误关 | Alt+F4 / 点叉 → 收进托盘，不退出 | 过 |
 | 单实例再启 | 第二次启动只唤起已有窗口，不起第二个服务 | 过 |
 | D3 最小化 | `Ctrl+Alt+M` → 最小化；再恢复 | 过（`{"ok":true,"found":1,"minimized":1}`） |
