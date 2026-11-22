@@ -66,6 +66,10 @@ test("深色模式是纯黑底、白字", async ({ page }) => {
   const colors = await readColors();
   expect(colors.fg).toBe("rgb(255, 255, 255)");
 
+  // 0.5.1 起「点完菜单项就收起」（大屏上不留一堆敞开的控件），
+  // 所以点回来之前要重新展开一次；别再假设菜单还开着。
+  await expect(page.locator("#corner")).not.toHaveClass(/open/);
+  await openTools(page);
   await page.locator("#btn-theme").click();
   await expect(page.locator("body")).not.toHaveAttribute("data-theme", "dark");
 });
