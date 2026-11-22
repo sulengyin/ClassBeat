@@ -1,58 +1,67 @@
-# ClassBeat 桌面化 · 开发包（文档集）
+# ClassBeat 桌面化 · 开发包
 
 把 ClassBeat 从「解压包 + bat + 自解压 exe + PowerShell 看门狗 + Chrome kiosk」
 改成**一个可安装、可注册、可卸载、无控制台窗口**的 Windows 应用（Tauri 2）。
 
-这一套是**给下个窗口直接开工用的文档**，不是代码交付。业务代码零改动。
+**0.5.0 起，壳与本地服务都是 Rust**：安装包 10.87 MiB → 2.43 MiB，
+运行期不再有任何 Python 进程，构建也不再需要 Python。
 
 ---
 
-## 怎么用
-
-新开一个窗口，把 [`docs/07-任务清单与提示词.md`](docs/07-任务清单与提示词.md) 里的
-**§7.3 goal 模式启动词**整段粘进去，再附一句"文档在 `desktop/docs/`，先读再动手"。
-之后按 §7.4 的分阶段提示词逐个推进。
-
-想先自己判断可行性，只读三个文件就够：`01`（为什么做）、`06`（怎么算做完）、`08`（哪里会踩坑）。
-
-## 文档清单
-
-| 文件 | 内容 | 先读它的时机 |
-|---|---|---|
-| [`docs/01-方案总览.md`](docs/01-方案总览.md) | 问题证据、目标形态、三条不可让步的约束、范围边界 | 开工前 |
-| [`docs/02-模块规格.md`](docs/02-模块规格.md) | 12 个模块的职责 / 函数 / 失败处理 / 验收点 | 写 Rust 时逐条对照 |
-| [`docs/03-安装与系统注册.md`](docs/03-安装与系统注册.md) | tauri.conf 关键段、注册表五面、四个 NSIS 钩子、卸载流程、签名 | 做安装阶段 |
-| [`docs/04-服务适配契约.md`](docs/04-服务适配契约.md) | 3 个环境变量、6 处逐字补丁、退出协议、更新归属变更 | 改 Python 时 |
-| [`docs/05-构建与发布.md`](docs/05-构建与发布.md) | 环境、装配步骤、构建命令、CI、更新链路、发布检查单 | 第一次构建前 |
-| [`docs/06-验收清单.md`](docs/06-验收清单.md) | P0 探测 + 验收 A~E + 一票否决项 | 每阶段结束 |
-| [`docs/07-任务清单与提示词.md`](docs/07-任务清单与提示词.md) | 阶段表、勾选清单、**goal 启动词**、分阶段提示词 | 交给下个窗口 |
-| [`docs/08-风险与待确认.md`](docs/08-风险与待确认.md) | 风险登记、Tauri API 版本差异与降级、真机复测项、决策门 | 开工前 + 卡住时 |
-
-## 目录里还有什么
+## 现在的结构
 
 ```
 desktop/
-├── docs/            ← 主体，8 篇
-├── src-tauri/       ← 参考实现（Rust，约 1400 行，未编译验证）
-│   ├── src/*.rs
-│   ├── installer/hooks.nsh + stop-legacy.ps1
-│   ├── icons/classbeat.ico
-│   └── tauri.conf.json
-├── web/index.html   ← 启动兜底 / 错误页
-└── scripts/         ← 参考工具（装配 / 构建 / 自检 / 开发）
+├── src-tauri/     ← 桌面壳（窗口 / 托盘 / 单实例 / 更新器 / NSIS 钩子）
+├── server-rs/     ← 本地服务（classbeat-server.exe，取代 rhythm_server.py）
+├── tools-rs/      ← 构建与验收工具（classbeat-tools.exe）
+├── web/           ← 启动兜底 / 错误页
+├── docs/          ← 规格、构建、验收、实测记录
+└── scripts/       ← PowerShell 入口（build_windows.ps1 / dev.ps1）
 ```
 
-**关于参考实现**：`src-tauri/` 与 `scripts/` 是按本套文档写出来的，逻辑完整，
-但**没有在真机上编译验证过**（编写环境访问不到 crates.io）。用法二选一：
+`app/`（大屏页面）与 `server/phone.html` 等业务静态资源一字未改；
+Rust 服务是按端点逐条对齐 Python 版重写的，等价性证据见
+[`docs/11-功能等价对比.md`](docs/11-功能等价对比.md) 与
+[`docs/12-服务从Python迁到Rust.md`](docs/12-服务从Python迁到Rust.md)。
 
-- 当作起点：`cargo check` 报错就按 `08 §8.2` 的降级表改，比自己从零写快；
-- 当作参考：只看接口与行为，代码整段重写。**02 的契约才是要遵守的东西。**
+## 怎么构建
 
-`scripts/verify_package.py` 可以离线跑，能查出「文件缺失 / JSON 不对 / 钩子缺宏 /
-模块声明与文件不匹配 / 服务适配锚点跟上游代码对不上」这类问题，建议放进 CI 第一步。
+```powershell
+# 一条命令：编译工具 → 自检 → 装配资源 → 编译打包
+powershell -ExecutionPolicy Bypass -File desktop\scripts\build_windows.ps1
+
+# 只想自检
+desktop\tools-rs\target\release\classbeat-tools.exe verify
+
+# 装完跑一遍运行期验收（D1–D8：全屏 / 误关 / 单实例 / 最小化 / 自愈 / 退出）
+desktop\tools-rs\target\release\classbeat-tools.exe accept
+```
+
+前置只有 Rust 1.77+ 与 Node（装 tauri-cli 用）；WebView2 在 Win10 1803+ 通常自带。
+
+签名发布要带 `TAURI_SIGNING_PRIVATE_KEY` 与 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，
+否则只出包、不出 `.sig`，也就没法生成 `latest.json`。
+
+## 文档清单
+
+| 文件 | 内容 |
+|---|---|
+| [`docs/01-方案总览.md`](docs/01-方案总览.md) | 问题证据、目标形态、三条不可让步的约束 |
+| [`docs/02-模块规格.md`](docs/02-模块规格.md) | 12 个模块的职责 / 函数 / 失败处理 / 验收点 |
+| [`docs/03-安装与系统注册.md`](docs/03-安装与系统注册.md) | tauri.conf 关键段、注册表五面、NSIS 钩子、卸载、签名 |
+| [`docs/04-服务适配契约.md`](docs/04-服务适配契约.md) | 壳与服务之间的契约（0.5.0 起服务为 Rust，历史补丁已退役） |
+| [`docs/05-构建与发布.md`](docs/05-构建与发布.md) | 环境、装配、构建命令、更新链路、发布检查单 |
+| [`docs/06-验收清单.md`](docs/06-验收清单.md) | P0 探测 + 验收 A~E + 一票否决项 |
+| [`docs/07-任务清单与提示词.md`](docs/07-任务清单与提示词.md) | 阶段表、勾选清单、启动词 |
+| [`docs/08-风险与待确认.md`](docs/08-风险与待确认.md) | 风险登记、Tauri API 差异与降级、真机复测项 |
+| [`docs/09-阶段小结-P0P2实测.md`](docs/09-阶段小结-P0P2实测.md) | P0–P2 阶段实测：探测、构建、进程树、偏差 |
+| [`docs/10-验收实测-A到E.md`](docs/10-验收实测-A到E.md) | 真机实测记录（安装 / 更新 / 卸载 / Defender） |
+| [`docs/11-功能等价对比.md`](docs/11-功能等价对比.md) | 旧包 vs 新包的功能等价证据 |
+| [`docs/12-服务从Python迁到Rust.md`](docs/12-服务从Python迁到Rust.md) | 0.5.0 迁移：为什么、怎么做、差在哪 |
 
 ## 一句话结论
 
 **问题不是功能缺，是壳层架构。** 旧链路跑着四个不属于本项目的进程，
-所以每加一个需求就要打一层壳层补丁（`docs/PLAN.md` 里「看门狗」31 处、「kiosk」17 处）。
-换成 Tauri 之后，窗口、服务、安装生命周期都在自己手里，那类 bug 结构性消失。
+所以每加一个需求就要打一层壳层补丁。换成 Tauri 之后，窗口、服务、安装生命周期
+都在自己手里；再把服务换成 Rust，连「捆一个 Python 运行时」这个包袱也卸掉了。
