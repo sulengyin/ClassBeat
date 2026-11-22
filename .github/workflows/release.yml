@@ -141,7 +141,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "$setup" "$zip" dist/*-single.html dist/update.json \
             --title "ClassBeat $GITHUB_REF_NAME" \
-            --notes "Windows：推荐下载 classbeat-setup-版本号.exe 双击安装（自动装到本机用户目录、保留班级数据、建桌面 ClassBeat 图标）；或下载 classbeat-版本号.zip 解压后双击「打开大屏.bat」；只想看看效果可下载 classbeat-版本号-single.html 双击打开；附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」，包内目录仍是中文；完整说明见仓库 CHANGELOG.md。" \
+            --notes "桌面版（推荐）：下载 ClassBeat_版本号_x64-setup.exe 双击安装——不需要管理员密码，装到本机用户目录，班级数据保留，装完自动建桌面图标、打开即全屏；已经在用旧版的不用重新下载，大屏右下角「⋯」→ 更新里点「检查更新」就能升上来（0.5.1 起 Release 里同时挂了安装包、签名和 latest.json，更新器才取得到）。只想看看效果：下载 classbeat-版本号-single.html 双击打开，不用安装（单文件版不能自更新）。老形态的 classbeat-版本号.zip（解压后双击「打开大屏.bat」）仍在，给不想安装的机器用。附件名用纯英文，是因为 GitHub 会把中文附件名净化成「1.-.-」，包内目录仍是中文；完整说明见仓库 CHANGELOG.md。" \
             --generate-notes \
             --verify-tag
 
