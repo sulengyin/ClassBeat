@@ -458,7 +458,17 @@
     var t = S.prefs().theme === "dark" ? "dark" : "light";
     document.body.dataset.theme = t;
     applyDaylight(nowMinutes());
-    if (el.btnTheme) el.btnTheme.textContent = t === "dark" ? "浅色" : "深色";
+    /* 只改文字与提示，别动整块 innerHTML/textContent：
+       按钮里除了字还有月亮/太阳两个图标（哪个显示由 CSS 按主题选），
+       写 textContent 会把图标一起抹掉——0.5.1 真机反馈"深色前面没图案"。*/
+    if (el.btnTheme) {
+      var label = t === "dark" ? "浅色" : "深色";
+      var span = el.btnTheme.querySelector ? el.btnTheme.querySelector(".mi-t") : null;
+      if (span) span.textContent = label;
+      else el.btnTheme.textContent = label;   /* 老构建副本没有 .mi-t 时兜底 */
+      el.btnTheme.setAttribute("aria-label", "切换成" + label);
+      el.btnTheme.title = "切换成" + label;
+    }
   }
 
   /* ---------- 老师改过的文字 ----------

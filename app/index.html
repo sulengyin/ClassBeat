@@ -703,6 +703,12 @@ body[data-reduce="1"] .tk-strip{transition:none!important}
              background-color var(--d-fast) var(--e-soft),color var(--d-fast) var(--e-soft);
 }
 .corner .mi svg{width:2.6vmin;height:2.6vmin;flex:none;pointer-events:none}
+/* 深浅色按钮备两个图标：浅色时挂月亮（点了变深），深色时挂太阳。
+   图标由 CSS 按当前主题选，JS 只改文字，别再整块写 textContent——
+   那会把 svg 一起抹掉，菜单里就剩一行没有图案的字（0.5.1 真机反馈）。 */
+.corner .mi .i-sun{display:none}
+body[data-theme="dark"] .corner .mi .i-sun{display:block}
+body[data-theme="dark"] .corner .mi .i-moon{display:none}
 .corner .mi:hover{color:var(--ink);background:var(--card)}
 .corner .mi:active{transform:scale(.96)}
 .corner .mi.on{background:var(--accent);border-color:var(--accent);color:var(--band-ink)}
@@ -1088,9 +1094,10 @@ body[data-demo="1"] .corner{bottom:calc(var(--demo-h) + 1.2vmin)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4l1.7 5 5 1.7-5 1.7-1.7 5-1.7-5-5-1.7 5-1.7z"/><path d="M18.4 16.2l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
       <span class="mi-t">关闭动效</span>
     </button>
-    <button class="mi" id="btn-theme" role="menuitem" style="--c:1;--r:2" aria-label="切换深色或浅色">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-      <span class="mi-t">深浅色</span>
+    <button class="mi" id="btn-theme" role="menuitem" style="--c:1;--r:2" aria-label="切换成深色" title="切换成深色">
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.4"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+      <span class="mi-t">深色</span>
     </button>
     <button class="mi" id="btn-full" role="menuitem" style="--c:0;--r:3" aria-label="全屏">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>

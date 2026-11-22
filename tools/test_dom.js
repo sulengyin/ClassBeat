@@ -1833,8 +1833,27 @@ global.Remote.info.phone = "";
 
   const miButtons = cornerHtml.match(/<button class="mi[^"]*"[\s\S]*?<\/button>/g) || [];
   check(miButtons.length === 12, "⋯ 展开后一共 12 个功能", miButtons.length + " 个");
-  check(miButtons.every(b => /<svg /.test(b) && /class="mi-t">[^<]+</.test(b)),
+  check(miButtons.every(b => /<svg /.test(b) && /<span class="mi-t">[^<]+</.test(b)),
     "每个按钮都是「图标 + 文字」，老师不用猜含义");
+
+  /* 深浅色按钮图标（0.5.1 真机反馈：菜单里只剩「深色」两个字，前面空空的）。
+     病根是 applyTheme 里 `btnTheme.textContent = ...` 把 svg 一起抹了——
+     静态 HTML 看着有图标，跑起来就没了。所以两头都查：HTML 备了月亮/太阳，
+     JS 只写 .mi-t 文字，且全文件只留一处带 else 兜底的 textContent。 */
+  const themeChunk = (menuHtml.match(/<button class="mi"[^>]*id="btn-theme"[\s\S]*?<\/button>/) || [""])[0];
+  check(/class="i-moon"/.test(themeChunk) && /class="i-sun"/.test(themeChunk),
+    "深浅色按钮备了月亮和太阳两个图标");
+  check(/<span class="mi-t">深色</.test(themeChunk), "浅色主题下按钮写的是「深色」");
+  check(/\.corner \.mi \.i-sun\{display:none\}/.test(pageHtml)
+        && /body\[data-theme="dark"\] \.corner \.mi \.i-sun\{display:block\}/.test(pageHtml),
+    "浅色主题藏太阳，深色主题换成太阳");
+
+  const screenThemeSrc = fs.readFileSync(path.join(ROOT, "app/screen.js"), "utf8");
+  check(/span\.textContent = label/.test(screenThemeSrc), "切主题只改 .mi-t 的文字");
+  const themeWrites = (screenThemeSrc.match(/el\.btnTheme\.textContent\s*=/g) || []).length;
+  check(themeWrites === 1 && /else el\.btnTheme\.textContent/.test(screenThemeSrc),
+    "没有把整个按钮的 textContent 写掉（那会连图标一起抹）",
+    themeWrites + " 处写入");
 
   check(/id="btn-min"/.test(toolsHtml) && /id="btn-phone"/.test(toolsHtml)
         && /id="btn-edit"/.test(toolsHtml)
