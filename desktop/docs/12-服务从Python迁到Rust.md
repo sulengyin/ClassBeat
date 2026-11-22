@@ -210,9 +210,9 @@ RMDir /r "$INSTDIR\resources\server\__pycache__"
 所以出包后单独验了一遍"双源是否自洽"：
 
 ```powershell
-classbeat-tools make-latest --bundle ...\bundle\nsis --version 0.5.0 `
+classbeat-tools make-latest --bundle ...\bundle\nsis --version 0.5.1 `
   --base-url http://127.0.0.1:8799 --out dist\local-test\github\latest.json
-classbeat-tools make-latest --bundle ...\bundle\nsis --version 0.5.0 `
+classbeat-tools make-latest --bundle ...\bundle\nsis --version 0.5.1 `
   --base-url http://127.0.0.1:8798 --out dist\local-test\accelerated\latest.json
 # 两个源各起一个静态服务，然后读 latest.json、比对 signature、下载包算 sha256
 ```
@@ -221,9 +221,16 @@ classbeat-tools make-latest --bundle ...\bundle\nsis --version 0.5.0 `
 |---|---|---|---|---|
 | 127.0.0.1:8799（对应 GitHub 源） | 0.5.0 | 一致 | 2,552,879 B | 一致 |
 | 127.0.0.1:8798（对应加速域名源） | 0.5.0 | 一致 | 2,552,879 B | 一致 |
+| 127.0.0.1:8799（对应 GitHub 源） | 0.5.1 | 一致 | 2,317,118 B | 一致 |
+| 127.0.0.1:8798（对应加速域名源） | 0.5.1 | 一致 | 2,317,118 B | 一致 |
 
 也就是说"签名、清单、安装包"三者是对得上的——剩下那步（人点"检查更新"）只是把这三样喂给
 `tauri-plugin-updater`，那段代码 0.5.0 没动过。
+
+生产那两份（`dist/github`、`dist/accelerated`）同样生成了，但**能不能真的升上来取决于 Release**：
+0.5.0 那次的 `latest.json` 只躺在本地 `dist/` 里，Release 上没有，于是 `releases/latest/download/
+latest.json` 是 404——所有 0.4.x 用户点"检查更新"都失败。0.5.1 起由 CI 的 `desktop` job 负责上传
+（见 [`05`](05-构建与发布.md) §5.6），这是"老用户能不能自动升到新版"的唯一开关。
 
 ## 12.10 想复现这套对比
 
