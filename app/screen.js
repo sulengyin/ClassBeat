@@ -941,9 +941,13 @@
     el.btnCd.setAttribute("aria-label", cdTip);
     el.btnCd.classList.toggle("on", !!picks || (p.cdMode || "auto") !== "auto");
     /* 2026-11-19 真机反馈③：默认无动效。亮起表示「动效开着」；
-     文案跟着状态走，点一下就是切到另一边。 */
-    el.btnReduce.textContent = p.reduce ? "增加动效" : "关闭动效";
-    el.btnReduce.classList.toggle("on", !p.reduce);
+     文案跟着状态走，点一下就是切到另一边。
+     注意只改标签文字：按钮里还有图标，整块 textContent 会把 svg 抹掉。 */
+    if (el.btnReduce) {
+      var reduceLabel = el.btnReduce.querySelector(".mi-t") || el.btnReduce;
+      reduceLabel.textContent = p.reduce ? "增加动效" : "关闭动效";
+      el.btnReduce.classList.toggle("on", !p.reduce);
+    }
     document.body.dataset.reduce = p.reduce ? "1" : "0";
     applyTheme();
   }
@@ -981,20 +985,85 @@
     var pt = params.get("theme");
     if (pt === "dark" || pt === "light") document.body.dataset.theme = pt;
 
-    el.btnGear.addEventListener("click", function () {
-      el.corner.classList.toggle("open");
-    });
+    /* ---------- 右下角：悬停展开，点击钉住 ----------
+       · 鼠标停在⋯上 90ms 展开；离开后 200ms 收起（留出从⋯走到按钮的时间）
+       · 点一下⋯固定展开，再点一下收起（触屏没有 hover，全靠这一路）
+       · 视觉展开态只有一个 .show 类；.open 只表示"钉住不随鼠标收起"
+       见 index.html 的「角落控制」段。 */
+    var hot = false;          /* 鼠标是否还在这个角落 */
+    var hotTimer = null;      /* 展开前的短暂延迟，划过去不会闪 */
+    var leaveTimer = null;    /* 收起前的宽限 */
+    var quietUntil = 0;       /* 这个时刻之前不再自动展开（刚点完按钮，鼠标还压在上面） */
+
+    function menuIsOpen() { return el.corner.classList.contains("open"); }
+
+    function syncCorner() {
+      var on = menuIsOpen() || hot;
+      el.corner.classList.toggle("show", on);
+      if (el.btnGear) el.btnGear.setAttribute("aria-expanded", on ? "true" : "false");
+    }
+
+    function setHot(v) {
+      if (hotTimer) { clearTimeout(hotTimer); hotTimer = null; }
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+      if (v) {
+        if (Date.now() < quietUntil) return;
+        hotTimer = setTimeout(function () {
+          hotTimer = null;
+          hot = true;
+          syncCorner();
+        }, 90);
+      } else {
+        hot = false;
+        syncCorner();
+      }
+    }
+
+    /* 从⋯走到浮层要跨过一点空隙，直接收起会闪，所以给 200ms 宽限 */
+    function scheduleLeave() {
+      if (leaveTimer) clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(function () { leaveTimer = null; setHot(false); }, 200);
+    }
+
+    function closeMenu() {
+      el.corner.classList.remove("open");
+      setHot(false);
+    }
+
+    if (el.btnGear) {
+      el.btnGear.addEventListener("mouseenter", function () { setHot(true); });
+      el.btnGear.addEventListener("mouseleave", function () { if (!menuIsOpen()) scheduleLeave(); });
+      el.btnGear.addEventListener("click", function () {
+        var willOpen = !menuIsOpen();
+        el.corner.classList.toggle("open", willOpen);
+        hot = willOpen;
+        syncCorner();
+      });
+    }
+    if (el.corner) {
+      var toolsBox = el.corner.querySelector(".tools");
+      [el.menu, toolsBox].forEach(function (box) {
+        if (!box) return;
+        box.addEventListener("mouseenter", function () { setHot(true); });
+        box.addEventListener("mouseleave", function () { if (!menuIsOpen()) scheduleLeave(); });
+      });
+    }
 
     /* 菜单项点完就收起；点菜单外也收起（大屏上不留一堆敞开的控件） */
-    function closeMenu() { el.corner.classList.remove("open"); }
     if (el.menu) el.menu.addEventListener("click", function (e) {
-      if (e.target && e.target.closest && e.target.closest("button")) closeMenu();
+      if (e.target && e.target.closest && e.target.closest("button")) {
+        /* 鼠标还停在原处，别让 hover 立刻又把它弹开 */
+        quietUntil = Date.now() + 420;
+        closeMenu();
+      }
     });
     document.addEventListener("click", function (e) {
       if (menuIsOpen() && !el.corner.contains(e.target)) closeMenu();
     });
-
-    function menuIsOpen() { return el.corner.classList.contains("open"); }
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && menuIsOpen()) closeMenu();
+    });
+    syncCorner();
 
     /* ---------- 最小化 / 退出：网页关不掉 kiosk 窗口，由本地服务出面 ---------- */
     function hasServer() {

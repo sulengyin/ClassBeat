@@ -116,6 +116,9 @@ pub struct AppState {
     pub paths: Paths,
     /// 这份安装的身份证（路径哈希前 8 位），与 Python 版同算法。
     pub home_id: String,
+    /// 安装包版本（`resources/build-info.json` 里的 version）。
+    /// 和 `version.js` 的网页版本不是一回事：桌面版要露的是这个号。
+    pub package: String,
     /// 桌面壳模式。Rust 服务本身就是壳的一部分，恒为 true，
     /// 保留这个字段是为了让 `/api/ping` 的 `shell` 键与前端契约不变。
     pub shell: bool,
@@ -135,9 +138,11 @@ impl AppState {
     pub fn new(paths: Paths) -> AppState {
         let (tx, _rx) = broadcast::channel(16);
         let home_id = util::home_id(&paths.base);
+        let package = read_package_version(&paths.install_root);
         AppState {
             paths,
             home_id,
+            package,
             shell: true,
             conf: Mutex::new(Conf {
                 port: 0,
@@ -224,4 +229,15 @@ impl AppState {
     pub fn is_stopping(&self) -> bool {
         self.stopping.load(Ordering::SeqCst)
     }
+}
+
+/// 安装包版本：只有桌面版带 `resources/build-info.json`；
+/// 解压即用版没有这个文件，返回空串，前端就退回网页版本号。
+fn read_package_version(install_root: &Path) -> String {
+    let file = install_root.join("build-info.json");
+    std::fs::read_to_string(file)
+        .ok()
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        .and_then(|v| v.get("version").and_then(|x| x.as_str()).map(|s| s.to_string()))
+        .unwrap_or_default()
 }

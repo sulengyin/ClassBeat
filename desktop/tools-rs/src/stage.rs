@@ -126,10 +126,14 @@ pub fn run(repo: &Path, data_arg: &str, clean: bool, check_only: bool) -> Result
     println!("  · classbeat-server.exe 就位（{size} 字节）");
 
     println!("\n[5/5] 写 build-info.json");
-    let (version, build) = read_version(repo);
+    let (app_version, build) = read_version(repo);
+    // 安装包版本来自 tauri.conf.json（安装器文件名、卸载项用的就是它）；
+    // 以前这里写的是 app/version.js 的网页版本，于是"装的是 0.5.0、面板显示 0.3.25"。
+    let pkg = package_version(&desktop).unwrap_or_else(|| app_version.clone());
     let mut info = Map::new();
     info.insert("product".into(), json!("ClassBeat"));
-    info.insert("version".into(), json!(version));
+    info.insert("version".into(), json!(pkg));
+    info.insert("appVersion".into(), json!(app_version));
     info.insert(
         "build".into(),
         json!(if build == "dev" || build.is_empty() {
@@ -215,6 +219,13 @@ pub fn git_sha(repo: &Path) -> String {
 fn read_version(repo: &Path) -> (String, String) {
     let js = std::fs::read_to_string(repo.join("app").join("version.js")).unwrap_or_default();
     (grab(&js, "var VERSION = \""), grab(&js, "var BUILD = \""))
+}
+
+/// `desktop/src-tauri/tauri.conf.json` 里的 version，即安装包版本。
+fn package_version(desktop: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(desktop.join("src-tauri").join("tauri.conf.json")).ok()?;
+    let v: Value = serde_json::from_str(&text).ok()?;
+    v.get("version").and_then(|x| x.as_str()).map(|s| s.to_string())
 }
 
 fn grab(src: &str, key: &str) -> String {

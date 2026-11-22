@@ -398,6 +398,34 @@ fn check_staged_build(resources: &Path, errors: &mut Vec<String>, notes: &mut Ve
             format!("build-info.json 的 build={b} 与 app/version.js 的 {build} 不一致"),
             errors,
         );
+        // 0.5.1 起 build-info 的 version 必须是安装包版本（tauri.conf.json），
+        // 不是 app/version.js 的网页版本——否则装的是 0.5.1、页面显示 0.3.25。
+        //
+        // 只在"装配副本不比 tauri.conf 旧"时比：刚改完版本号还没装配，
+        // 这里必然是旧值，报错只会误导（装配后复核那一步会再查）。
+        let conf = resources.parent().map(|p| p.join("tauri.conf.json"));
+        if let Some(conf) = conf {
+            let newer_or_equal = match (
+                std::fs::metadata(&info).and_then(|m| m.modified()),
+                std::fs::metadata(&conf).and_then(|m| m.modified()),
+            ) {
+                (Ok(a), Ok(b)) => a >= b,
+                _ => true,
+            };
+            if newer_or_equal {
+                let ver = j["version"].as_str().unwrap_or("");
+                let want = std::fs::read_to_string(&conf)
+                    .ok()
+                    .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+                    .and_then(|v| v["version"].as_str().map(|s| s.to_string()))
+                    .unwrap_or_default();
+                need(
+                    !want.is_empty() && ver == want,
+                    format!("build-info.json 的 version={ver} 与 tauri.conf.json 的 {want} 不一致（安装包版本才是要露出来的号）"),
+                    errors,
+                );
+            }
+        }
     }
 }
 

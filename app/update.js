@@ -16,6 +16,7 @@
   var DOWNLOAD_PAGE = "https://github.com/sulengyin/ClassBeat/releases/latest";
 
   var latest = "";       /* 更新源报上来的新版本号 */
+  var pkg = "";          /* 安装包版本（桌面版才有；网页版本的号是另一条线） */
   var migrateOn = false; /* 是否在提示「旧地址的设置可以导过来」 */
   var timer = null;
   var restarting = false; /* 「重启服务」已点下，等服务回来就整页重载 */
@@ -61,6 +62,20 @@
     return (r && r.hub) || "";
   }
 
+  /* 版本号只写在「更新」这一项的右侧：桌面版露安装包版本（0.5.x），
+     网页版本（0.3.x）是界面自己的号，放在面板里说明，别占这一格。 */
+  function paintVer() {
+    var node = el("ver");
+    if (!node) return;
+    var v = pkg || V.version || "";
+    node.textContent = v ? "v" + v : "";
+    if (node.setAttribute) {
+      node.setAttribute("title", pkg && V.version
+        ? "安装包 " + pkg + "，界面 " + V.version
+        : "");
+    }
+  }
+
   function renderTip() {
     var box = el("tip");
     var txt = el("tipText");
@@ -99,7 +114,12 @@
       .then(function (r) { return r && r.ok ? r.json() : null; })
       .then(function (d) {
         if (t) root.clearTimeout(t);
-        if (!d || !d.ok || !d.available || !d.latest) return;
+        if (!d || !d.ok) return;
+        if (d.package && String(d.package) !== pkg) {
+          pkg = String(d.package);
+          paintVer();
+        }
+        if (!d.available || !d.latest) return;
         latest = String(d.latest);
         renderTip();
       })
@@ -159,7 +179,8 @@
     var state = st.state || "idle";
     var single = ui.single || st.selfUpdate === false;
     var busy = !!ui.busy || !!st.busy || restarting;
-    var version = st.version || st.currentVersion || V.version || "";
+    var appVer = st.appVersion || st.currentVersion || V.version || "";
+    var version = st.package || pkg || appVer;
     var newLatest = st.latest || lg.latest || "";
     var available = st.available === true || (st.available === undefined && lg.available === true);
     var progress = Math.max(0, Math.min(100, Number(st.progress) || 0));
@@ -202,6 +223,7 @@
 
     return {
       version: version,
+      app: appVer,
       build: st.build || "",
       text: text,
       progress: progress,
@@ -219,8 +241,9 @@
   }
 
   function paint(part, vm) {
-    part.ver.textContent = "当前版本 v" + (vm.version || "?")
-      + (vm.build ? " · " + vm.build : "");
+    var verText = "当前版本 v" + (vm.version || "?") + (vm.build ? " · " + vm.build : "");
+    if (vm.app && vm.app !== vm.version) verText += "（界面 " + vm.app + "）";
+    part.ver.textContent = verText;
     part.state.textContent = vm.text;
     part.state.hidden = !vm.text;
 
@@ -519,8 +542,7 @@
   }
 
   function init() {
-    var ver = el("ver");
-    if (ver && V.text) ver.textContent = V.text();
+    paintVer();
 
     var loc = root.location || {};
     if ((loc.protocol === "http:" || loc.protocol === "https:")

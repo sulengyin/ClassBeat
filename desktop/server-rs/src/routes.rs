@@ -179,6 +179,7 @@ async fn handle_get(
                 "port": conf.port,
                 "lan": lan,
                 "version": v.version,
+                "package": st.package,
                 "build": v.build,
                 "addrChanged": changed,
                 "lastLan": last,
@@ -195,6 +196,7 @@ async fn handle_get(
             &json!({
                 "ok": true,
                 "version": v.version,
+                "package": st.package,
                 "build": v.build,
                 "startedAt": v.started_at,
                 "checked": !up.checked_at.is_empty(),
@@ -605,7 +607,7 @@ fn update_status(st: &Arc<AppState>) -> Response<Body> {
     m.insert("canApply".into(), json!(false));
     m.insert(
         "blockedReason".into(),
-        json!("桌面版由 ClassBeat 应用统一更新：点托盘图标 → 检查更新（或按 Ctrl+Alt+U）"),
+        json!("桌面版由程序自己更新：点托盘图标 → 检查更新（或按 Ctrl+Alt+U），装完班级数据不变。"),
     );
     m.insert("notes".into(), json!(""));
     m.insert("publishedAt".into(), json!(""));
@@ -619,6 +621,8 @@ fn update_status(st: &Arc<AppState>) -> Response<Body> {
     m.insert("ok".into(), json!(true));
     m.insert("canRestart".into(), json!(true));
     m.insert("version".into(), json!(v.version));
+    m.insert("package".into(), json!(st.package.clone()));
+    m.insert("appVersion".into(), json!(v.version));
     m.insert("build".into(), json!(v.build));
     resp::json(&Value::Object(m), 200)
 }

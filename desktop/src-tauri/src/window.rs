@@ -18,9 +18,7 @@ pub fn open_screen(app: &AppHandle, port: u16) {
 
 fn create_screen(app: &AppHandle, port: u16) {
     if let Some(w) = app.get_webview_window("screen") {
-        let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
+        reveal(&w);
         return;
     }
     let url = match tauri::Url::parse(&format!("http://127.0.0.1:{port}/screen")) {
@@ -31,6 +29,10 @@ fn create_screen(app: &AppHandle, port: u16) {
         }
     };
     // 窗口参数一个都不能少：标题（页面靠它找窗口）、全屏、无边框、置顶、不可缩放。
+    //
+    // **先隐藏建窗、设好全屏再显示**：`visible(true)` + `fullscreen(true)` 同时传，
+    // Windows 上偶尔会先闪一下 1280x720 的窗口再撑满屏（老师看到的就是"没全屏，
+    // 打了个窗口"）。建完再补一次 set_fullscreen 是幂等的，多这一下不亏。
     let built = WebviewWindowBuilder::new(app, "screen", WebviewUrl::External(url))
         .title(config::KIOSK_TITLE)
         .inner_size(1280.0, 720.0)
@@ -38,7 +40,7 @@ fn create_screen(app: &AppHandle, port: u16) {
         .fullscreen(true)
         .always_on_top(true)
         .resizable(false)
-        .visible(true)
+        .visible(false)
         .focused(true)
         .build();
 
@@ -47,6 +49,7 @@ fn create_screen(app: &AppHandle, port: u16) {
     // 所以闭包里捕获 AppHandle 自己找窗口）。见 docs/08 §8.2 降级方案。
     match built {
         Ok(w) => {
+            reveal(&w);
             let handle = app.clone();
             w.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
@@ -61,6 +64,18 @@ fn create_screen(app: &AppHandle, port: u16) {
             show_error(app, &format!("大屏窗口创建失败：{e}"));
         }
     }
+}
+
+/// 把大屏露出来：先断言全屏，再显示、置顶、抢焦点。
+/// 托盘「打开大屏」、热键恢复、首次建窗都走这一条，保证每次回来的都是满屏。
+fn reveal(w: &tauri::WebviewWindow) {
+    if !w.is_fullscreen().unwrap_or(false) {
+        let _ = w.set_fullscreen(true);
+    }
+    let _ = w.show();
+    let _ = w.unminimize();
+    let _ = w.set_always_on_top(true);
+    let _ = w.set_focus();
 }
 
 /// 关大屏 ≠ 关应用。
@@ -99,9 +114,7 @@ pub fn reload_screen(app: &AppHandle, port: u16) {
 
 pub fn show_or_open(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("screen") {
-        let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
+        reveal(&w);
         return;
     }
     let port = app.state::<AppState>().port();

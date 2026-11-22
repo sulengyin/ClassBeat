@@ -64,6 +64,12 @@ if (-not $SkipStage) {
   if ($Clean) { $stageArgs += '--clean' }
   & $tools @stageArgs
   if ($LASTEXITCODE -ne 0) { throw "资源装配失败" }
+
+  # 装配后再自检一次：有几条（build-info 的版本号、resources 里有没有 Python）
+  # 只有装完才看得到。第一次自检在装配前，查的是仓库侧的完整性。
+  Step "装配后复核"
+  & $tools verify
+  if ($LASTEXITCODE -ne 0) { throw "装配后复核没通过" }
 } else {
   Write-Host "跳过装配（-SkipStage）"
 }

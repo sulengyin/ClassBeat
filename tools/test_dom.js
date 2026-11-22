@@ -1820,34 +1820,54 @@ global.Remote.info.phone = "";
     check(hp([{ start: "10:00", end: "09:00" }]).includes("早于结束"), "倒挂单独提示");
   }
 
-  /* ---------- 2026-11-20 屏面收纳与窗口动作 ---------- */
+  /* ---------- 2026-11-22 右下角改悬浮展开菜单 ---------- */
 
-  /* 屏面瘦身：常驻工具区只剩 4 个图标按钮（深色/全屏/倒计时/编辑），
-     低频项全部收进⋯菜单；退出和最小化必须有、退出必须先确认 */
+  /* 悬停 ⋯ 后：左侧浮出常用三项（带文字），上方两列网格收其余功能。
+     视觉展开态只有一个 .show；点一下还能钉住（触屏没有 hover）。 */
   const cornerHtml = pageHtml.slice(pageHtml.indexOf('<div class="corner"'),
     pageHtml.indexOf('<div class="setup"'));
-  const toolsHtml = cornerHtml.slice(cornerHtml.indexOf('<div class="tools">'),
+  const toolsHtml = cornerHtml.slice(cornerHtml.indexOf('<div class="tools"'),
     cornerHtml.indexOf('<button class="gear"'));
-  const toolsCount = (toolsHtml.match(/id="btn-/g) || []).length;
-  check(toolsCount === 4 && /btn-theme/.test(toolsHtml) && /btn-cd/.test(toolsHtml)
-        && /btn-full/.test(toolsHtml) && /btn-edit/.test(toolsHtml),
-    "常驻工具区只有深色/全屏/倒计时/编辑四个", toolsCount + " 个");
-  check(/id="menu"/.test(cornerHtml) && /btn-phone/.test(cornerHtml)
-        && /btn-demo/.test(cornerHtml) && /btn-update/.test(cornerHtml)
-        && /btn-setup/.test(cornerHtml) && /btn-help/.test(cornerHtml)
-        && /btn-min/.test(cornerHtml) && /btn-exit/.test(cornerHtml)
-        && /update-dot/.test(cornerHtml),
-    "低频项收进⋯菜单且带最小化/退出/帮助/红点");
-  check(cornerHtml.indexOf("btn-help") < cornerHtml.indexOf("mi-sep")
-        && cornerHtml.indexOf("mi-sep") < cornerHtml.indexOf("btn-min")
-        && cornerHtml.indexOf("btn-min") < cornerHtml.indexOf("btn-exit"),
-    "最小化与退出单独分组，退出放最后");
+  const menuHtml = cornerHtml.slice(cornerHtml.indexOf('<div class="menu"'),
+    cornerHtml.indexOf('<div class="tools"'));
 
-  /* 倒计时状态写在悬停提示里（按钮已图标化，不能再往按钮里塞文字） */
+  const miButtons = cornerHtml.match(/<button class="mi[^"]*"[\s\S]*?<\/button>/g) || [];
+  check(miButtons.length === 12, "⋯ 展开后一共 12 个功能", miButtons.length + " 个");
+  check(miButtons.every(b => /<svg /.test(b) && /class="mi-t">[^<]+</.test(b)),
+    "每个按钮都是「图标 + 文字」，老师不用猜含义");
+
+  check(/id="btn-min"/.test(toolsHtml) && /id="btn-phone"/.test(toolsHtml)
+        && /id="btn-edit"/.test(toolsHtml)
+        && toolsHtml.indexOf('btn-min') < toolsHtml.indexOf('btn-phone')
+        && toolsHtml.indexOf('btn-phone') < toolsHtml.indexOf('btn-edit'),
+    "⋯ 左侧是 最小化 / 手机 / 编辑，按顺序排");
+  check(!/btn-min|btn-phone|btn-edit/.test(menuHtml),
+    "常用三项不再重复出现在上方网格里");
+
+  check(["btn-demo", "btn-update", "btn-setup", "btn-help", "btn-reduce",
+    "btn-theme", "btn-full", "btn-cd", "btn-exit"]
+    .every(id => menuHtml.indexOf('id="' + id + '"') >= 0),
+    "⋯ 上方网格收着演练/更新/配置班级/帮助/动效/主题/全屏/倒计时/退出");
+  check(/id="btn-update"[\s\S]*?id="update-dot"[\s\S]*?id="ver"/.test(menuHtml),
+    "红点与版本号仍挂在「更新」一项里");
+  check(/class="mi mi-wide mi-danger" id="btn-exit"/.test(menuHtml)
+        && menuHtml.indexOf('btn-exit') > menuHtml.indexOf('btn-cd'),
+    "退出在最后、整行、危险色");
+  check((menuHtml.match(/--c:[0-9];--r:[0-9]/g) || []).length >= 9,
+    "每个格子都写了行列，错峰动画才有依据");
+
+  check(/id="btn-gear"[\s\S]*?aria-expanded="false"/.test(cornerHtml)
+        && /class="g-dots"/.test(cornerHtml) && /class="g-x"/.test(cornerHtml),
+    "主按钮有展开状态和 ⋯↔× 两个图标");
+
+  /* 倒计时状态写在 data-tip / aria-label 里（按钮本身是固定标签 + 高亮） */
   const cdEl = document.getElementById("btn-cd");
-  check(cdEl.dataset.tip && cdEl.dataset.tip.indexOf("倒计时 · 按推荐") === 0
-        && cdEl.textContent === "",
-    "倒计时状态写进 data-tip，按钮本身无文字", cdEl.dataset.tip);
+  check(cdEl.dataset.tip && cdEl.dataset.tip.indexOf("倒计时 · 按推荐") === 0,
+    "倒计时状态写进 data-tip", cdEl.dataset.tip);
+  const cdChunk = menuHtml.slice(menuHtml.indexOf('id="btn-cd"'));
+  check(cdChunk.indexOf('<span class="mi-t">倒计时</span>') === 0 ||
+        cdChunk.indexOf('<span class="mi-t">倒计时</span>') > 0,
+    "倒计时项显示固定标签，状态靠高亮", cdChunk.slice(0, 60));
 
   /* 首次引导：第一次打开弹出、走完或跳过后写 localStorage 不再来 */
   const guideModal = document.getElementById("guideModal");

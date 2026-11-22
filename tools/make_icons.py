@@ -75,52 +75,81 @@ def dist_seg(px, py, ax, ay, bx, by):
     return math.hypot(px - (ax + t * vx), py - (ay + t * vy))
 
 
+AMBER_DEEP = (198, 114, 24, 255)   # 环的下半段，给一点体积感
+PAPER_TOP = (255, 250, 239, 255)    # 纸面高光
+PAPER_LOW = (246, 229, 198, 255)    # 纸面收暗
+
+
+def _lerp(a, b, t):
+    t = 0.0 if t < 0 else (1.0 if t > 1 else t)
+    return (round(a[0] + (b[0] - a[0]) * t),
+            round(a[1] + (b[1] - a[1]) * t),
+            round(a[2] + (b[2] - a[2]) * t), 255)
+
+
 def build(size):
-    S = 2                       # 2x 超采样换边缘平滑
+    """奶油纸卡 + 琥珀圆弧 + 墨色时针。
+
+    2026-11-22 换掉了原来的"CB 单字 + 屏风"：那套在 16/24px 下笔画糊成一团，
+    任务栏和桌面上一眼认不出。现在主体只有一个圆，缩到 16px 仍读得出"钟"，
+    正好是这块屏在教室里干的事（看着时间走）。
+
+    小尺寸的两个坑：描边和环宽都按 512 的比例缩，到 16px 只剩零点几像素，
+    会被超采样抹成灰边。所以统一走 v(base, min_px)，给每条线一个真实像素下限。
+    """
+    S = 4 if size <= 128 else 2        # 超采样倍数：小尺寸多采几刀
     W = size * S
-    u = W / 512.0               # 以下几何尺寸都以 512 为基准
-    rad = 56 * u                # 圆角
-    margin = 14 * u             # 描边到边缘
-    border = 9 * u              # 描边宽
-    cx, cy = 256 * u, 262 * u
-    R = 148 * u                 # 表盘外半径
-    ring = 30 * u               # 琥珀环宽
-    hand_w = 13 * u
-    # 时针指向 10 点，分针指向 2 点
-    hx, hy = cx - 74 * u, cy - 90 * u
-    mx, my = cx + 96 * u, cy - 66 * u
+    k = size / 512.0                   # 1 个基准单位 = k 个真实像素
+
+    def v(base, min_px=0.0):
+        return max(base * k, min_px) * S
+
+    rad = v(108)
+    border = v(10, 1.7)
+    R = v(170)                         # 环外半径
+    ring = v(48, 2.5)                  # 环宽
+    hand_w = v(30, 1.9)
+    dot = v(18, 1.4)
+    cx = cy = W / 2.0
+    tipx, tipy = cx - 0.46 * R, cy - 0.37 * R        # 时针指向 10 点
+    tick_w = v(10, 1.5)              # 12/3/6/9 的刻度，只有大图才画
+    tick_a, tick_b = R - ring - v(3), R - ring - v(3) + v(26)
 
     px = [[CLEAR] * W for _ in range(W)]
     for y in range(W):
         row = px[y]
+        fy = y + 0.5
         for x in range(W):
-            # 纸底 + 格线（只在圆角矩形内画）
             if not in_round(x, y, W, W, rad):
                 continue
-            inner = in_round(x + margin, y + margin, W - 2 * margin, W - 2 * margin, max(1.0, rad - margin))
+            # 注意是 x - border：判的是"退进内框后"的相对坐标。
+            # 写成 x + border 会让右边和下边多出一条厚边（旧版就有这个 bug，
+            # 只是底色是深蓝所以看不出来）。
+            inner = in_round(x - border, y - border, W - 2 * border,
+                             W - 2 * border, max(1.0, rad - border))
             if not inner:
                 row[x] = INK
                 continue
-            g = 26 * u
-            if (x % g) < 1.6 * u or (y % g) < 1.6 * u:
-                row[x] = GRID
-                continue
-            d = math.hypot(x - cx, y - cy)
-            if abs(d - R) <= ring / 2:
-                row[x] = AMBER
-            elif d < R - ring / 2:
-                if dist_seg(x, y, cx, cy, hx, hy) <= hand_w / 2:
+            # 纸面：上亮下暗
+            row[x] = _lerp(PAPER_TOP, PAPER_LOW, fy / W)
+            fx = x + 0.5
+            d = math.hypot(fx - cx, fy - cy)
+            if R - ring <= d <= R:
+                row[x] = _lerp(AMBER, AMBER_DEEP, (fy / W - 0.2) / 0.7)
+            elif d < R - ring:
+                if d <= dot:
                     row[x] = INK
-                elif dist_seg(x, y, cx, cy, mx, my) <= hand_w / 2:
-                    row[x] = TEAL
-                elif d <= 16 * u:
+                elif dist_seg(fx, fy, cx, cy, tipx, tipy) <= hand_w / 2:
+                    row[x] = INK
+                elif size >= 96 and any(
+                        dist_seg(fx, fy, cx + tick_a * math.cos(t), cy + tick_a * math.sin(t),
+                                 cx + tick_b * math.cos(t), cy + tick_b * math.sin(t)) <= tick_w / 2
+                        for t in (0.0, math.pi / 2, math.pi, 1.5 * math.pi)):
                     row[x] = INK
                 else:
                     row[x] = CARD
-            else:
-                row[x] = BG
 
-    # 2x 超采样盒式降采样
+    # 超采样盒式降采样
     out = [[None] * size for _ in range(size)]
     for Y in range(size):
         for X in range(size):
