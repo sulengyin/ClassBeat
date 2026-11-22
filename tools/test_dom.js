@@ -241,6 +241,21 @@ check(!!global.Demo, "demo.js 注册成功");
 check(!!global.Remote, "remote.js 注册成功");
 check(global.Remote && /127\.0\.0\.1:8765/.test(global.Remote.hub), "默认连本机服务", global.Remote && global.Remote.hub);
 
+/* 消息过期判定：until 只有 HH:MM，跨零点时字符串比较会反过来。
+   23:55 发一条 10 分钟的消息，until=00:05 —— 不能当场判成"已过期"，否则
+   老师晚上发的通知大屏上什么都不显示（2026-11-22 23:53 的 CI 就是这么红的）。 */
+{
+  const exp = global.Remote._noticeExpired;
+  check(typeof exp === "function", "跨零点判定是可单测的纯函数");
+  if (typeof exp === "function") {
+    check(exp("00:05", "23:55") === false, "23:55 发的 10 分钟消息，零点前不算过期");
+    check(exp("00:05", "00:01") === false, "跨零点后仍在有效期内");
+    check(exp("12:30", "12:31") === true, "同一天过点就算过期");
+    check(exp("12:30", "12:29") === false, "还没到点");
+    check(exp("", "23:59") === false, "没有 until 就不过期");
+  }
+}
+
 /* 版本号只有一个来源；更新/迁移提示都不该打扰大屏 */
 check(!!global.AppVersion && /^\d+\.\d+\.\d+$/.test(AppVersion.version),
   "版本号是语义版本", AppVersion && AppVersion.version);

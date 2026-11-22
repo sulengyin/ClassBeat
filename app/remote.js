@@ -85,11 +85,23 @@
     return (h < 10 ? "0" : "") + h + ":" + (mm < 10 ? "0" : "") + mm;
   }
 
+  /* 消息到期没有：比的是「到点时间」，但存下来的是 HH:MM。
+     23:55 发一条 10 分钟的消息，until 会写成 00:05 —— 跨了零点，字符串比较
+     （"23:55" >= "00:05"）会当场判成过期，大屏上什么都看不到。服务端
+     messages.rs 的 expired() 早就对 00:00–06:00 这一段做了同样的例外，
+     这里以前漏了：结果是服务认为消息还活着、页面却把它藏起来，两边打架。
+     2026-11-22 23:53 的 CI 就是因为这个红了 6 条（本地跑都在零点以后，看不见）。 */
+  function noticeExpired(until, now) {
+    if (!until) return false;
+    if (until >= "00:00" && until < "06:00") return false;   // 跨零点，不算过期
+    return now >= until;
+  }
+
   /* 只认「给全班看」的消息。给自己记的不上屏——教室屏是学生语言区。 */
   function visible(msg) {
     if (!msg || !msg.text) return false;
     if (msg.forWhom && msg.forWhom !== "class") return false;
-    if (msg.until && nowHM() >= msg.until) return false;
+    if (noticeExpired(msg.until, nowHM())) return false;
     return true;
   }
 
@@ -308,7 +320,9 @@
   root.Remote = {
     hub: HUB, info: info, probe: probe,
     connect: connect, retract: retract, syncClock: syncClock,
-    pullConfig: pullConfig
+    pullConfig: pullConfig,
+    /* 给 test_dom 用的纯函数：跨零点那条边界最容易写错 */
+    _noticeExpired: noticeExpired
   };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
