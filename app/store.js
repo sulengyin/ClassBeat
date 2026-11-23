@@ -1125,11 +1125,29 @@
     return { ok: true, n: plan.length, klass: meta.klass || sch.class || "" };
   }
 
+  /* 启动时洗一次盘上的存量。
+     写闸门只管「这次要写的东西」，而老机器上那些 [object Object] 是躺在盘上
+     的——读出来被显示层挡住了，从来没有被写回去，所以写闸门永远轮不到它们。
+     只在「洗完确实变了」时写盘，不制造无意义的写入；清洗是幂等的，
+     从第二次启动起就稳定不写。 */
+  function cleanStoredOnce() {
+    var raw = read(KEY.config, null);
+    if (isPlain(raw)) {
+      var fixed = cleanConfig(raw);
+      if (JSON.stringify(fixed) !== JSON.stringify(raw)) write(KEY.config, fixed);
+    }
+    var ov = read(KEY.overrides, null);
+    if (isPlain(ov)) {
+      var ovFixed = cleanOverrides(ov);
+      if (JSON.stringify(ovFixed) !== JSON.stringify(ov)) write(KEY.overrides, ovFixed);
+    }
+  }
+
   upgrade();
-  /* 把组员的旧 id 编码（"s01"）就地换成姓名编码（"name:张三"）：
-     换一份名单，id 就全变了，老师的组会整片对不上。幂等——没有可转的就
-     不写盘，所以不需要靠版本号触发一次。放在 upgrade 之后单独跑，
-     因为升级只在版本落后时执行，而这台机器上可能早就是 v2 了。 */
+  /* 先把形状洗对，再把组员的旧 id 编码（"s01"）换成本姓名编码（"name:张三"）。
+     两步都幂等，所以不靠版本号触发——这台机器可能早就是 v2 了，
+     升级迁移早就跑过，洗不到现在这些。 */
+  cleanStoredOnce();
   fixGroupKeys();
 
   var api = {
