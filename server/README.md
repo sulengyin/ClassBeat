@@ -15,7 +15,7 @@
 | `sw.js` | `/phone-sw.js`，手机页的 Service Worker |
 | `icons/icon-192.png`、`icon-512.png` | 手机页 PWA 清单与主屏图标 |
 
-`tools/make_ico.py` 会顺手重生成这两个图标（与大屏图标同一套品牌图）。
+`tools/make_icons.py` 会重生成这两个图标（与大屏安装包同一张源图 `tools/brand/icon-source.png`）。
 
 装配时 `classbeat-tools stage` 只拷这四样进 `src-tauri/resources/server/`，
 连同 `classbeat-server.exe` 一起——不会再有 `.py` 进包。

@@ -72,6 +72,14 @@ body[data-setup="1"] .warn{display:none}
 
 .setup-h{font-size:2.6vmin;font-weight:900;margin:1.6vmin 0 1.2vmin}
 .setup-p{font-size:2vmin;line-height:1.7;color:#6B5545;margin:0 0 2vmin}
+/* 跨代升级入口：从 0.3.x 网页版搬设置。放在第一步，别让老师先填完四步才找得到。 */
+.setup-legacy{
+  border:.2vmin dashed #C9B79E;border-radius:1.2vmin;background:#FFFDF6;
+  padding:1.4vmin 1.6vmin;margin:0 0 2vmin;
+  display:flex;align-items:center;gap:1.4vmin;flex-wrap:wrap;
+}
+.setup-legacy-tip{flex:1 1 24vmin;font-size:1.8vmin;line-height:1.6;color:#6B5545}
+.setup-legacy-btn{flex:none}
 
 .setup-field{display:flex;align-items:center;gap:1.6vmin;margin:0 0 1.6vmin}
 .setup-field label{

@@ -2033,6 +2033,19 @@ global.Remote.info.phone = "";
         && editSrc2.includes("其中几天要写不同的话"),
     "编辑面板：每段有星期展开器（默认收起，保证简洁）");
 
+  /* 跨代升级：0.3.x 的用户装完 0.5.x 第一次打开就是向导第一步，
+     旧数据只有「导出设置 → 导入设置」一条路，入口必须在第一步，
+     而不是让人先填班名走完四步再翻到最后一页。 */
+  const setupSrc = fs.readFileSync(path.join(ROOT, "app/setup.js"), "utf8");
+  const pageClassSrc = setupSrc.slice(setupSrc.indexOf("function pageClass"),
+    setupSrc.indexOf("function pageTime"));
+  check(pageClassSrc.includes("setup-legacy") && pageClassSrc.includes("pickImport"),
+    "向导第一步：有「导入旧设置 JSON」入口，且复用已有的 pickImport");
+  check(setupSrc.includes("state.step = 3;"),
+    "向导：导入整份设置后直接跳到最后一页，只剩点「完成」");
+  check(!setupSrc.includes("function pickImport2"),
+    "向导：导入只有一套实现，没有为跨代另写一份");
+
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
 })();

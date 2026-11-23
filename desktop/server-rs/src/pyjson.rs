@@ -1,11 +1,18 @@
-//! Python `json.dumps` 的输出格式复刻。
+//! 确定性 JSON 序列化：同一份数据永远得到同一串字节。
 //!
-//! 为什么不用 `serde_json::to_string`：Python 默认分隔符是 `", "` 和 `": "`，
-//! 输出 `{"ok": true, "port": 8765}`；serde_json 是 `{"ok":true,"port":8765}`。
-//! 字节级验收（docs/11）要求两边完全一致，所以这里按 Python 的规则自己写。
+//! 这不是"为了迁就 Python 的临时补丁"，而是**产品行为的一部分**，两条硬理由：
 //!
-//! 覆盖 Python 的三个常用形态：
-//!   - `dumps(v)`                      默认分隔符
+//! 1. **落盘要稳定**。`server/messages.json`、快照与清单都是覆盖写；如果每次
+//!    写出的字节有差异，git diff、备份比对、"内容没变"的判断全部失真。
+//! 2. **对拍要靠哈希**。`tools/` 里 Python 是参考实现，Rust 是产品实现，
+//!    docs/11 的字节级验收要求两边输出同一个字符串——只有确定性格式才可能做到。
+//!
+//! 具体形状沿用了 Python `json.dumps` 的三档（分隔符 `", "` 与 `": "`），
+//! 原因是既有文件的字节基线就是它；换成 serde_json 的紧凑分隔符
+//! （`{"ok":true,"port":8765}`）等于让所有历史文件变成"不一致"。
+//! 这不是兼容包袱，是既定格式。
+//!
+//!   - `dumps(v)`                      默认分隔符，`{"ok": true, "port": 8765}`
 //!   - `dumps_indent(v, 2)`            清单文件（indent=2）
 //!   - `dumps_sorted_compact(v)`       落盘快照（sort_keys=True, separators=(",",":")）
 

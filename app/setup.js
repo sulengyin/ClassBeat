@@ -1327,6 +1327,21 @@
     var p = el("div", "setup-page on");
     p.appendChild(el("h3", "setup-h", "先告诉屏，这是哪个班"));
     p.appendChild(el("p", "setup-p", "这两行会出现在左上角、页面标题和消息服务里。以后想改，从「⋯ → 配置班级」再进来。"));
+
+    /* 跨代升级入口（2026-11-23）：0.3.x 是解压文件夹 + 浏览器存数据，
+       0.5.x 是安装包，老师装完第一次打开看到的就是这一页。旧数据只有
+       「导出设置 → 导入设置」这一条路，所以入口得在第一步，
+       不能让人先填完班级名走完四步，再到最后一页去找导入。 */
+    var legacy = el("div", "setup-legacy");
+    legacy.appendChild(el("span", "setup-legacy-tip",
+      "以前用的是网页版（0.3.x）？先在旧的那台上「⋯ → 导出设置」存成 JSON 文件，"
+      + "从这里导进来，班名、作息、课表、岗位、文字一起带过来，四步就不用填了。"));
+    var legacyBtn = el("button", "setup-btn setup-legacy-btn", "导入旧设置 JSON");
+    legacyBtn.type = "button";
+    legacyBtn.addEventListener("click", pickImport);
+    legacy.appendChild(legacyBtn);
+    p.appendChild(legacy);
+
     p.appendChild(field("学校", state.school, function (v) { state.school = v; }, "text", "例如：春江中心小学"));
     p.appendChild(field("班级", state.klass, function (v) { state.klass = v; }, "text", "例如：五（1）班"));
     p.appendChild(field("班主任", state.head, function (v) { state.head = v; }, "text", "可以不填"));
@@ -2783,7 +2798,10 @@
         }
         state = fillState(loadCurrent());
         state.applied = true;
-        state.flash = "已导入" + (r.klass ? "「" + r.klass + "」的" : "") + "整份设置，屏上已经换过来。";
+        /* 导入的是整份设置，四步没什么可填的了：直接跳到最后一页，
+           老师点「完成」就收工。在最后一页导入时本来就在 step 3，无副作用。 */
+        state.step = 3;
+        state.flash = "已导入" + (r.klass ? "「" + r.klass + "」的" : "") + "整份设置，屏上已经换过来。点「完成」关掉这一页就行。";
         clearDraft();
         render();
       };

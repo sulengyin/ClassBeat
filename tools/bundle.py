@@ -96,7 +96,10 @@ def main() -> None:
             print(f"已并入 {baked.relative_to(ROOT)}：{len(texts)} 组文字")
 
     out = Path(args.out).resolve() if args.out else ROOT / "app" / "data.js"
-    with out.open("w", encoding="utf-8") as f:
+    # newline="\n"：Windows 上文本模式会把 \n 翻成 \r\n，同一份数据在不同平台
+    # 生成的字节就不一样了。Rust 那边（classbeat-tools bundle）写的是 LF，
+    # 两边要能用哈希直接比（tools/check_bundle_parity.py），所以钉死 LF。
+    with out.open("w", encoding="utf-8", newline="\n") as f:
         f.write("/* 由 tools/bundle.py 生成，不要手改 */\n")
         f.write("window.RHYTHM_DATA=")
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))

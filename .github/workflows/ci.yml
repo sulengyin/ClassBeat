@@ -96,6 +96,31 @@ jobs:
       - name: 跨学校配置矩阵
         run: python3 tools/test_variants.py --verbose
 
+  # data.js 有两套实现：tools/bundle.py（参考实现，只在开发机/CI 跑）与
+  # classbeat-tools bundle（产品实现，打包时真正用的）。约定是"以 Rust 为准、
+  # Python 只当尺子"，但约定不等于校验——这里让两边各出一份，抹掉署名、
+  # 时间戳与换行后必须逐字节一致（desktop/docs/13 §13.3）。
+  parity:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/tools-rs -> target
+
+      - name: 编 classbeat-tools
+        run: cargo build --release --manifest-path desktop/tools-rs/Cargo.toml
+
+      - name: data.js 双实现比对
+        run: python3 tools/check_bundle_parity.py
+
   # 真浏览器：一体机 1920/1366、iPad(Safari 内核)、iPhone/SE/安卓/鸿蒙视口
   e2e:
     runs-on: ubuntu-24.04

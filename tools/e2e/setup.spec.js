@@ -28,6 +28,45 @@ function stored(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem("rhythm.config.v1") || "{}"));
 }
 
+test("向导第一步就能导入旧设置，不用先填班名（0.3.x 跨代升级）", async ({ page }) => {
+  /* 0.3.x 的数据在浏览器 localStorage 里，只能导出/导入。以前导入入口在第 4 步，
+     第一步还强制先填班级名——从网页版升上来的老师得先编一个班名再绕回去。
+     这个用例钉住：入口在第一步、点得到、导入后直接跳到最后一页。 */
+  await page.route("**/app/data.js", (route) =>
+    route.fulfill({ status: 200, contentType: "application/javascript", body: "window.RHYTHM_DATA={};" }));
+
+  const errors = await openScreen(page, AT);
+  await expect(page.locator("#setup")).toHaveClass(/open/);
+  await expect(page.locator(".setup-step")).toHaveCount(4);
+
+  const legacy = page.locator(".setup-legacy");
+  await expect(legacy).toBeVisible();
+  await expect(legacy).toContainText("导出设置");
+  const btn = page.locator(".setup-legacy-btn");
+  await expect(btn).toHaveText("导入旧设置 JSON");
+
+  /* 用程序自己导出的格式造一份"旧设置"，保证走的是真格式而不是测试自造的字段。 */
+  const payload = await page.evaluate(() => {
+    const o = window.Store.exportAll();
+    o.config = o.config || {};
+    o.config.meta = Object.assign({}, o.config.meta, { klass: "导入来的班" });
+    return o;
+  });
+
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), btn.click()]);
+  await chooser.setFiles({
+    name: "旧版设置.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(payload), "utf8"),
+  });
+
+  // 导入成功 → 直接跳到第 4 步，只剩点「完成」
+  await expect(page.locator(".setup-step").nth(3)).toHaveClass(/on/);
+  expect(await page.evaluate(() => window.Store.config().meta.klass)).toBe("导入来的班");
+  expect(await page.evaluate(() => window.Store.config().meta.klass)).not.toBe("空包测试班");
+  expect(errors, "控制台不应有报错").toEqual([]);
+});
+
 test("空配置打开就进向导，不碰命令行也能配出当天的屏", async ({ page }) => {
   /* 空包 = 还没跑 bundle.py。把 data.js 换成空对象，模拟一台新电脑第一次打开。 */
   await page.route("**/app/data.js", (route) =>

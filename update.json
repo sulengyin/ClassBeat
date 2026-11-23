@@ -1,0 +1,25 @@
+{
+  "schema": 2,
+  "$comment": [
+    "【跨代公告，不是可消费的更新清单】",
+    "0.3.x 的服务会读 <git 仓库>/main/update.json 当更新源（地址写在包根 update-source.txt 里，",
+    "形如 https://ghfast.top/https://raw.githubusercontent.com/sulengyin/ClassBeat/main/update.json）。",
+    "0.5.x 起更新改走安装包：由 Tauri updater 读 Release 上的 latest.json（另一套格式，带 minisign 签名）。",
+    "两种形态装法完全不同（0.3.x 是解压文件夹 + 原位替换文件；0.5.x 是 NSIS 安装包 + 注册表 + 卸载项），",
+    "所以 0.3.x 不可能自动跨到 0.5.x，只能手动装一次安装包。",
+    "这里把 schema 标成 2：0.3.x 的解析器只认 schema 1，会直接拒绝，并把",
+    "「更新清单格式版本是 2，这个版本的程序只认 1；请先手动更新」显示在更新面板里——",
+    "这比原来删掉文件后报「连不上更新服务器」要准确，老师也知道该做什么。",
+    "下面的 version/url/sha256 只为留痕（指向 v0.5.2 的真实安装包），任何现代版本都不会读它们。",
+    "0.4.0 之前的自动更新能力到此为止；以后不要再往这份文件里写可执行的升级。"
+  ],
+  "version": "0.5.2",
+  "build": "8803c93",
+  "publishedAt": "2026-11-23T14:00:00+08:00",
+  "minVersion": "0.4.0",
+  "notes": "0.4 起改成安装包形态，0.3.x 只能手动装一次：先在大屏编辑面板「导出设置」，再装 ClassBeat_x64-setup.exe，装好后「导入设置」。",
+  "url": "https://github.com/sulengyin/ClassBeat/releases/download/v0.5.2/ClassBeat_0.5.2_x64-setup.exe",
+  "sha256": "ab834ef1243e6b84971405e4f2019835010780a80a1372c090bbea2c3d3bbde5",
+  "bytes": 2326009,
+  "files": []
+}

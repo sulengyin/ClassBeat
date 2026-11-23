@@ -55,8 +55,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/sulengyin/ClassBeat/releases/latest/download/latest.json",
-        "https://classbeat.example.com/update/latest.json"
+        "https://github.com/sulengyin/ClassBeat/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2RDUzMEYzNEM0RUQ1QzMKUldURDFVNU04ekRWVmkzU2djcU5FazRZYWtoSVk1WGNYckpMTStNNGtFbjZURnI0Z2s4d0N4QWcK",
       "windows": {
