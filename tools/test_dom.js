@@ -999,8 +999,33 @@ global.Store.patchConfig({ students: global.window.RHYTHM_DATA.students });
 const cleanLine = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
 cleanLine.children[0]._h.click();
+
+/* B：打开面板先只列「今天这一轮」，不铺整份名单。
+   以前 paint() 一上来就把 24 个候选铺出来，于是「这个岗位已经分过组」
+   在界面上完全看不出来；点组又直接把整组塞进 selected，底下那句
+   「已选 15 人」对老师来说像是凭空冒出来的。 */
+const openedPeople = document.querySelectorAll(".ep-person").map(b => b.textContent);
+const allRoster = global.Store.config().students.map(s => s.name);
+check(openedPeople.length < allRoster.length,
+  "打开面板不铺整份名单，只列今天这一轮的人",
+  openedPeople.length + " 人 / 名单 " + allRoster.length + " 人");
+check(document.querySelectorAll(".ep-person.on").length === 0,
+  "打开时一个都不预先勾上：没选就不该显示「已选 N 人」");
+const statusTxt = (document.querySelector(".ep-pickstatus") || {}).textContent || "";
+check(/今天这一轮|今天还没排人/.test(statusTxt),
+  "状态行说明现在列的是哪批人", statusTxt);
+
+/* 只点一个人，按钮就该只说一个人 */
+const onePerson = document.querySelectorAll(".ep-person")[0];
+onePerson._h.click();
+check(/用这 1 人/.test(document.querySelector(".ep-primary").textContent),
+  "只点一个人时按钮就说一个人，不会莫名变成一整组",
+  document.querySelector(".ep-primary").textContent);
+onePerson._h.click();
+check(document.querySelectorAll(".ep-person.on").length === 0, "再点一下取消选择");
+
 const groupChips = document.querySelectorAll(".ep-group-chip");
-const roleGroupChip = groupChips.filter(c => c.textContent === "值日组")[0];
+const roleGroupChip = groupChips.filter(c => c.textContent.indexOf("值日组") === 0)[0];
 check(!!roleGroupChip && groupChips.length >= 1,
   "换人弹窗里有「点组带出」，排班组按当天值日实时出人",
   groupChips.map(c => c.textContent).join("、"));
@@ -1010,8 +1035,19 @@ const groupPicked = document.querySelectorAll(".ep-person.on");
 check(groupPicked.length === 8 && global.Store.peopleGroups().length === groupsBefore,
   "点「值日组」把整组 8 人一次选上，且没有自动落库",
   groupPicked.length + " 人，配置里 " + groupsBefore + " 组");
+/* 点组会重建整排 chip，所以要重新查一次节点，不能拿点之前那个引用 */
+const chipAfter = document.querySelectorAll(".ep-group-chip")
+  .filter(c => c.textContent.indexOf("值日组") === 0)[0];
+check(!!chipAfter && chipAfter.classList.contains("on"),
+  "点过的组有「按下去」的样子——以前点完毫无变化，老师不知道带入了没有",
+  chipAfter ? chipAfter.className : "没找到 chip");
+check(/已带入「值日组」/.test(document.querySelector(".ep-pickstatus").textContent),
+  "状态行写明已带入哪一组",
+  document.querySelector(".ep-pickstatus").textContent);
+check(!!document.querySelector(".ep-pickstatus-x"),
+  "带入之后给「重新挑」的出口，不必关掉窗口重来");
 const confirmBtn = document.querySelector(".ep-primary");
-check(!!confirmBtn && confirmBtn.textContent.indexOf("已选 8 人") >= 0,
+check(!!confirmBtn && /确定.*8/.test(confirmBtn.textContent),
   "多选岗位才保留「确定」，并显示已选人数",
   confirmBtn ? confirmBtn.textContent : "没有确定按钮");
 check(document.querySelector(".ep-group-modify").style.display === "none",
@@ -1024,7 +1060,7 @@ check(savedGroup.length === 1 && savedGroup[0].name === "放学留下"
   "点「另存为新组」才写入本机配置，成员不重复",
   savedGroup.length + " 组，" + (savedGroup[0] || {}).memberIds.length + " 人");
 const manualChip = document.querySelectorAll(".ep-group-chip")
-  .filter(c => c.textContent === "放学留下")[0];
+  .filter(c => c.textContent.indexOf("放学留下") === 0)[0];
 check(!!manualChip, "存好的组立刻出现在「点组带出」里");
 
 /* 回归：已存的组要能就地改成员，不新增重复组 */
@@ -1049,7 +1085,7 @@ check(global.Store.peopleGroups().length === 0,
   "删组只删这一条，不动名单", global.Store.peopleGroups().length + " 组");
 
 /* 2026-11-19 真机反馈②：名单没录入时绝不拿样例名单冒充本班学生，
-   候选退化为岗位现有的人，并给补录指引。 */
+   候选退化为岗位现有的人。 */
 global.Store.patchConfig({ students: null });
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 const bareLine = document.querySelectorAll(".ep-rowline")
@@ -1063,9 +1099,25 @@ check(bareNames.length > 0
       && bareNames.indexOf("吕雨桐") >= 0,
   "名单没录入时候选只含岗位现有的人（节能小队长是吕雨桐）",
   bareNames.join("、"));
-check(Array.from(document.querySelectorAll(".ep-note"))
-      .map(n => n.textContent).join("｜").indexOf("配置班级") >= 0,
-  "名单没录入时弹窗里有补录指引");
+
+/* 光有一句「去配置班级补录」不算解决：老师被指到那条路，而那条路上
+   名册为空时连录入框都不渲染。这里改成就地能加——打字找不到人时，
+   按钮就在下面。 */
+const bareQ = Array.from(document.querySelectorAll(".ep-input"))
+  .filter(i => /打一个字/.test(i.placeholder || ""))[0];
+bareQ.value = "新转来的同学";
+bareQ._h.input();
+const addBtn = document.querySelectorAll(".ep-addperson")[0];
+check(!!addBtn && /加进名单/.test(addBtn.textContent),
+  "搜不到人时就地给「加进名单」，而不是一句指路",
+  addBtn ? addBtn.textContent : "没有按钮");
+addBtn._h.click();
+check(global.Store.config().students.some(s => s.name === "新转来的同学"),
+  "点一下就写进本班名单",
+  JSON.stringify(global.Store.config().students));
+check(Array.from(document.querySelectorAll(".ep-person"))
+        .some(b => b.textContent === "新转来的同学"),
+  "加完立刻出现在候选里，不用关窗口重来");
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 global.Store.patchConfig({ students: window.RHYTHM_DATA.students });
 
@@ -1079,13 +1131,39 @@ const warnLine = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
 warnLine.children[0]._h.click();
 const warnChip = document.querySelectorAll(".ep-group-chip")
-  .filter(c => c.textContent === "擦黑板组")[0];
+  .filter(c => c.textContent.indexOf("擦黑板组") === 0)[0];
 check(!!warnChip && warnChip.classList.contains("ep-group-warn"),
   "成员 id 失配的组仍在「点组带出」里显示，并带警示标记");
-check(warnChip && warnChip.title.indexOf("另有 1 人已不在名单里") >= 0,
-  "失配组 chip 悬停提示有几人不在名单", warnChip ? warnChip.title : "");
+check(warnChip && warnChip.textContent.indexOf("缺1") >= 0,
+  "失配组的 chip 上直接写「缺 1」，不靠悬停提示", warnChip ? warnChip.textContent : "");
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 global.Store.patchConfig({ peopleGroups: null });
+
+/* 名单整份换掉（新学年、新接一个班）时，排班组也不能消失。
+   以前它被名单过滤成空数组，整排 chip 无声消失——老师看到的就是
+   「我分好的组丢了」，而数据其实一直在岗位配置里。 */
+global.Store.patchConfig({ students: [{ name: "新同学甲" }, { name: "新同学乙" }] });
+const swapLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+swapLine.children[0]._h.click();
+const swapChips = document.querySelectorAll(".ep-group-chip");
+const roleChipAfterSwap = swapChips.filter(c => c.textContent.indexOf("值日组") === 0)[0];
+check(!!roleChipAfterSwap,
+  "名单整份换掉后，排班组仍在「点组带出」里，不会无声消失",
+  swapChips.map(c => c.textContent).join(" / "));
+check(!!roleChipAfterSwap && roleChipAfterSwap.classList.contains("ep-group-warn"),
+  "组员全对不上时给警示标记，而不是假装这组是空的");
+/* 缺几个人必须写在屏上。以前这句只进 chip 的 title，一体机没有悬停，
+   教室里永远看不到（红线 7）；现在点开这组，状态行直接说。 */
+roleChipAfterSwap._h.click();
+const missStatus = document.querySelector(".ep-pickstatus");
+check(!!missStatus && /另有 \d+ 人不在名单里/.test(missStatus.textContent),
+  "点开缺人的组，状态行写出有几人不在名单里",
+  missStatus ? missStatus.textContent : "(没有状态行)");
+check(!!missStatus && !!missStatus.querySelector(".ep-help"),
+  "补人的办法收在「?」里，不铺成一段文字");
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+global.Store.patchConfig({ students: window.RHYTHM_DATA.students });
 
 /* 屏面人名解析（0.3.25 真机反馈："点进去除了人名还有英文字母串"）：
    岗位成员里存了学生 id 时，上屏前用名册解析成人名。 */
@@ -1124,10 +1202,15 @@ document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0].
 const linePersist = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
 linePersist.children[0]._h.click();
-const dlgNotes25 = Array.from(document.querySelectorAll(".ep-note"))
-  .map(n => n.textContent);
-check(dlgNotes25.some(t => t.indexOf("只换今天") >= 0 && t.indexOf("长期固定") >= 0),
-  "换人弹窗写清「默认只换今天 / 长期固定」语义");
+/* 语义仍然要写清楚，但不必占满一屏：页面上留一句短提示，
+   「只改今天 / 想长期怎么办」收进「?」——一体机没有悬停，点开才看到。 */
+const hintTxt25 = (document.querySelector(".ep-pickhint-t") || {}).textContent || "";
+const tipTxt25 = Array.from(document.querySelectorAll(".ep-helptip"))
+  .map(n => n.textContent).join("｜");
+check(hintTxt25.indexOf("确定") >= 0 && hintTxt25.length <= 20,
+  "换人弹窗页面上只留一句短提示", hintTxt25);
+check(tipTxt25.indexOf("只改今天") >= 0 && /固定人员|长期固定/.test(tipTxt25),
+  "「只改今天 / 想长期怎么办」收进「?」，内容没丢", tipTxt25.slice(0, 50));
 const rolesBeforePersist = JSON.parse(JSON.stringify(global.Runtime.config().roles));
 const pick25 = document.querySelectorAll(".ep-person")
   .filter(b => !b.classList.contains("on"))[0];
@@ -1420,7 +1503,7 @@ global.Remote.info.phone = "";
 
   btn._h.click();
   check(box.classList.contains("open"), "点「配置班级」打开向导");
-  check(box.querySelectorAll(".setup-step").length === 4, "向导是四步",
+  check(box.querySelectorAll(".setup-step").length === 5, "向导是五步",
     String(box.querySelectorAll(".setup-step").length));
   check(inputsIn(box).length >= 4, "第一步能填学校/班级/班主任/开学日",
     String(inputsIn(box).length));
@@ -1429,13 +1512,34 @@ global.Remote.info.phone = "";
     .filter(b => b.textContent === "下一步")[0];
 
   next()._h.click();
+
+  /* 第二步是名单。它单独占一步，不再藏在「从岗位表导入」的第①块里——
+     那条路要走六层，入口还叫「从岗位表导入」，老师根本想不到名单在那儿。 */
+  const stepTexts = box.querySelectorAll(".setup-step").map(s => s.textContent);
+  check(/名单/.test(stepTexts[1] || ""), "第二步是名单", stepTexts.join(" / "));
+  check(box.querySelectorAll(".setup-roster-pick").length === 1
+        && box.querySelector(".setup-roster-save").textContent === "保存名单"
+        && box.querySelector(".setup-import-text.setup-roster-input"),
+    "名单步能传表格文件、也能直接粘贴");
+
+  /* 从 Excel 整列复制会带上表头和序号。它们不是学生：
+     真放进去，换人时候选里会多出一个叫「姓名」的假人。 */
+  const rosterTa = box.querySelector(".setup-roster-input");
+  rosterTa.value = "序号\t姓名\t性别\n1\t孙星野\t男\n2\t孔子墨\t男\n3\t周予宁\t男";
+  rosterTa._h.input();
+  box.querySelector(".setup-roster-save")._h.click();
+  check(/已保存 3 人/.test(box.querySelector(".setup-msg").textContent),
+    "名单页从表格粘贴只认姓名，表头与序号不进名单",
+    box.querySelector(".setup-msg").textContent);
+  next()._h.click();
+
   const tpls = box.querySelectorAll(".setup-tpl");
-  check(tpls.length === 3, "第二步给三套作息模板", String(tpls.length));
+  check(tpls.length === 3, "第三步给三套作息模板", String(tpls.length));
   const rows = box.querySelectorAll(".setup-row");
-  check(rows.length > 20, "第二步列出每一段起止", rows.length + " 行");
+  check(rows.length > 20, "第三步列出每一段起止", rows.length + " 行");
   check(box.querySelectorAll(".setup-time-file").length === 1
         && box.querySelector(".setup-time-file").accept === ".xlsx,.docx",
-    "第二步能直接选作息表文件");
+    "第三步能直接选作息表文件");
   check(box.querySelector(".setup-time-apply").disabled === true,
     "没识别前「套用到作息」不可点");
   const timeTa = box.querySelector(".setup-import-text");
@@ -1448,10 +1552,10 @@ global.Remote.info.phone = "";
 
   next()._h.click();
   const cells = inputsIn(box).filter(i => i.type !== "file");
-  check(cells.length === 35, "第三步是 5×7 课表", cells.length + " 格");
+  check(cells.length === 35, "第四步是 5×7 课表", cells.length + " 格");
   check(box.querySelectorAll(".setup-grid-file").length === 1
         && box.querySelector(".setup-grid-file").accept === ".xlsx,.docx",
-    "第三步能直接选班级课表文件");
+    "第四步能直接选班级课表文件");
   const gridTa = box.querySelector(".setup-import-text");
   gridTa.value = "周一\t周二\t周三\t周四\t周五\n第 1 节\t英语\t语文\t语文\t语文\t数学";
   gridTa._h.input();
@@ -1466,13 +1570,13 @@ global.Remote.info.phone = "";
   check(doneBtns.indexOf("导入设置 JSON") >= 0, "完成页能导入另一台机器的设置",
     doneBtns.join(" / "));
 
-  /* B4a：第四步列出岗位卡片和可折叠的文案分组，仍然只有四步 */
+  /* B4a：最后一步列出岗位卡片和可折叠的文案分组，一共五步 */
   const roleCards = box.querySelectorAll(".setup-role");
   const bakedRoles = (window.RHYTHM_DATA.roles || {}).roles || [];
-  check(roleCards.length === bakedRoles.length, "第四步按岗位逐个列卡片",
+  check(roleCards.length === bakedRoles.length, "最后一步按岗位逐个列卡片",
     roleCards.length + " / " + bakedRoles.length);
-  check(box.querySelectorAll(".setup-src").length === 1, "第四步标明岗位来源班");
-  check(box.querySelectorAll(".setup-text-sec").length >= 4, "第四步有可折叠的文案分组",
+  check(box.querySelectorAll(".setup-src").length === 1, "最后一步标明岗位来源班");
+  check(box.querySelectorAll(".setup-text-sec").length >= 4, "最后一步有可折叠的文案分组",
     String(box.querySelectorAll(".setup-text-sec").length));
   check(doneBtns.indexOf("恢复至修改前") >= 0, "完成页有恢复快照的入口",
     doneBtns.join(" / "));
@@ -1491,42 +1595,34 @@ global.Remote.info.phone = "";
   check(inputsIn(box).length > 35, "岗位和文案都能直接编辑",
     String(inputsIn(box).length));
 
-  /* B4b：从岗位表导入。粘贴 → 识别 → 核对四态 → 并入草稿 */
+  /* B4b：从岗位表导入。粘贴 → 识别 → 核对四态 → 并入草稿。
+     名单已经独立成一步，这里不再摆一份「①学生名单」——同一份名单
+     只能有一个入口，否则在导入面板里改的和名单页显示的迟早不一致。 */
   const studentsBefore = JSON.stringify(window.RHYTHM_DATA.students);
   check(box.querySelectorAll(".setup-import-open").length === 1,
-    "第四步有「从岗位表导入」入口");
+    "最后一步有「从岗位表导入」入口");
   box.querySelector(".setup-import-open")._h.click();
-  check(box.querySelectorAll(".setup-import-block").length === 1
-        && box.querySelectorAll(".setup-import-roster-names").length === 1,
-    "打开后先出现①学生名单板块", String(box.querySelectorAll(".setup-import-block").length));
-  check(box.querySelector(".setup-import-roster-names").textContent.indexOf("孙星野") >= 0,
-    "①里列出名册姓名");
-  check(box.querySelectorAll(".setup-import-text").length === 0
-        && box.querySelectorAll(".setup-import-gate").length === 1,
-    "名单没确认前，岗位表上传入口不出现");
-
-  /* 名册修正：只改本机核对用的名单，② 仍要先重新确认 */
-  check(box.querySelectorAll(".setup-roster-fix").length === 1, "①有「修正名单」入口");
-  box.querySelector(".setup-roster-fix")._h.click();
-  check(box.querySelectorAll(".setup-roster-text").length === 1, "点修正后出现名单编辑框");
-  box.querySelector(".setup-roster-text").value = "孙星野\n孔子墨\n新同学测试";
-  box.querySelector(".setup-roster-save")._h.click();
-  check(box.querySelectorAll(".setup-roster-text").length === 0, "保存后收起编辑框");
-  check(box.querySelectorAll(".setup-import-text").length === 0,
-    "名单变了，岗位表要重新确认");
-  const fixedNames = box.querySelector(".setup-import-roster-names").textContent;
-  check(fixedNames.indexOf("新同学测试") >= 0 && fixedNames.indexOf("赵子墨") < 0,
-    "①显示修正后的名单", fixedNames);
-  box.querySelector(".setup-roster-reset")._h.click();
-  const backNames = box.querySelector(".setup-import-roster-names").textContent;
-  check(backNames.indexOf("新同学测试") < 0 && backNames.indexOf("赵子墨") >= 0,
-    "「恢复班级名单」回到原名单", backNames.slice(0, 20));
-
-  box.querySelector(".setup-roster-ok")._h.click();
-  check(box.querySelectorAll(".setup-import-block").length === 2,
-    "确认名单后出现②岗位表板块", String(box.querySelectorAll(".setup-import-block").length));
+  check(box.querySelectorAll(".setup-import-block").length === 1,
+    "导入面板只有「岗位表」一块，不再重复摆一份名单",
+    String(box.querySelectorAll(".setup-import-block").length));
   check(box.querySelectorAll(".setup-import-text").length === 1,
     "打开后有粘贴框");
+
+  /* 名单为空时不能只写一句「先去补名单」——指路要能走：
+     给一个按钮，一点就跳到「名单」那一步。 */
+  const studentsBackup = window.RHYTHM_DATA.students;
+  window.RHYTHM_DATA.students = [];
+  global.Store.patchConfig({ students: null });
+  box.querySelector(".setup-import-open")._h.click();
+  box.querySelector(".setup-import-open")._h.click();
+  check(box.querySelectorAll(".setup-import-gate").length === 1
+        && box.querySelector(".setup-import-goroster")
+        && box.querySelector(".setup-import-goroster").textContent === "去录入名单",
+    "名单为空时给出「去录入名单」按钮");
+  window.RHYTHM_DATA.students = studentsBackup;
+  global.Store.patchConfig({ students: null });
+  box.querySelector(".setup-import-open")._h.click();
+  box.querySelector(".setup-import-open")._h.click();
 
   const ta = box.querySelector(".setup-import-text");
   ta.value = "岗位,职责,负责人\n路队长,提醒静齐排队,孙星野、孔子墨\n图书角管理员,整理图书角,周予宁";
@@ -1673,7 +1769,8 @@ global.Remote.info.phone = "";
   const nameInput = inputsIn(box)[1];
   nameInput.value = "测试二班";
   nameInput._h.input();
-  next()._h.click();
+  next()._h.click();          /* 班级 → 名单 */
+  next()._h.click();          /* 名单 → 作息 */
 
   const startInput = inputsIn(box)[0];
   startInput.value = "07:40";
@@ -1731,8 +1828,13 @@ global.Remote.info.phone = "";
   blankName.value = "空包测试班";
   blankName._h.input();
   next()._h.click();
+  /* 空包没有名单。这一页必须仍然给得出录入框：
+     以前名册为空时整块 return，老师被指到这儿却发现无处可填。 */
+  check(!!box.querySelector(".setup-roster-input"),
+    "空包进到名单页仍然有录入框，不会把人堵住");
+  next()._h.click();
   check(box.querySelectorAll(".setup-row").length > 20,
-    "空包第二步已经套上一套模板，不是空表",
+    "空包第三步已经套上一套模板，不是空表",
     String(box.querySelectorAll(".setup-row").length));
   next()._h.click();
   next()._h.click();
@@ -2087,7 +2189,10 @@ global.Remote.info.phone = "";
     setupSrc.indexOf("function pageTime"));
   check(pageClassSrc.includes("setup-legacy") && pageClassSrc.includes("pickImport"),
     "向导第一步：有「导入旧设置 JSON」入口，且复用已有的 pickImport");
-  check(setupSrc.includes("state.step = 3;"),
+  /* 断言意图而不是实现：以前这里钉的是 "state.step = 3;"，
+     等于用一条用例把「最后一页的序号是 3」焊死了——加一步就得改用例，
+     而用例本该告诉我们「加一步之后行为还对不对」。 */
+  check(setupSrc.includes("state.step = lastStep();"),
     "向导：导入整份设置后直接跳到最后一页，只剩点「完成」");
   check(!setupSrc.includes("function pickImport2"),
     "向导：导入只有一套实现，没有为跨代另写一份");

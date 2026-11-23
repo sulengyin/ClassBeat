@@ -3,11 +3,14 @@
  * 解决的不是"改一个时间"（作息页早就能改），是"从空白到这个班的屏"：
  * 别的老师拿到包，屏上是别人的班、别人的作息、别人的课表。
  *
- * 四步：班级 → 作息 → 课表 → 岗位 / 文案。每一步都能跳过，改完立刻生效，
- * 不用重新打包、不用命令行。产出仍是 localStorage 里的本机配置，
+ * 五步：班级 → 名单 → 作息 → 课表 → 岗位 / 文案。每一步都能跳过（班级名除外），
+ * 改完立刻生效，不用重新打包、不用命令行。产出仍是 localStorage 里的本机配置，
  * 换电脑时用「导出设置」把整份带走。
  *
- * 第四步只做最小编辑：岗位能改名称和职责，文案能改常用的那几组。
+ * 步骤表在 STEPS 里声明，加一步只改那张表：不要再写 state.step === 2 这样的序号，
+ * 序号一散，加一步就会串页（名单当初就是因为没有位置，才被塞进导入面板的）。
+ *
+ * 最后一步只做最小编辑：岗位能改名称和职责，文案能改常用的那几组。
  * 人员名单、执行频率、轮换规则一律原样保留——那些不是改字能解决的，
  * 硬改只会让屏上出现一半新一半旧的岗位。
  *
@@ -24,7 +27,27 @@
 
   var KEY = "rhythm.setup.draft.v1";
   var DRAFT_DAYS = 7;
-  var STEP_NAMES = ["班级", "作息", "课表", "岗位 / 文案"];
+
+  /* 向导的每一步只在这里声明一次。
+     以前是「一个名字数组 + 散在五处的 step === 0 / step < 3 / state.step = 3」：
+     加一步要改六处，漏一处就静默走错页；草稿里存的还是 step 序号，
+     加一步之后老师上次停的地方会整体错位（停在「作息」的人被带到「课表」）。
+     现在：id 是稳定标识，草稿存 id 不存序号；canLeave 和步骤绑在一起，
+     返回 true 或一句「为什么还不能走」，不再靠序号去认这是哪一步。 */
+  var STEPS = [
+    { id: "class", name: "班级", render: pageClass, canLeave: leaveClass },
+    { id: "roster", name: "名单", render: pageRoster, canLeave: leaveRoster },
+    { id: "time", name: "作息", render: pageTime, canLeave: leaveTime },
+    { id: "grid", name: "课表", render: pageGrid, canLeave: null },
+    { id: "done", name: "岗位 / 文案", render: pageDone, canLeave: null }
+  ];
+
+  function lastStep() { return STEPS.length - 1; }
+
+  function stepIndexOf(id) {
+    for (var i = 0; i < STEPS.length; i++) if (STEPS[i].id === id) return i;
+    return 0;
+  }
 
   /* 「早读」自 0.2.1 起改叫「晨间自主管理」。旧配置里块名存的还是「早读」，
      只在显示时换新名；草稿和已保存的数据都不改。 */
@@ -61,7 +84,7 @@
 
   function localStore() { return root.Store || {}; }
 
-  /* 当前生效文案（包内默认 + 本机改动）。第四步改的就是这一份。 */
+  /* 当前生效文案（包内默认 + 本机改动）。最后一步改的就是这一份。 */
   function effectiveTexts() {
     return localStore().texts ? (localStore().texts() || {}) : ((root.RHYTHM_DATA && root.RHYTHM_DATA.texts) || {});
   }
@@ -224,13 +247,21 @@
     if (inp.focus) inp.focus();
   }
 
-  /* 老师在面板里修正过的名单，只用于姓名核对，不写回班级数据。
-     存在 Store 的 config.students 里，跟作息、岗位一样属于本机配置。 */
+  /* 本班名单的权威只有一份：Store 里的 config.students。
+     班级数据（RHYTHM_DATA.students）里那份只是**初值**——打包来源班带的
+     可能是别人的名单（2026-11-19 真机反馈②：模板包的样例名单被当成本班
+     学生，换人候选里冒出别班的名字）。所以它只在老师还没有本机名单时
+     当参考显示，点「保存名单」才真正写进本机。
+     换人候选（edit.js 的 rosterStudents）只认本机这份，故意不回落：
+     那儿一回落，别班的名单就会直接混进候选。 */
   function rosterOverride() {
     var cfg = root.Store && root.Store.config ? root.Store.config() : null;
     var d = cfg && cfg.students;
     return Array.isArray(d) && d.length ? d : null;
   }
+
+  /* 这份名单是不是还没落到本机（只来自班级数据） */
+  function rosterFromPkg() { return !rosterOverride(); }
 
   function rosterNames() {
     var d = rosterOverride() || (root.RHYTHM_DATA && root.RHYTHM_DATA.students);
@@ -250,8 +281,42 @@
     return out.filter(function (n) { return n; });
   }
 
-  /* 把「一行一个姓名」写进本机配置。原来的 id / alias 尽量保留；
-     新补的姓名只用于核对，不带学籍信息，也绝不进 roles.json。 */
+  /* 从任意文本里挑出姓名。见过的来源有三种：手打的一行一个、
+     从 Excel 复制的整列（带「姓名」表头和序号）、Word 表格（tab 分列）。
+     规则只有一条——看起来像个人名。
+     不这么筛，表头会被当成一个叫「姓名」的学生写进名单，
+     换人时候选里就多出两个字的假人；序号也会变成学号。 */
+  var ROSTER_HEADER = /^(姓名|学生姓名|学生|名字|名单|序号|学号|编号|班级|性别|男|女|备注|联系电话|name|no\.?)$/i;
+
+  function looksLikeName(s) {
+    if (!s || s.length > 12) return false;
+    if (ROSTER_HEADER.test(s)) return false;
+    if (/^[\d\s.\-]+$/.test(s)) return false;
+    return true;
+  }
+
+  function extractNames(text) {
+    var out = [];
+    String(text == null ? "" : text).split(/[\r\n]+/).forEach(function (line) {
+      /* 带 tab 就是表格行：一行里可能并排放着序号、姓名、性别，
+         逐个单元格判，不像人名的直接丢。 */
+      var cells = line.indexOf("\t") >= 0 ? line.split("\t") : [line];
+      cells.forEach(function (cell) {
+        String(cell).split(/[、,，;；]+/).forEach(function (raw) {
+          var name = stripLeadingNumber(raw).text.trim();
+          if (!looksLikeName(name)) return;
+          /* 不去重：同一个班真可能有两个同名学生，合并掉就等于
+             凭空少一个人，而且核对岗位表时会认错人。 */
+          out.push(name);
+        });
+      });
+    });
+    return out;
+  }
+
+  /* 把名单写进本机配置（config.students）——这是本班名单的唯一权威。
+     原来那份里的 id / alias 尽量保留（名字没变就能对上，学号不至于丢）；
+     新加的姓名只带姓名，不带学籍信息，也绝不进 roles.json。 */
   function saveRoster(text) {
     var src = [];
     var d = root.RHYTHM_DATA && root.RHYTHM_DATA.students;
@@ -263,15 +328,13 @@
     });
 
     var list = [];
-    String(text == null ? "" : text).split(/[\r\n、,，;；]+/).forEach(function (raw) {
-      var name = stripLeadingNumber(raw).text;
-      if (!name || /^\d+$/.test(name)) return;
+    extractNames(text).forEach(function (name) {
       var keep = byName[name];
       list.push(keep
         ? { id: keep.id, name: name, active: true, alias: keep.alias }
         : { name: name, active: true });
     });
-    if (!list.length) return { ok: false, why: "名单里至少要留一个姓名。" };
+    if (!list.length) return { ok: false, why: "至少要有一个姓名。" };
     root.Store.patchConfig({ students: list });
     return { ok: true, n: list.length };
   }
@@ -1267,6 +1330,9 @@
   function saveDraft() {
     if (!state) return;
     state.ts = Date.now();
+    /* 存步骤的 id，不存序号：加一步或调一次顺序，老师上次停的地方
+       还在原来那一步，而不是被带到隔壁。 */
+    state.stepId = (STEPS[state.step] || STEPS[0]).id;
     try { root.localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
   }
 
@@ -1317,8 +1383,11 @@
       importHtml: "",
       importRows: [],
       importFlash: "",
-      rosterOk: false,
-      rosterEdit: false,
+      /* null = 老师还没动过名单，页面显示当前名单；
+         有字符串 = 改了还没保存（草稿）。不能用 "" 表示「没改」，
+         否则老师真的把名单清空时，会和「没动过」分不开。 */
+      rosterText: null,
+      rosterFlash: "",
       timeText: "",
       timeRows: [],
       timeFlash: "",
@@ -1341,7 +1410,7 @@
     var cur = ((c.schedule || {}).entries || []).filter(function (e) { return e.subject; });
     var draft = (state.entries || []).filter(function (e) { return e.subject; });
     if (!same(cur, draft)) return false;
-    /* 第四步改的文案/岗位还没写回去，也不能算“已生效”，
+    /* 最后一步改的文案/岗位还没写回去，也不能算“已生效”，
        否则右下角给一个「完成」，一关就把改动丢了。 */
     if (Object.keys(buildTextPatch(state.texts, state.textsBase)).length) return false;
     return same(c.roles, state.roles);
@@ -1362,14 +1431,19 @@
     if (!("importHtml" in s)) s.importHtml = "";
     if (!("importRows" in s)) s.importRows = [];
     if (!("importFlash" in s)) s.importFlash = "";
-    if (!("rosterOk" in s)) s.rosterOk = false;
-    if (!("rosterEdit" in s)) s.rosterEdit = false;
+    if (!("rosterText" in s)) s.rosterText = null;
+    if (!("rosterFlash" in s)) s.rosterFlash = "";
     if (!("timeText" in s)) s.timeText = "";
     if (!("timeRows" in s)) s.timeRows = [];
     if (!("timeFlash" in s)) s.timeFlash = "";
     if (!("gridText" in s)) s.gridText = "";
     if (!("gridRows" in s)) s.gridRows = [];
     if (!("gridFlash" in s)) s.gridFlash = "";
+    /* 草稿里存的是步骤 id（老草稿存的是序号）。按 id 还原，
+       同时把序号夹回合法范围——老的 step=3 在加了一步之后不再等于「最后一页」。 */
+    if (s.stepId) s.step = stepIndexOf(s.stepId);
+    if (typeof s.step !== "number" || s.step < 0 || s.step > lastStep()) s.step = 0;
+    delete s.stepId;
     return s;
   }
 
@@ -1418,10 +1492,8 @@
     panel.appendChild(steps());
 
     var body = el("div", "setup-body");
-    body.appendChild(state.step === 0 ? pageClass()
-      : state.step === 1 ? pageTime()
-      : state.step === 2 ? pageGrid()
-      : pageDone());
+    var cur = STEPS[state.step] || STEPS[0];
+    body.appendChild(cur.render());
     panel.appendChild(body);
 
     panel.appendChild(foot());
@@ -1430,11 +1502,11 @@
 
   function steps() {
     var wrap = el("div", "setup-steps");
-    STEP_NAMES.forEach(function (name, i) {
+    STEPS.forEach(function (step, i) {
       if (i) wrap.appendChild(el("i"));
       var s = el("div", "setup-step" + (i === state.step ? " on" : (i < state.step ? " done" : "")));
       s.appendChild(el("b", null, String(i + 1)));
-      s.appendChild(el("span", null, name));
+      s.appendChild(el("span", null, step.name));
       wrap.appendChild(s);
     });
     return wrap;
@@ -1455,7 +1527,7 @@
   function pageClass() {
     var p = el("div", "setup-page on");
     p.appendChild(el("h3", "setup-h", "先告诉屏，这是哪个班"));
-    p.appendChild(el("p", "setup-p", "这两行会出现在左上角、页面标题和消息服务里。以后想改，从「⋯ → 配置班级」再进来。"));
+    p.appendChild(el("p", "setup-p", "会出现在屏幕左上角和标题栏。"));
 
     /* 跨代升级入口（2026-11-23）：0.3.x 是解压文件夹 + 浏览器存数据，
        0.5.x 是安装包，老师装完第一次打开看到的就是这一页。旧数据只有
@@ -1475,14 +1547,129 @@
     p.appendChild(field("班级", state.klass, function (v) { state.klass = v; }, "text", "例如：五（1）班"));
     p.appendChild(field("班主任", state.head, function (v) { state.head = v; }, "text", "可以不填"));
     p.appendChild(field("开学日", state.term, function (v) { state.term = v; }, "date"));
-    p.appendChild(el("p", "setup-p", "开学日用来算单双周和值日轮次；填错了只影响单双周课程，不影响作息。"));
+    p.appendChild(el("p", "setup-p", "开学日用来算单双周和值日轮次。"));
     return p;
+  }
+
+  /* 第二步：学生名单。
+     名单不是「核对岗位表用的一张对照表」，它就是这班的学生——
+     换人时的候选、大屏上学号对应的姓名，都从它来。所以它单独占一步，
+     而不是藏在「从岗位表导入」的第①块里：那条路要走六层，
+     而且入口叫「从岗位表导入」，没人会想到名单在里面。 */
+  function pageRoster() {
+    var p = el("div", "setup-page on");
+    var names = rosterNames();
+
+    p.appendChild(el("h3", "setup-h", "这个班的学生"));
+    p.appendChild(el("p", "setup-p",
+      !names.length
+        ? "还没有名单。换人时会找不到任何学生。"
+        : rosterFromPkg()
+          ? "班级数据里带着 " + names.length + " 人，还没保存。"
+          : "本机名单，现在 " + names.length + " 人。换人时打一个字就能找到。"));
+    p.appendChild(el("p", "setup-p",
+      "保存后，换人和大屏才认这份名单。"));
+
+    /* 读取顺序：草稿里改过就用草稿，没改过就用当前名单。
+       null 表示「老师还没动过」，不是「名单为空」。 */
+    var text = state.rosterText != null ? state.rosterText : names.join("\n");
+    var ta = el("textarea", "setup-import-text setup-roster-input");
+    ta.rows = 10;
+    ta.value = text;
+    ta.placeholder = "一行一个姓名，例如：\n赵子墨\n钱嘉禾\n也可以从 Excel 复制整列粘进来";
+    ta.addEventListener("input", function () {
+      state.rosterText = ta.value;
+      saveDraft();
+    });
+    p.appendChild(ta);
+
+    var bar = el("div", "setup-actions setup-roster-bar");
+
+    /* 传文件：读进来先填进框里让老师看一眼，不当场写库——
+       万一把隔壁班的表读进来，老师还有机会发现。 */
+    var file = document.createElement("input");
+    file.type = "file";
+    file.accept = ".xlsx,.xlsm,.docx";
+    file.className = "setup-roster-file";
+    file.addEventListener("change", function () {
+      readPickedFile(file).then(function (res) {
+        if (!res) return;
+        var picked = extractNames(res.text);
+        if (!picked.length) {
+          state.rosterFlash = "「" + res.name + "」里没读到姓名，换个文件或直接粘贴。";
+          saveDraft();
+          render();
+          return;
+        }
+        state.rosterText = picked.join("\n");
+        state.rosterFlash = "从「" + res.name + "」读到 " + picked.length + " 个姓名，确认无误后点「保存名单」。";
+        saveDraft();
+        render();
+      }).catch(function (err) {
+        state.rosterFlash = "读不了这个文件：" + (err && err.message ? err.message : "格式不对");
+        saveDraft();
+        render();
+      });
+      file.value = "";
+    });
+    var pick = el("button", "setup-btn setup-roster-pick", "从表格文件导入");
+    pick.type = "button";
+    pick.addEventListener("click", function () { file.click(); });
+    bar.appendChild(pick);
+    bar.appendChild(file);
+
+    var save = el("button", "setup-btn primary setup-roster-save", "保存名单");
+    save.type = "button";
+    save.addEventListener("click", function () {
+      var r = saveRoster(ta.value);
+      if (!r.ok) {
+        state.rosterFlash = r.why;
+        saveDraft();
+        render();
+        return;
+      }
+      state.rosterText = null;      /* 存下了，草稿就不必再记一份 */
+      state.rosterFlash = "已保存 " + r.n + " 人。";
+      saveDraft();
+      render();
+    });
+    bar.appendChild(save);
+    p.appendChild(bar);
+
+    if (state.rosterFlash) p.appendChild(el("p", "setup-msg ok", state.rosterFlash));
+
+    /* 本机改过名单才给「恢复」：回到班级数据里那一份。 */
+    if (rosterOverride()) {
+      var back = el("button", "setup-btn ghost setup-roster-reset", "恢复成班级数据里的名单");
+      back.type = "button";
+      back.addEventListener("click", function () {
+        root.Store.patchConfig({ students: null });
+        state.rosterText = null;
+        state.rosterFlash = "已恢复班级数据里的名单。";
+        saveDraft();
+        render();
+      });
+      p.appendChild(back);
+    }
+    return p;
+  }
+
+  function leaveRoster() {
+    /* 改了名单没点保存就往下走，替老师存掉再走：
+       名单是数据不是草稿，丢了以后换人那儿就找不到人。 */
+    if (state.rosterText == null) return true;
+    if (state.rosterText === rosterNames().join("\n")) return true;
+    if (!state.rosterText.trim()) return true;
+    var r = saveRoster(state.rosterText);
+    if (!r.ok) return r.why;
+    state.rosterText = null;
+    return true;
   }
 
   function pageTime() {
     var p = el("div", "setup-page on");
     p.appendChild(el("h3", "setup-h", "作息：先套一套相近的，再改不一样的地方"));
-    p.appendChild(el("p", "setup-p", "下面每一段的开始和结束都能改。相邻两段必须首尾相接，中间不能留空。"));
+    p.appendChild(el("p", "setup-p", "相邻两段必须首尾相接，中间不能留空。"));
 
     var tpls = el("div", "setup-tpls");
     (root.RHYTHM_TEMPLATES || []).forEach(function (t) {
@@ -1799,7 +1986,7 @@
     } else state.entries.push({ weekday: w, periodNo: n, subject: subject });
   }
 
-  /* ---------- 第四步：岗位 / 文案 ---------- */
+  /* ---------- 最后一步：岗位 / 文案 ---------- */
   /* 只列课表里已经用到的科目：没排课的科目写了准备清单也不会出现在屏上。 */
   function usedSubjects() {
     var used = {}, out = [];
@@ -1910,16 +2097,31 @@
     if (state.importOpen) p.appendChild(importPanel());
   }
 
+  /* 只做一件事：把岗位表并进来。
+     名单以前也挂在这一块里当「①」，结果名单成了「上传岗位表」的子步骤，
+     老师被指到这儿却看不见名单的入口。名单现在自己一步，这里只核对岗位表。 */
   function importPanel() {
     var wrap = el("div", "setup-import");
-    wrap.appendChild(el("p", "setup-p",
-      "岗位表里的姓名要按学生名单核对，所以分两步：先确认学生名单，再上传岗位表。一份一份来。"));
 
-    wrap.appendChild(rosterBlock());
-
-    if (state.rosterOk) wrap.appendChild(roleBlock());
-    else wrap.appendChild(el("p", "setup-msg setup-import-gate",
-      "确认学生名单后，「岗位表」这一步才会出现。"));
+    if (rosterNames().length) {
+      wrap.appendChild(roleBlock());
+    } else {
+      /* 没有名单就核对不了姓名。别只写一句「先去补名单」——
+         给一个能点的按钮，直接跳到那一步，老师不用自己找路。 */
+      var gate = el("div", "setup-import-gate");
+      gate.appendChild(el("p", "setup-msg",
+        "还没有班级名单，岗位表里的姓名没法核对。"));
+      var go = el("button", "setup-btn setup-import-goroster", "去录入名单");
+      go.type = "button";
+      go.addEventListener("click", function () {
+        state.importOpen = false;
+        state.step = stepIndexOf("roster");
+        saveDraft();
+        render();
+      });
+      gate.appendChild(go);
+      wrap.appendChild(gate);
+    }
 
     var foot = el("div", "setup-actions");
     var cancel = el("button", "setup-btn ghost setup-import-cancel", "取消");
@@ -1935,113 +2137,10 @@
     return wrap;
   }
 
-  /* 第一步：学生名单。岗位表里的姓名只有这一份依据，
-     名单还没确认就不让上传岗位表，避免对着空名册核对。 */
-  function rosterBlock() {
-    var box = el("div", "setup-import-block");
-    var head = el("div", "setup-import-block-head");
-    head.appendChild(el("span", "setup-import-step", "①"));
-    head.appendChild(el("span", "setup-import-block-title", "学生名单"));
-    if (state.rosterOk) head.appendChild(el("span", "setup-import-tag applied", "已确认"));
-    box.appendChild(head);
-
-    var names = rosterNames();
-    if (!names.length) {
-      box.appendChild(el("p", "setup-import-req",
-        "名册是空的：没有可对照的姓名，岗位表里的姓名会全部变成「未找到」。"
-        + "先让制作者把班级名单补进班级数据。"));
-      return box;
-    }
-
-    box.appendChild(el("p", "setup-import-req",
-      "名册 " + names.length + " 人" + (rosterOverride() ? "（本机修正过）" : "，来自班级数据")
-      + "。岗位表里的姓名只按这份名单核对；对不上的会标「疑似错字 / 未找到 / 同名」，"
-      + "不会自动改名册，也不会新增学生。"));
-    box.appendChild(el("div", "setup-import-roster-names", names.join("、")));
-
-    var tools = el("div", "setup-actions setup-roster-tools");
-    var fix = el("button", "setup-btn setup-roster-fix",
-      state.rosterEdit ? "正在修正…" : "修正名单");
-    fix.type = "button";
-    fix.addEventListener("click", function () {
-      state.rosterEdit = true;
-      render();
-    });
-    tools.appendChild(fix);
-
-    if (rosterOverride()) {
-      var back = el("button", "setup-btn ghost setup-roster-reset", "恢复班级名单");
-      back.type = "button";
-      back.addEventListener("click", function () {
-        root.Store.patchConfig({ students: null });
-        state.rosterEdit = false;
-        state.rosterOk = false;
-        state.importRows = [];
-        state.importFlash = "已恢复班级数据里的名单。";
-        saveDraft();
-        render();
-      });
-      tools.appendChild(back);
-    }
-    box.appendChild(tools);
-
-    if (state.rosterEdit) {
-      var ed = el("textarea", "setup-import-text setup-roster-text");
-      ed.rows = 8;
-      ed.value = names.join("\n");
-      box.appendChild(ed);
-      box.appendChild(el("p", "setup-import-req",
-        "一行一个姓名。修正只在本机生效、只用于核对姓名，不写回班级数据；"
-        + "同名可以保留，核对时会标「同名」。保存后要重新确认名单。"));
-
-      var edActs = el("div", "setup-actions setup-roster-edit-acts");
-      var save = el("button", "setup-btn primary setup-roster-save", "保存修正");
-      save.type = "button";
-      save.addEventListener("click", function () {
-        var r = saveRoster(ed.value);
-        if (!r.ok) {
-          state.importFlash = r.why;
-          saveDraft();
-          render();
-          return;
-        }
-        state.rosterEdit = false;
-        state.rosterOk = false;      /* 名单变了，之前的核对结果作废 */
-        state.importRows = [];
-        state.importFlash = "名单已修正为 " + r.n + " 人（本机生效，只用于核对）。";
-        saveDraft();
-        render();
-      });
-      edActs.appendChild(save);
-
-      var drop = el("button", "setup-btn ghost setup-roster-cancel", "取消修正");
-      drop.type = "button";
-      drop.addEventListener("click", function () {
-        state.rosterEdit = false;
-        render();
-      });
-      edActs.appendChild(drop);
-      box.appendChild(edActs);
-    }
-
-    if (!state.rosterOk) {
-      var ok = el("button", "setup-btn primary setup-roster-ok", "名单没问题，下一步");
-      ok.type = "button";
-      ok.addEventListener("click", function () {
-        state.rosterOk = true;
-        saveDraft();
-        render();
-      });
-      box.appendChild(ok);
-    }
-    return box;
-  }
-
-  /* 第二步：岗位表。整个面板只有这一个上传入口，且一次只读一个文件。 */
+  /* 岗位表。整个面板只有这一个上传入口，且一次只读一个文件。 */
   function roleBlock() {
     var box = el("div", "setup-import-block");
     var head = el("div", "setup-import-block-head");
-    head.appendChild(el("span", "setup-import-step", "②"));
     head.appendChild(el("span", "setup-import-block-title", "岗位表"));
     box.appendChild(head);
 
@@ -2613,7 +2712,7 @@
 
     roleSection(p);
     textSectionList(p);
-    p.appendChild(el("p", "setup-p", "文案留空就是回到系统原来那句话。改动只存在这台机器上，不影响别人的班。"));
+    p.appendChild(el("p", "setup-p", "留空就是原来的话；只改这台机器。"));
 
     var acts = el("div", "setup-actions");
     var snap = localStore().setupSnapshot ? localStore().setupSnapshot() : null;
@@ -2644,7 +2743,7 @@
     acts.appendChild(inp);
     p.appendChild(acts);
 
-    p.appendChild(el("p", "setup-p", "导出的是整份设置（含岗位、文案和本机偏好）。换电脑后点「导入设置 JSON」，选对方给的这份文件，班级、作息、课表、岗位、文案一起搬过来。"));
+    p.appendChild(el("p", "setup-p", "导出整份设置。换电脑后点「导入设置 JSON」搬过去。"));
 
     /* 版本与更新：入口放在设置最后一页，和「导出/导入」同属维护动作。 */
     var upBox = el("div", "setup-update");
@@ -2661,6 +2760,21 @@
     return p;
   }
 
+  /* 每一步「能不能走」的规则跟步骤写在一起（见顶部 STEPS）。
+     返回 true 放行，返回字符串就是拦下来的理由，直接显示给老师。 */
+  function leaveClass() {
+    if (!state.klass) return "先填班级名。「我的班」这种占位名屏上也能用，但家长会看到。";
+    return true;
+  }
+
+  function leaveTime() {
+    var bad = blockErrors();
+    if (Object.keys(bad).length) {
+      return "作息里有 " + Object.keys(bad).length + " 段时间不对，红色那几行先改好。";
+    }
+    return true;
+  }
+
   function foot() {
     var f = el("div", "setup-foot");
     var back = el("button", "setup-btn ghost", "上一步");
@@ -2670,21 +2784,13 @@
     f.appendChild(back);
     f.appendChild(el("span", "grow"));
 
-    if (state.step < 3) {
+    if (state.step < lastStep()) {
       var next = el("button", "setup-btn primary", "下一步");
       next.type = "button";
       next.addEventListener("click", function () {
-        if (state.step === 0 && !state.klass) {
-          alertBox("先填班级名。「我的班」这种占位名屏上也能用，但家长会看到。");
-          return;
-        }
-        if (state.step === 1) {
-          var bad = blockErrors();
-          if (Object.keys(bad).length) {
-            alertBox("作息里有 " + Object.keys(bad).length + " 段时间不对，红色那几行先改好。");
-            return;
-          }
-        }
+        var step = STEPS[state.step];
+        var why = step && step.canLeave ? step.canLeave() : true;
+        if (why !== true) { alertBox(why); return; }
         state.step++;
         saveDraft();
         render();
@@ -2954,9 +3060,9 @@
         }
         state = fillState(loadCurrent());
         state.applied = true;
-        /* 导入的是整份设置，四步没什么可填的了：直接跳到最后一页，
-           老师点「完成」就收工。在最后一页导入时本来就在 step 3，无副作用。 */
-        state.step = 3;
+        /* 导入的是整份设置，各步没什么可填的了：直接跳到最后一页，
+           老师点「完成」就收工。 */
+        state.step = lastStep();
         state.flash = "已导入" + (r.klass ? "「" + r.klass + "」的" : "") + "整份设置，屏上已经换过来。点「完成」关掉这一页就行。";
         clearDraft();
         render();

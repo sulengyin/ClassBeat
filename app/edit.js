@@ -61,6 +61,25 @@
     return n;
   }
 
+  /* 一个「?」：点一下在下面展开一句解释，再点收起。
+     触摸屏没有 hover，所以不能用 title 悬停提示——一体机上根本看不到。
+     用法约定：界面本身（按钮文字、状态、图标）能说清的就别写句子；
+     说不清的那部分收进这里。说明越长，老师越会跳过，然后照样做错。 */
+  function helpNote(text) {
+    var wrap = h("span", "ep-helpw");
+    var b = h("button", "ep-help", "?");
+    b.type = "button";
+    b.setAttribute("aria-label", "看说明");
+    var tip = h("span", "ep-helptip", text);
+    b.addEventListener("click", function (e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      wrap.classList.toggle("open");
+    });
+    wrap.appendChild(b);
+    wrap.appendChild(tip);
+    return wrap;
+  }
+
   /* ---------- 打开 / 关闭 ---------- */
   function open() {
     ensureDom();
@@ -1274,9 +1293,13 @@
 
   function renderDuty(ov, key) {
     var sec = h("section", "ep-sec");
-    sec.appendChild(h("h3", null, "换人只改这一条"));
-    sec.appendChild(h("p", "ep-note", "点一下岗位，从名单里选。改的是今天，不影响以后的排班。"));
-    sec.appendChild(h("p", "ep-note", "▲▼ 调的是同一时刻谁先做，大屏值日条跟着变。"));
+    sec.appendChild(h("h3", null, "点岗位换人"));
+    /* 标题先把结论说了，剩下的收进「?」：
+       以前这里两句说明、下面每行再标一遍「已换」，同一件事说了三遍。 */
+    var dutyNote = h("p", "ep-note");
+    dutyNote.appendChild(h("span", null, "只换今天，不动以后的排班"));
+    dutyNote.appendChild(helpNote("▲▼ 调的是同一时刻谁先做，大屏底下的值日条会跟着变。"));
+    sec.appendChild(dutyNote);
 
     var doc = roleDoc();
     var roles = (doc.roles || []).slice().sort(function (a, b) {
@@ -1332,8 +1355,15 @@
     if (!roles.length) return;
     var presSec = h("section", "ep-sec");
     presSec.appendChild(h("h3", null, "哪些岗位整段常驻"));
-    presSec.appendChild(h("p", "ep-note",
-      "点选岗位，让它在晨间自主管理 / 课间 / 午间这一整段都挂在值日条上；岗位多到一行放不下会自动滚动。没选的岗位按各自设的触发方式出现，互不影响。还没选人的岗位挂上大屏会显示「待定」——先到「值日」页点岗位把人选好。"));
+    /* 原来是 100 字的一段话，老师不会读。标题说结论，细节收进「?」。 */
+    var presNote = h("p", "ep-note");
+    presNote.appendChild(h("span", null, "勾上的岗位整段挂在值日条上"));
+    presNote.appendChild(helpNote(
+      "勾了哪个时段，这个岗位就在那一整段都挂在值日条上；岗位多到一行放不下会自动滚动。"
+      + "没勾的岗位按各自设的触发方式出现，互不影响。"
+      + "还没选人的岗位挂上大屏会显示「待定」，先在「值日」页点岗位把人选好。"
+    ));
+    presSec.appendChild(presNote);
 
     var pres = (RT && RT.config) ? (RT.config().dutyPresents || {}) : {};
     [
@@ -1456,9 +1486,10 @@
 
     if (role && role.grp) {
       var names = [];
+      var dropped = 0;          /* 组里有人不在当前名单上 */
       function add(x) {
         S.peopleList(x).forEach(function (n) {
-          if (keep !== null && !keep[n]) return;
+          if (keep !== null && !keep[n]) { dropped++; return; }
           if (names.indexOf(n) < 0) names.push(n);
         });
       }
@@ -1473,8 +1504,12 @@
         /* 同组其他岗位今天是谁：问同一个入口，别在这儿再算一遍 */
         rolePeopleNow(r, key).forEach(add);
       });
-      if (names.length) {
-        out.push({ id: "role:" + role.grp, name: role.grp, source: "role", names: names });
+      /* 和手工分的组一样：人全不在名单里时也不能把组藏掉。
+         以前名单一换（新学年、新班），这排「值日组」就无声消失，
+         老师看到的就是「我分好的组丢了」——数据其实一直在岗位配置里。 */
+      if (names.length || dropped) {
+        out.push({ id: "role:" + role.grp, name: role.grp, source: "role",
+                   names: names, missing: dropped });
       }
     }
     var byId = rosterNameIndex(roster);
@@ -1535,6 +1570,10 @@
     wrap.appendChild(q);
 
     var grid = h("div", "ep-people");
+    /* 一行状态：现在列的是哪批人、共几个。
+       没有它，「点没点组」只差在几个字的颜色上，老师看不出来。 */
+    var statusBar = h("div", "ep-pickstatus");
+    wrap.appendChild(statusBar);
     wrap.appendChild(grid);
 
     /* 单人岗位（如「班牌」）点一下就是选定今天，不弹二次确认；但老师
@@ -1552,29 +1591,36 @@
       wrap.appendChild(pinBtn);
     }
 
-    /* 名单没录入时指一条路：候选只剩岗位现有人，完整名单要去向导补 */
-    if (!rosterStudents().length) {
-      wrap.appendChild(h("p", "ep-note",
-        "还没录入班级名单：候选只显示这个岗位现有的人；要完整名单，去「⋯ 菜单 → 配置班级」补录。"));
-    }
+    /* 换人的范围只有三种，用一行字说清楚就够。
+       以前这里叠着三段说明（"这个岗位现在按 A/B 组轮换。这里点的只改今天；
+       要固定成这些人，点下面的「改为固定人员」——以后每天都显示他们，
+       轮换表还留着，随时能恢复。"共 64 字），一眼扫过去只会被跳过，
+       然后老师照样以为改一次就一直有效。长解释收进「?」，谁想细看谁点。 */
+    var hintRow = h("div", "ep-pickhint");
+    hintRow.appendChild(h("span", "ep-pickhint-t", multi ? "选人后点「确定」" : "点谁就是谁"));
+    hintRow.appendChild(helpNote(
+      "换只改今天这一天，不影响以后的排班。"
+      + (role.groups || role.peopleMap || role.rotation
+        ? "这个岗位有轮换表：今天定的人只顶今天；要以后每天都是这些人，点下面「改为固定人员」，轮换表会留着，随时能改回来。"
+        : "要让以后每天都用这些人，点下面的「长期固定」。")
+    ));
+    wrap.appendChild(hintRow);
 
-    /* 换人语义先说清楚（真机反馈 2026-11-20：老师选好了人，
-       常驻岗位大屏却显示「待定」——原因就是换人只改今天，
-       岗位配置里其实没人，老师以为选一次就一直有效）。
-       2026-11-23：有轮换表的岗位也能长期指定人，所以这里不再把它们排除在外。 */
-    if (role.groups || role.peopleMap || role.rotation) {
-      wrap.appendChild(h("p", "ep-note",
-        "这个岗位现在按" + (role.groups ? " A/B 组" : "星期") + "轮换。"
-        + "这里点的只改今天；要固定成这些人，点下面的「改为固定人员」——"
-        + "以后每天都显示他们，轮换表还留着，随时能恢复。"));
-    } else if (multi) {
-      wrap.appendChild(h("p", "ep-note",
-        "这里选的人默认只换今天；要一直显示这些人，点下面的「长期固定」。"));
-    } else {
-      wrap.appendChild(h("p", "ep-note", "点谁就是谁：只换今天这一天。"));
-    }
-
+    /* 打开时把「今天这一轮的人」列出来（就是它们，不用再去找），
+       但**一个都不预先勾上**。
+       以前 selected 一上来就是整组，老师点一个人想换掉，底下却写
+       「已选 15 人」，看着像点错了。现在：选了才叫选，没选就是不改。 */
+    var currentNames = rolePeopleNow(role, key);
     var selected = [];
+    /* 面板现在在看什么。以前没有这个状态：
+         · paint() 一上来就把整份名单铺 24 个人出来，所以「已经分组」在界面上
+           完全看不出来；
+         · 点组直接把 15 人塞进 selected，但组按钮没有任何变化，
+           于是底下那句「已选 15 人」对老师来说像是凭空冒出来的。
+       current —— 只列这个岗位今天的人（打开时的样子）
+       group   —— 点了某一组，只列这组的人
+       search  —— 老师在打字，列匹配到的候选 */
+    var view = { kind: "current" };
     var saveBtn = null;
     var related = relatedNames(role);
     var activeGroup = null;   /* 从已存组带出时记住它，「保存修改」写回原组 */
@@ -1600,7 +1646,8 @@
       roles[role.id] = { people: names.slice() };
       S.patchDayOverride(key, { roles: roles });
       wrap.remove();
-      flash(role.name + " 今天换给 " + names.join("、"));
+      flash(role.name + " 今天换给 "
+        + (names.length > 3 ? names.length + " 人" : names.join("、")));
       renderBody(role.id);
     }
 
@@ -1648,18 +1695,33 @@
       if (!defs.length) return;
       groupBox.appendChild(h("span", "ep-groups-label", "点组带出"));
       defs.forEach(function (g) {
+        var on = view.kind === "group" && view.id === g.id;
         var box = h("span", "ep-group");
-        var b = h("button", "ep-group-chip", g.name);
-        b.title = "点一下把这组 " + g.names.length + " 人全选上：" + g.names.join("、");
-        if (g.missing) {
-          b.title += "；另有 " + g.missing + " 人已不在名单里（名单重录或学生 id 变更会导致这样），可在下方重新勾人后点「保存修改」补齐。";
-          b.classList.add("ep-group-warn");
-        }
+        /* 「缺 N」写在按钮上，不写进 title：一体机没有悬停，title 在教室里等于不存在（红线 7）。 */
+        var label = g.name;
+        if (g.names.length) label += " · " + g.names.length + "人";
+        if (g.missing) label += " · 缺" + g.missing;
+        var b = h("button", "ep-group-chip" + (on ? " on" : ""), label);
+        b.title = on
+          ? "再点一下取消带入"
+          : "点一下只列这组 " + g.names.length + " 人，并全部勾上；还要点下面的「确定」才生效";
+        if (g.missing) b.classList.add("ep-group-warn");
         b.addEventListener("click", function () {
-          selected = g.names.slice();
+          if (on) {
+            /* 再点一下取消：回到「今天这一轮」，不留下半截选择 */
+            view = { kind: "current" };
+            selected = [];
+            activeGroup = null;
+          } else {
+            view = { kind: "group", id: g.id, name: g.name,
+                     names: g.names.slice(), missing: g.missing || 0 };
+            selected = g.names.slice();
+            activeGroup = (g.source === "manual") ? g : null;
+            if (activeGroup && nameInput) nameInput.value = activeGroup.name;
+          }
+          q.value = "";              /* 带入是整体动作，把搜索条件清掉免得两套条件打架 */
           g.names.forEach(function (n) { S.markPicked(n); });
-          activeGroup = (g.source === "manual") ? g : null;
-          if (activeGroup && nameInput) nameInput.value = activeGroup.name;
+          paintGroupChips();
           paintGroupHint();
           paint();
         });
@@ -1670,8 +1732,13 @@
           x.addEventListener("click", function () {
             S.deleteGroup(g.id);
             if (activeGroup && activeGroup.id === g.id) activeGroup = null;
+            if (view.kind === "group" && view.id === g.id) {
+              view = { kind: "current" };
+              selected = [];
+            }
             paintGroupChips();
             paintGroupHint();
+            paint();
             flash("已删除「" + g.name + "」");
           });
           box.appendChild(x);
@@ -1680,14 +1747,94 @@
       });
     }
 
-    function paint() {
-      grid.innerHTML = "";
-      var res = S.rankStudents(pickerPool(), q.value, related, 24);
-      if (!res.length) {
-        grid.appendChild(h("p", "ep-note", "名单里没有这个人"));
+    /* 状态行：现在列的是哪批人。没有这行，「点没点组」只差在几个字的
+       颜色上，老师看不出来。 */
+    function paintStatus(qs) {
+      statusBar.innerHTML = "";
+      if (qs) return;                /* 搜索时让位，别两句话打架 */
+      if (view.kind === "group") {
+        /* 带入之后老师可能又增减了几个人，这时再说「已带入」就不老实了 */
+        var picked = selected.length;
+        var lead = view.edited
+          ? (picked ? "从「" + view.name + "」里挑了 " + picked + " 人"
+                    : "从「" + view.name + "」里挑人")
+          : "已带入「" + view.name + "」" + (picked ? " · " + picked + " 人" : "");
+        statusBar.appendChild(h("span", "ep-pickstatus-t", lead));
+        if (view.missing) {
+          statusBar.appendChild(h("span", "ep-pickstatus-w",
+            "另有 " + view.missing + " 人不在名单里"));
+          statusBar.appendChild(helpNote(
+            "这几位多半是名单整份换过（新学年、新接一个班），组里还留着旧姓名。"
+            + "从下面把现有的人勾上，点「确定」就补回来了；原组还在岗位配置里。"));
+        }
+        var redo = h("button", "ep-pickstatus-x", "重新挑");
+        redo.title = "不要这一整组，自己从里面挑几个人";
+        redo.addEventListener("click", function () {
+          selected = [];
+          view.edited = true;
+          paint();
+        });
+        statusBar.appendChild(redo);
         return;
       }
-      res.forEach(function (s) {
+      /* 没有名单时把「为什么列表这么短、怎么办」并进这一行，
+         省掉一整段说明文字 */
+      var hasRoster = rosterStudents().length > 0;
+      statusBar.appendChild(h("span", "ep-pickstatus-t",
+        !hasRoster
+          ? "还没有名单 · 打字可以顺手加人"
+          : currentNames.length
+            ? "今天这一轮 " + currentNames.length + " 人"
+            : "今天还没排人"));
+    }
+
+    function syncSaveBtn() {
+      if (!saveBtn) return;
+      saveBtn.textContent = selected.length
+        ? "确定 · 用这 " + selected.length + " 人"
+        : "确定";
+    }
+
+    function paint() {
+      grid.innerHTML = "";
+      var qs = String(q.value || "").trim();
+      var rows;
+      if (qs) {
+        rows = S.rankStudents(pickerPool(), qs, related, 24);
+      } else if (view.kind === "group") {
+        rows = view.names.map(function (n) { return { name: n }; });
+      } else {
+        rows = currentNames.map(function (n) { return { name: n }; });
+      }
+
+      paintStatus(qs);
+
+      if (!rows.length) {
+        if (qs) {
+          /* 搜不到人时就地补，不能只写一句「名单里没有这个人」把老师晾着。
+             （以前这里指路「去 ⋯ 菜单 → 配置班级补录」，而那条路上
+             名册为空时连录入框都不渲染——指的方向根本走不通。） */
+          var typed = qs;
+          var add = h("button", "ep-addperson", "把「" + typed + "」加进名单");
+          add.addEventListener("click", function () {
+            var r = S.addStudent(typed);
+            if (!r.ok) { flash(r.why); return; }
+            flash(r.existed ? "名单里本来就有「" + typed + "」" : "已加进名单：" + typed);
+            /* 搜索词留着：加完当场就能在候选里看到他，
+               不用再打一遍字（打了字却什么都没变，老师会以为没加上） */
+            paint();
+          });
+          grid.appendChild(add);
+        } else if (view.kind === "group") {
+          grid.appendChild(h("p", "ep-note", "这一组还没有人"));
+        } else {
+          grid.appendChild(h("p", "ep-note", "今天还没排人：打字找人，或从上面点一组"));
+        }
+        syncSaveBtn();
+        return;
+      }
+
+      rows.forEach(function (s) {
         var b = h("button", "ep-person" + (selected.indexOf(s.name) >= 0 ? " on" : ""), s.name);
         b.addEventListener("click", function () {
           S.markPicked(s.name);
@@ -1706,13 +1853,12 @@
           var i = selected.indexOf(s.name);
           if (i >= 0) selected.splice(i, 1);
           else selected.push(s.name);
+          if (view.kind === "group") view.edited = true;
           paint();
         });
         grid.appendChild(b);
       });
-      if (saveBtn) {
-        saveBtn.textContent = selected.length ? "确定 · 已选 " + selected.length + " 人" : "确定";
-      }
+      syncSaveBtn();
     }
 
     q.addEventListener("input", paint);
@@ -1785,7 +1931,13 @@
     if (multi) {
       saveBtn = h("button", "ep-primary", "确定");
       saveBtn.addEventListener("click", function () {
-        if (!selected.length) { flash("先选人"); return; }
+        if (!selected.length) {
+          /* 没选人 = 这次不改。关掉窗口，岗位保持原样——
+             别把「我什么都没点」写成「这个岗位今天没人」。 */
+          closePicker();
+          flash("没选人，这次不改");
+          return;
+        }
         commit(selected);
       });
       row.appendChild(saveBtn);

@@ -215,7 +215,8 @@ test("设置最后一页也有同一个入口", async ({ page }) => {
   await page.locator("#btn-setup").click();
   await expect(page.locator("#setup")).toHaveClass(/open/);
   await page.locator(".setup-field input").nth(1).fill("更新入口测试班");
-  for (let i = 0; i < 3; i += 1) {
+  // 班级 → 名单 → 作息 → 课表 → 岗位/文案（最后一页）：四步，不是三步
+  for (let i = 0; i < 4; i += 1) {
     await page.locator(".setup-foot .setup-btn.primary").click();
   }
 

@@ -37,7 +37,7 @@ test("向导第一步就能导入旧设置，不用先填班名（0.3.x 跨代�
 
   const errors = await openScreen(page, AT);
   await expect(page.locator("#setup")).toHaveClass(/open/);
-  await expect(page.locator(".setup-step")).toHaveCount(4);
+  await expect(page.locator(".setup-step")).toHaveCount(5);
 
   const legacy = page.locator(".setup-legacy");
   await expect(legacy).toBeVisible();
@@ -60,8 +60,8 @@ test("向导第一步就能导入旧设置，不用先填班名（0.3.x 跨代�
     buffer: Buffer.from(JSON.stringify(payload), "utf8"),
   });
 
-  // 导入成功 → 直接跳到第 4 步，只剩点「完成」
-  await expect(page.locator(".setup-step").nth(3)).toHaveClass(/on/);
+  // 导入成功 → 直接跳到最后一页，只剩点「完成」
+  await expect(page.locator(".setup-step").nth(4)).toHaveClass(/on/);
   expect(await page.evaluate(() => window.Store.config().meta.klass)).toBe("导入来的班");
   expect(await page.evaluate(() => window.Store.config().meta.klass)).not.toBe("空包测试班");
   expect(errors, "控制台不应有报错").toEqual([]);
@@ -76,17 +76,22 @@ test("空配置打开就进向导，不碰命令行也能配出当天的屏", as
 
   await expect(page.locator("#setup")).toHaveClass(/open/);
   await expect(page.locator("body")).toHaveAttribute("data-setup", "1");
-  await expect(page.locator(".setup-step")).toHaveCount(4);
+  await expect(page.locator(".setup-step")).toHaveCount(5);
 
   await page.locator(".setup-field input").nth(1).fill("空包测试班");
   await next(page);
 
-  // 空包没有作息可改，第二步应该先套上一套模板，而不是一张空表
+  /* 空包没有名单。这一页必须仍然给得出录入框——以前名册为空时整块 return，
+     老师被指到这儿却发现无处可填，问题就卡死在这里。 */
+  await expect(page.locator(".setup-roster-input")).toBeVisible();
+  await next(page);
+
+  // 空包没有作息可改，这一页应该先套上一套模板，而不是一张空表
   await expect(page.locator(".setup-tpl")).toHaveCount(3);
   expect(await page.locator(".setup-row").count()).toBeGreaterThan(20);
   await next(page);
 
-  // 第三步 5×7：一条课都不填，屏上显示「—」，但不报错
+  // 课表 5×7：一条课都不填，屏上显示「—」，但不报错
   await expect(page.locator(".setup-grid-row:not(.head) input")).toHaveCount(35);
   await next(page);
 
@@ -124,7 +129,9 @@ test("改班名和课表后刷新仍在，屏上抬头跟着换", async ({ page 
   await expect(page.locator("#setup")).toHaveClass(/open/);
 
   await page.locator(".setup-field input").nth(1).fill("测试二班");
-  await next(page);
+  await next(page); // 班级 → 名单
+  // 名单页包里有名单，不用动，直接过
+  await next(page); // 名单 → 作息
 
   // 作息第一段的开始时间改成 07:40，验证相邻段仍然衔接
   await page.locator(".setup-row input").first().evaluate((el, v) => {
@@ -177,12 +184,12 @@ test("岗位表核对时漏了人，打一个字或姓氏拼音首字母就能�
   const errors = await openScreen(page, AT);
 
   await page.locator(".setup-field input").nth(1).fill("补人测试班");
+  await next(page);   // 名单：包里有，直接用
   await next(page);   // 作息：用默认那一套
   await next(page);   // 课表：一节课都不填也能往下走
   await next(page);   // 岗位 / 文案
 
   await page.locator(".setup-import-open").click();
-  await page.locator(".setup-roster-ok").click();
 
   await page.locator(".setup-import-text").fill("岗位\t职责\t负责人\n路队长\t提醒排队\t赵子墨");
   await page.locator(".setup-import-run").click();

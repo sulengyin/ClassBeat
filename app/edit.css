@@ -199,6 +199,11 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-person{font:inherit;font-size:2.6vmin;padding:1.4vmin .8vmin;border-radius:1.2vmin;
            border:.24vmin solid #6B5641;background:#3D2D20;color:#E2D4BC;cursor:pointer}
 .ep-person.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10;font-weight:900}
+/* 名单里搜不到时就地加人：占满一行，和候选人分开，不会误当成一个学生 */
+.ep-addperson{grid-column:1/-1;font:inherit;font-size:2.3vmin;font-weight:800;
+              padding:1.3vmin 1.6vmin;border-radius:1.2vmin;
+              border:.24vmin dashed #B0803C;background:#3D2D20;color:#F2C879;cursor:pointer}
+.ep-addperson:hover{background:#4A3728;border-color:#E0A84E;color:#FFD64F}
 
 .ep-groups{display:flex;flex-wrap:wrap;gap:.8vmin;align-items:center;margin-bottom:1.3vmin}
 .ep-groups-label{font-size:2vmin;color:#8E7B66;letter-spacing:.12em;margin-right:.4vmin}
@@ -208,6 +213,38 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
                color:#E2D4BC;cursor:pointer}
 .ep-group-chip:hover{background:#4A3728;border-color:#A08A6E}
 .ep-group-chip.ep-group-warn{border-style:dashed;border-color:#B0803C;color:#F2C879}
+/* 点过的组要有「按下去」的样子。以前点完毫无变化，
+   老师根本不知道自己有没有带入成功——这是「点和没点几乎没变化」的根。 */
+.ep-group-chip.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10;font-weight:900}
+.ep-group-chip.on:hover{background:#FFDE72;border-color:#F1E3C6}
+.ep-group-chip.on.ep-group-warn{border-style:dashed;border-color:#B0803C;color:#7A4E12}
+
+/* 状态行：现在列的是哪批人（今天这一轮 / 已带入某组） */
+.ep-pickstatus{display:flex;align-items:center;gap:1.2vmin;min-height:3.4vmin;
+               font-size:2.1vmin;color:#C8B49A}
+.ep-pickstatus-t{font-weight:700}
+.ep-pickstatus-w{color:#E8B45A;font-weight:700}
+.ep-pickstatus-x{font:inherit;font-size:2vmin;line-height:1;padding:.7vmin 1.3vmin;
+                 border-radius:1vmin;border:.22vmin solid #6B5641;
+                 background:transparent;color:#E2D4BC;cursor:pointer}
+.ep-pickstatus-x:hover{background:#4A3728;border-color:#A08A6E}
+
+/* 「?」说明：点一下展开，再点收起。一体机上没有悬停，只能点——
+   这也是为什么不用 title：在触摸屏上它永远不会出现。 */
+.ep-helpw{position:relative;display:inline-flex;vertical-align:middle}
+.ep-help{font:inherit;font-size:1.9vmin;line-height:1;width:3.4vmin;height:3.4vmin;
+         border-radius:50%;border:.22vmin solid #6B5641;background:transparent;
+         color:#C8B49A;cursor:pointer;padding:0}
+.ep-help:hover{background:#4A3728;border-color:#A08A6E;color:#FFD64F}
+.ep-helpw.open .ep-help{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10}
+.ep-helptip{display:none;position:absolute;left:0;top:4.2vmin;z-index:8;
+            width:54vmin;max-width:72vw;padding:1.4vmin 1.6vmin;border-radius:1.2vmin;
+            background:#2A1F16;border:.22vmin solid #6B5641;color:#E2D4BC;
+            font-size:2vmin;line-height:1.7;font-weight:400;text-align:left;
+            box-shadow:0 .8vmin 2vmin rgba(0,0,0,.45)}
+.ep-helpw.open .ep-helptip{display:block}
+.ep-pickhint{display:flex;align-items:center;gap:1vmin;flex-wrap:wrap;
+             font-size:2.1vmin;color:#A8957E;margin:.4vmin 0 0}
 .ep-group-del{font:inherit;font-size:2vmin;line-height:1;padding:.7vmin .9vmin;
               border-radius:1vmin;border:.24vmin solid #6E3A32;background:transparent;
               color:#F08A7E;cursor:pointer}

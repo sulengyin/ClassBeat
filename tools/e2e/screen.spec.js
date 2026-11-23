@@ -127,6 +127,17 @@ test("值日岗位指定了人，大屏就显示这个人（不再整组「待�
   const row = page.locator(".ep-rowline").filter({ hasText: "扫地" }).locator(".ep-row");
   await expect(row).toBeVisible();
   await row.click();
+
+  /* 面板现在打开只列「今天这一轮」。这个岗位按 A/B 轮换，今天这一轮是空的，
+     所以老师要先点同组的「值日组」把人带出来——这正是真实动作。 */
+  const chip = page.locator(".ep-group-chip").first();
+  await expect(chip, "排班组要出现在「点组带出」里").toBeVisible();
+  await chip.click();
+  await expect(page.locator(".ep-pickstatus")).toContainText("已带入");
+  /* 带入的是整组；这里只想固定其中一个人，先「重新挑」清空再点 */
+  await page.locator(".ep-pickstatus-x").click();
+  await expect(page.locator(".ep-person.on")).toHaveCount(0);
+
   const person = page.locator(".ep-person").first();
   const name = (await person.innerText()).trim();
   expect(name, "候选里要有人名").not.toBe("");
@@ -536,4 +547,61 @@ test("作息边界联动 + 时段改名后文字同步（真机 2026-11-19 ②�
   const renamed = page.locator(".ep-field", { hasText: newName }).first();
   await expect(renamed).toBeVisible();
   await expect(renamed.locator("input.ep-input")).toHaveValue("先热身，再活动");
+});
+
+test("名单在向导里单独一步能录能存，换人时打一个字就找得到；点组有明确反馈", async ({ page, request }) => {
+  /* 三件事一起钉住（2026-11-23 真机反馈）：
+     ① 学生名单以前藏在「从岗位表导入」的第①块里，要点六层才到；
+        而且名册为空时那块直接 return，老师被指到这儿却发现无处可填。
+     ② 换人面板一打开就把整份名单铺出来，看不出这个岗位已经分过组。
+     ③ 点了组按钮毫无变化，底下却突然写「已选 15 人」。 */
+  const errors = await openScreen(page, ARRIVE);
+  const ping = await (await request.get("/api/ping")).json();
+
+  /* ① 名单：向导第二步，粘贴三个人，保存 */
+  await openTools(page);
+  await page.locator("#btn-setup").click();
+  await expect(page.locator("#setup")).toHaveClass(/open/);
+  await expect(page.locator(".setup-step")).toHaveCount(5);
+  await expect(page.locator(".setup-step").nth(1)).toContainText("名单");
+
+  await page.locator(".setup-field input").nth(1).fill("名单测试班");
+  await page.locator(".setup-foot .setup-btn.primary").click();
+  /* 在原有名单上补一个人，而不是整份换掉：整份换掉的话，值日组的人就全
+     对不上了（组是按名单筛人的），这条用例要验的是「名单能录、能搜到」，
+     不是「换一份名单之后组会怎样」。 */
+  const rosterBox = page.locator(".setup-roster-input");
+  const before = (await rosterBox.inputValue()).split("\n").filter((s) => s.trim());
+  await rosterBox.fill(before.concat(["周子航"]).join("\n"));
+  await page.locator(".setup-roster-save").click();
+  await expect(page.locator(".setup-msg.ok")).toContainText("已保存 " + (before.length + 1) + " 人");
+  expect(await page.evaluate(() => window.Store.config().students.map((s) => s.name)))
+    .toContain("周子航");
+  await page.locator(".setup-x").click();
+
+  /* ②③ 值日换人 */
+  await openTools(page);
+  await unlockEdit(page, ping.class);
+  await page.locator(".ep-tab", { hasText: "值日" }).click();
+  await page.locator(".ep-rowline").filter({ hasText: "扫地" }).locator(".ep-row").click();
+
+  /* 刚录的人打一个字就搜得到——原来那条「去配置班级补录」的路是断的 */
+  const search = page.locator(".ep-dialog.picker .ep-input").first();
+  await search.fill("子航");
+  await expect(page.locator(".ep-person", { hasText: "周子航" })).toBeVisible();
+
+  /* 打开时不预选：没选就不该显示「已选 N 人」 */
+  await search.fill("");
+  await expect(page.locator(".ep-person.on")).toHaveCount(0);
+  await expect(page.locator(".ep-pickstatus")).toContainText(/今天这一轮|今天还没排人/);
+
+  /* 点组：chip 变成按下的样子，状态行写明带入哪一组 */
+  const chip = page.locator(".ep-group-chip").first();
+  await chip.click();
+  await expect(page.locator(".ep-group-chip").first()).toHaveClass(/\bon\b/);
+  await expect(page.locator(".ep-pickstatus")).toContainText("已带入");
+  expect(await page.locator(".ep-person.on").count(), "带入后整组被选上").toBeGreaterThan(0);
+  await expect(page.locator(".ep-pickstatus-x")).toBeVisible();
+
+  expect(errors, "控制台不应有报错").toEqual([]);
 });

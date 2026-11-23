@@ -570,5 +570,21 @@ check(S.rankStudents(pyList, "wang").map(s => s.name).join("、") === "王六",
 check(S.rankStudents(pyList, "张").length === 1, "打汉字还是按名字包含匹配");
 check(S.rankStudents([{ name: "欧阳光" }], "o").length === 1, "表里有这个姓就能按首字母找到");
 
+/* 换人面板里「把 X 加进名单」。为了补一个人不该要求老师走完整个向导：
+   那条路要点六层，而且入口叫「从岗位表导入」，老师根本找不到。 */
+S.patchConfig({ students: [{ id: "s1", name: "张三", active: true }] });
+var addNew = S.addStudent("李四");
+check(addNew.ok && !addNew.existed && addNew.n === 2,
+  "加进名单：新人入册", JSON.stringify(addNew));
+check(S.rankStudents(S.config().students, "李", null, 8).map(function (s) { return s.name; }).join("、") === "李四",
+  "加完之后打一个字就搜得到");
+var addDup = S.addStudent("李四");
+check(addDup.ok && addDup.existed && addDup.n === 2,
+  "同一个人重复加不会变成两份", JSON.stringify(addDup));
+check(!S.addStudent("   ").ok, "空名字被拒绝，不会往名单里塞空条目");
+var addObj = S.addStudent({ name: "王五" });
+check(addObj.ok && S.config().students.length === 3,
+  "对象形状的姓名也能加（对象取 name）", JSON.stringify(addObj));
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

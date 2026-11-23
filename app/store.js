@@ -240,6 +240,22 @@
     return out;
   }
 
+  /* 把一个姓名加进本班名单。换人面板搜不到人时用它就地补——
+     为了加一个人要走完整个向导（还得先找到名单在哪一步），成本高到
+     老师会直接放弃，然后这个人的名字就永远进不了名单。
+     同名允许：一个班真可能有同名学生，合并掉等于凭空少一个人。 */
+  function addStudent(name) {
+    var n = personNameOf(name);
+    if (!n || n === "[object Object]") return { ok: false, why: "这个名字不能用。" };
+    var list = normStudents(config().students).slice();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].name === n) return { ok: true, existed: true, n: list.length };
+    }
+    list.push({ name: n, active: true });
+    patchConfig({ students: list });
+    return { ok: true, existed: false, n: list.length };
+  }
+
   /* ---------- 名单检索 ---------- */
   /* 姓氏的拼音首字母。只覆盖姓氏——老师打的就是「姓」；这不是拼音输入法，
      而是「打一个字就出人」的省事版：不会打字/打字慢的老师打 z 也能找到
@@ -1156,6 +1172,7 @@
     patchDayOverride: patchDayOverride, clearDayOverride: clearDayOverride,
     applyOverrides: applyOverrides, undo: undo, canUndo: canUndo,
     rankStudents: rankStudents, markPicked: markPicked,
+    addStudent: addStudent,
     normStudents: normStudents, personNameOf: personNameOf, peopleList: peopleList,
     memberIdOf: memberIdOf, sanitizeConfig: sanitizeConfig,
     cleanConfig: cleanConfig, cleanOverrides: cleanOverrides,

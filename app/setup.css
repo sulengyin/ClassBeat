@@ -248,23 +248,16 @@ body[data-setup="1"] .warn{display:none}
   background:#FFFDF6;padding:1.4vmin 1.6vmin;margin:0 0 1.6vmin;
 }
 .setup-import-block-head{display:flex;align-items:center;gap:1vmin;flex-wrap:wrap;margin:0 0 1vmin}
-.setup-import-step{
-  flex:none;width:3.6vmin;height:3.6vmin;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:1.9vmin;font-weight:800;color:#FFFDF6;background:#3A2A1E;
-}
 .setup-import-block-title{font-size:2.1vmin;font-weight:800;color:#31231A}
 .setup-import-req{
   font-size:1.8vmin;line-height:1.6;color:#6B5545;
   padding-left:1.2vmin;border-left:.3vmin solid #C9B79E;margin:0 0 .9vmin;
 }
-.setup-import-roster-names{
-  max-height:12vmin;overflow:auto;font-size:1.8vmin;line-height:1.7;color:#31231A;
-  background:#F7EDD9;border-radius:.9vmin;padding:1vmin 1.2vmin;margin:0 0 1.2vmin;
-}
 .setup-import-gate{color:#8A6A3E}
-.setup-roster-tools{margin:.4vmin 0 1.2vmin}
-.setup-import-text.setup-roster-text{min-height:12vmin;margin:0 0 1vmin}
+/* 名单步：名单是这个班的人，框给足高度，老师能看到整班 */
+.setup-import-text.setup-roster-input{min-height:22vmin;margin:0 0 1.2vmin}
+/* 文件选择框藏在「从表格文件导入」按钮后面，老师看到的是一个按钮 */
+.setup-roster-file{position:fixed;left:-200px;top:0;width:1px;height:1px;opacity:0}
 .setup-import-text{
   width:100%;min-height:14vmin;resize:vertical;
   font-family:inherit;font-size:1.95vmin;line-height:1.55;color:#31231A;
