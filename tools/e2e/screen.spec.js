@@ -567,14 +567,34 @@ test("名单在向导里单独一步能录能存，换人时打一个字就找�
 
   await page.locator(".setup-field input").nth(1).fill("名单测试班");
   await page.locator(".setup-foot .setup-btn.primary").click();
+
   /* 在原有名单上补一个人，而不是整份换掉：整份换掉的话，值日组的人就全
      对不上了（组是按名单筛人的），这条用例要验的是「名单能录、能搜到」，
      不是「换一份名单之后组会怎样」。 */
-  const rosterBox = page.locator(".setup-roster-input");
-  const before = (await rosterBox.inputValue()).split("\n").filter((s) => s.trim());
-  await rosterBox.fill(before.concat(["周子航"]).join("\n"));
+  const rosterCount = await page.locator(".setup-roster-item").count();
+  expect(rosterCount, "名单页把每个学生列成一条").toBeGreaterThan(0);
+
+  await page.locator(".setup-roster-new").fill("周子航");
+  await page.locator(".setup-roster-addbtn").click();
+  await expect(page.locator(".setup-roster-item", { hasText: "周子航" })).toBeVisible();
+  await expect(page.locator(".setup-roster-count")).toContainText("未保存");
+
+  /* 全选 / 取消全选：48 个人逐个点不现实，「换一整班」得先能全选 */
+  await page.locator(".setup-roster-all").click();
+  await expect(page.locator(".setup-roster-item.on")).toHaveCount(rosterCount + 1);
+  await expect(page.locator(".setup-roster-all")).toHaveText("取消全选");
+  await page.locator(".setup-roster-all").click();
+  await expect(page.locator(".setup-roster-item.on")).toHaveCount(0);
+
+  /* 保存只弹一次框，框里写清加了谁、人数怎么变；点确定才落库 */
   await page.locator(".setup-roster-save").click();
-  await expect(page.locator(".setup-msg.ok")).toContainText("已保存 " + (before.length + 1) + " 人");
+  const dlg = page.locator(".setup-modal");
+  await expect(dlg).toBeVisible();
+  await expect(dlg).toContainText("加上 1 人");
+  await expect(dlg).toContainText("周子航");
+  await dlg.locator(".setup-btn", { hasText: "确定保存" }).click();
+  await expect(page.locator(".setup-modal")).toHaveCount(0);
+  await expect(page.locator(".setup-msg.ok")).toContainText("已保存 " + (rosterCount + 1) + " 人");
   expect(await page.evaluate(() => window.Store.config().students.map((s) => s.name)))
     .toContain("周子航");
   await page.locator(".setup-x").click();

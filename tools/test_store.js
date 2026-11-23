@@ -586,5 +586,50 @@ var addObj = S.addStudent({ name: "王五" });
 check(addObj.ok && S.config().students.length === 3,
   "对象形状的姓名也能加（对象取 name）", JSON.stringify(addObj));
 
+/* 删名单里的学生时，「要不要顺手从分组/岗位上清掉」由老师在弹框里勾。
+   默认不清（删名单可撤销，清分组不可逆），勾了才走 prunePeople。 */
+S.patchConfig({
+  students: [{ name: "张三" }, { name: "李四" }, { name: "王五" }],
+  peopleGroups: [{ id: "g1", name: "扫地组", names: ["张三", "李四"] }],
+  roles: {
+    roles: [
+      { id: "z1", name: "扫地", people: ["张三", "王五"] },
+      { id: "z2", name: "擦窗", people: ["李四"], groups: { "A 组": ["张三", "王五"] },
+        peopleMap: { "1": "张三" } }
+    ]
+  }
+});
+var pr = S.prunePeople(["张三"]);
+check(S.config().roles.roles[0].people.join("|") === "王五",
+  "清掉岗位人员里的这个人", JSON.stringify(S.config().roles.roles[0].people));
+check(S.config().roles.roles[1].groups["A 组"].join("|") === "王五"
+      || S.config().roles.roles[1].groups["A 组"] === undefined,
+  "岗位分组里也清掉", JSON.stringify(S.config().roles.roles[1].groups));
+check(!(S.config().roles.roles[1].peopleMap || {})["1"],
+  "按星期指定的人也清掉", JSON.stringify(S.config().roles.roles[1].peopleMap));
+check(S.config().peopleGroups[0].names.join("|") === "李四",
+  "人群组里也清掉", JSON.stringify(S.config().peopleGroups[0].names));
+check(pr.roles > 0 && pr.groups > 0, "清理结果报回数量，界面才能说清动了什么",
+  JSON.stringify(pr));
+check(S.config().students.length === 3, "清理排班不动名单本身（名单由向导另一条路写）",
+  String(S.config().students.length));
+
+/* 当天临时调整里的指定人也一并清掉，不然「今天谁做」会指向一个已删掉的人 */
+S.patchDayOverride("2026-11-23", { roles: { z1: { people: ["张三"] } } });
+S.prunePeople(["张三"]);
+check(!S.getDayOverride("2026-11-23").roles.z1,
+  "当天临时调整里的人也清掉", JSON.stringify(S.getDayOverride("2026-11-23")));
+S.clearDayOverride("2026-11-23");
+
+/* 「名单是空的」和「还没有名单」是两件事。前者是老师把人都删了，
+   屏上就该没人；后者才回落到班级数据。折在一起就会出现
+   「全选删除 → 保存 → 48 个人又回来了」。 */
+S.patchConfig({ students: [] });
+check(Array.isArray(S.config().students) && S.config().students.length === 0,
+  "空名单照存空数组，不被折成「没有名单」", JSON.stringify(S.config().students));
+S.patchConfig({ students: null });
+check(S.config().students === undefined, "显式置空才回到「没有名单」",
+  JSON.stringify(S.config().students));
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

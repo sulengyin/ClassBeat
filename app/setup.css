@@ -254,10 +254,77 @@ body[data-setup="1"] .warn{display:none}
   padding-left:1.2vmin;border-left:.3vmin solid #C9B79E;margin:0 0 .9vmin;
 }
 .setup-import-gate{color:#8A6A3E}
-/* 名单步：名单是这个班的人，框给足高度，老师能看到整班 */
-.setup-import-text.setup-roster-input{min-height:22vmin;margin:0 0 1.2vmin}
+/* 名单步：一人一条，点一下选中。48 个人要能一眼扫完，所以用网格排。 */
+.setup-roster-status{display:flex;align-items:center;gap:1.4vmin;flex-wrap:wrap;margin:.4vmin 0 1vmin}
+.setup-roster-count{font-size:2vmin;font-weight:800;color:#31231A}
+.setup-roster-picked{font-size:1.9vmin;font-weight:700;color:#8A6A3E}
+.setup-roster-undo{
+  font:inherit;font-size:1.8vmin;font-weight:700;line-height:1;color:#6B5545;
+  padding:.8vmin 1.2vmin;border-radius:.8vmin;cursor:pointer;
+  border:.22vmin dashed #B9A488;background:transparent;
+}
+.setup-roster-undo:hover{color:#31231A;border-color:#B0803C;background:#FFF1CC}
+.setup-roster-tools{display:flex;gap:1.2vmin;margin:0 0 1.2vmin;flex-wrap:wrap}
+/* 全选 / 删除原来用 ghost（无边框无底色），在触摸屏上看着就是两个词，
+   不像能点的东西。给一层细边框，让它读起来是按钮，又不抢主按钮的戏。
+   选择器必须带 .ghost：.setup-btn.ghost 在文件后面，同权重会把它盖掉。 */
+.setup-roster-tools .setup-btn.ghost{
+  border-width:.22vmin;border-color:#C9B79E;background:#FFFDF6;
+  box-shadow:none;font-size:2vmin;padding:1.1vmin 1.9vmin;color:#4A3524;
+}
+.setup-roster-tools .setup-btn.ghost:hover:not(:disabled){border-color:#B0803C;background:#FFF1CC}
+.setup-btn-line{
+  border-width:.22vmin;border-color:#C9B79E;background:#FFFDF6;
+  box-shadow:none;font-size:2vmin;padding:1.1vmin 1.9vmin;
+}
+.setup-roster-list{
+  display:flex;flex-wrap:wrap;gap:.9vmin;align-content:flex-start;
+  max-height:30vmin;overflow:auto;
+  padding:1.4vmin;border:.26vmin solid #C9B79E;border-radius:1vmin;background:#FFFDF6;
+}
+.setup-roster-item{
+  font:inherit;font-size:2vmin;line-height:1;font-weight:700;color:#31231A;
+  padding:1.1vmin 1.4vmin;border-radius:.9vmin;cursor:pointer;
+  border:.26vmin solid #C9B79E;background:#FFF8E6;
+}
+.setup-roster-item:hover{border-color:#B0803C;background:#FFF1CC}
+.setup-roster-item.on{background:#FFD64F;border-color:#B0803C;box-shadow:inset 0 0 0 .2vmin #B0803C}
+.setup-roster-item.off{color:#8A7A66;background:#F3EDE2;border-style:dashed}
+.setup-roster-item.on.off{background:#FFE9AE}
+.setup-roster-tag{margin-left:.7vmin;font-size:1.6vmin;font-weight:600;color:#8A6A3E}
+.setup-roster-add{display:flex;gap:1.2vmin;margin:1.2vmin 0;flex-wrap:wrap}
+.setup-roster-new{
+  flex:1 1 24vmin;min-width:18vmin;
+  font-family:inherit;font-size:2.1vmin;font-weight:600;color:#31231A;
+  background:#FFFDF6;border:.26vmin solid #C9B79E;border-radius:1vmin;
+  padding:1.2vmin 1.5vmin;outline:none;
+}
+.setup-roster-new:focus{border-color:#3A2A1E;box-shadow:0 0 0 .3vmin rgba(255,214,79,.7)}
+.setup-roster-bar{margin-top:.6vmin}
 /* 文件选择框藏在「从表格文件导入」按钮后面，老师看到的是一个按钮 */
 .setup-roster-file{position:fixed;left:-200px;top:0;width:1px;height:1px;opacity:0}
+/* 名单的确认框：只做一件事——把改动摆出来，点一次确定 */
+.setup-modal{
+  position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;
+  background:rgba(24,16,10,.62);padding:4vmin;
+}
+.setup-modal-card{
+  width:min(96vmin,92vw);max-height:86vh;overflow:auto;
+  background:#FFFDF6;border:.3vmin solid #B0803C;border-radius:1.6vmin;
+  padding:2.4vmin 2.6vmin;box-shadow:0 1.6vmin 4vmin rgba(0,0,0,.4);
+}
+.setup-modal-h{margin:0 0 1.4vmin;font-size:2.6vmin;font-weight:900;color:#31231A}
+.setup-modal-line{margin:0 0 .9vmin;font-size:2.1vmin;line-height:1.6;color:#3B2B1F}
+.setup-modal-add{color:#2F6B3A;font-weight:700}
+.setup-modal-del{color:#A33A2A;font-weight:700}
+.setup-modal-info{color:#6B5545}
+.setup-modal-check{
+  display:flex;align-items:flex-start;gap:1.2vmin;margin:1.6vmin 0 .6vmin;
+  font-size:2.05vmin;line-height:1.5;font-weight:700;color:#31231A;cursor:pointer;
+}
+.setup-modal-check input{width:2.6vmin;height:2.6vmin;flex:none;margin:.2vmin 0 0;accent-color:#B0803C}
+.setup-modal-note{margin:0 0 1vmin;font-size:1.85vmin;line-height:1.65;color:#6B5545}
+.setup-modal-bar{display:flex;justify-content:flex-end;gap:1.2vmin;flex-wrap:wrap;margin-top:1.8vmin}
 .setup-import-text{
   width:100%;min-height:14vmin;resize:vertical;
   font-family:inherit;font-size:1.95vmin;line-height:1.55;color:#31231A;

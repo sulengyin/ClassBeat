@@ -343,22 +343,60 @@ check(!/"pending"|"confidence"|"raw"|"selected"|"targetId"|"state"/.test(mergedJ
   "识别元数据只留草稿，不写进岗位对象");
 check(!/"source"\s*:\s*"import"/.test(mergedJson), "岗位对象不带导入来源标记");
 
-/* ---------- B4b：名册修正（只作用于核对，不写回班级数据） ---------- */
+/* ---------- B4b：名单（姓名是唯一键；比较看人，不看顺序） ----------
+   2026-11-23 第二轮真机反馈后重写。原来这里钉的是「同名允许、4 人都留下」，
+   后来定了规则：姓名是全链路（分组、岗位人员、调课、大屏）的唯一键，
+   两条同名会让后半段分不清谁是谁，所以重复即合并——用例跟着改。 */
 const rosterBase = S3._rosterNames().slice();
 const r1 = S3._saveRoster("孙星野\n孔子墨\n李青禾\n李青禾");
-check(r1.ok && r1.n === 4, "修正名单写进本机配置", JSON.stringify(r1));
-check(S3._rosterNames().join("|") === "孙星野|孔子墨|李青禾|李青禾",
+check(r1.ok && r1.n === 3, "同名只留一个人", JSON.stringify(r1));
+check(r1.merged && r1.merged.join("|") === "李青禾",
+  "合并掉的名字要报出来，不能悄悄少一个人", JSON.stringify(r1));
+check(S3._rosterNames().join("|") === "孙星野|孔子墨|李青禾",
   "核对用的是修正后的名单", S3._rosterNames().join("|"));
 check(STORE.config().students[2].id === "s04"
       && STORE.config().students[2].name === "李青禾", "原名单里的 id 保留下来");
+
 const r2 = S3._saveRoster("1. 孙星野\n\n   \n2、孔子墨");
 check(r2.ok && r2.n === 2 && S3._rosterNames().join("|") === "孙星野|孔子墨",
   "行首编号剥掉、空行忽略", S3._rosterNames().join("|"));
 const r3 = S3._saveRoster("  \n");
-check(!r3.ok && r3.why.indexOf("一个姓名") >= 0, "空名单被拒绝", r3.why);
+check(!r3.ok && r3.why.indexOf("一个姓名") >= 0, "全空输入被拒绝", r3.why);
 check(S3._rosterNames().join("|") === "孙星野|孔子墨", "拒绝时不改动原名单");
+
+/* 顺序不同 ≠ 名单变了。少了这条，老师把名单按座位顺序重排一次，
+   系统就会当成「删了全班再重加一遍」，组员映射、岗位人员全跟着抖。 */
+const orderOnly = S3._rosterDiff([{ name: "孔子墨" }, { name: "孙星野" }]);
+check(orderOnly.changed === false && orderOnly.orderOnly === true,
+  "同一批人换个顺序算「没变」", JSON.stringify(orderOnly));
+const oneIn = S3._rosterDiff([{ name: "孙星野" }, { name: "孔子墨" }, { name: "周予安" }]);
+check(oneIn.changed && oneIn.added.join("|") === "周予安" && !oneIn.removed.length,
+  "只加一个人时，added 只报这一个", JSON.stringify(oneIn));
+const oneOut = S3._rosterDiff([{ name: "孙星野" }]);
+check(oneOut.changed && oneOut.removed.join("|") === "孔子墨",
+  "删一个人时，removed 只报这一个", JSON.stringify(oneOut));
+
+/* 「名单是空的」得能存住：否则全选删除再保存，班级数据里那 48 人又回来了 */
+S3._applyRosterList([]);
+check(Array.isArray(STORE.config().students) && !STORE.config().students.length,
+  "空名单照存空数组，不折成「没有名单」", JSON.stringify(STORE.config().students));
+check(S3._rosterNames().length === 0, "空名单时换人没有候选（不回落到班级数据）",
+  S3._rosterNames().join("|"));
+
+/* 导入一批名字时先对比再决定：表里盖住了现有全部人 → 直接并入；
+   有漏（表里没有、名单里有的）→ 可能是补人，也可能是换一整班，让老师定。 */
+const planAdd = S3._rosterImportPlan(["甲", "乙"], [{ name: "甲" }]);
+check(planAdd.direct && planAdd.extra.join("|") === "乙" && !planAdd.missing.length,
+  "表里只多不少 → 直接并进去，不打扰老师", JSON.stringify(planAdd));
+const planSwap = S3._rosterImportPlan(["甲"], [{ name: "甲" }, { name: "乙" }]);
+check(!planSwap.direct && planSwap.missing.join("|") === "乙",
+  "表里少了人 → 不直接并入，把差异摆出来", JSON.stringify(planSwap));
+const planOrder = S3._rosterImportPlan(["乙", "甲"], [{ name: "甲" }, { name: "乙" }]);
+check(planOrder.direct && !planOrder.extra.length && !planOrder.missing.length,
+  "同一批人换个顺序导入 → 没有新增也没有缺失", JSON.stringify(planOrder));
+
 STORE.patchConfig({ students: null });
-check(S3._rosterNames().join("|") === rosterBase.join("|"), "恢复班级名单");
+check(S3._rosterNames().join("|") === rosterBase.join("|"), "删掉本机名单才回落到班级名单");
 
 /* ---------- 作息表 / 班级课表识别 ---------- */
 const timeRows = S3._parseTimeRows(

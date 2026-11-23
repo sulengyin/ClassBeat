@@ -257,28 +257,16 @@
   function rosterOverride() {
     var cfg = root.Store && root.Store.config ? root.Store.config() : null;
     var d = cfg && cfg.students;
-    return Array.isArray(d) && d.length ? d : null;
+    /* 空数组也算「本机有名单，只是空的」——老师把人都删掉了，
+       不能因此回落到班级数据里那 48 个人（那样删了等于没删）。 */
+    return Array.isArray(d) ? d : null;
   }
 
-  /* 这份名单是不是还没落到本机（只来自班级数据） */
-  function rosterFromPkg() { return !rosterOverride(); }
-
+  /* 能在屏上出现的学生（停用的不算）。
+     一律从 rosterAll 派生，别在这儿另写一套过滤——两套过滤迟早给出两个答案。 */
   function rosterNames() {
-    var d = rosterOverride() || (root.RHYTHM_DATA && root.RHYTHM_DATA.students);
-    var list = [];
-    if (Array.isArray(d)) list = d;
-    else if (d && Array.isArray(d.students)) list = d.students;
-    var out = [];
-    list.forEach(function (s) {
-      if (!s) return;
-      if (typeof s === "string") { out.push(s); return; }
-      if (s.active === false) return;
-      /* 走 nameOf 而不是 tidy：tidy 会把对象 String() 成 "[object Object]"，
-         这个名字再进核对流程就成了一个假的「未找到的学生」。 */
-      var nm = nameOf(s.name);
-      if (nm) out.push(nm);
-    });
-    return out.filter(function (n) { return n; });
+    return rosterAll().filter(function (s) { return s.active !== false; })
+      .map(function (s) { return s.name; });
   }
 
   /* 从任意文本里挑出姓名。见过的来源有三种：手打的一行一个、
@@ -314,29 +302,379 @@
     return out;
   }
 
-  /* 把名单写进本机配置（config.students）——这是本班名单的唯一权威。
-     原来那份里的 id / alias 尽量保留（名字没变就能对上，学号不至于丢）；
-     新加的姓名只带姓名，不带学籍信息，也绝不进 roles.json。 */
-  function saveRoster(text) {
-    var src = [];
-    var d = root.RHYTHM_DATA && root.RHYTHM_DATA.students;
-    if (Array.isArray(d)) src = d;
-    else if (d && Array.isArray(d.students)) src = d.students;
-    var byName = {};
-    src.forEach(function (s) {
-      if (s && typeof s === "object" && s.name) byName[tidy(s.name)] = s;
-    });
+  /* ---------- 名单：一条路，一次确认 ----------
 
+     2026-11-23 第二轮真机反馈之后的第二次改法。原来这一页是「一个大文本框 +
+     保存名单」＝整份重写：老师想加三个转来的学生，也得把 45 个名字完整抄一遍，
+     抄错一个就等于把人转走了。旁边那个「恢复成班级数据里的名单」是这种模型的
+     补丁——它的存在恰好说明入口模型不对。
+
+     现在：列表直接可点（增 / 删 / 全选），改动只落在草稿里，点保存或下一步时
+     弹一次框，把「加了谁、删了谁、人数怎么变、删的人牵动几个组」写清楚。
+     不另设「二次确认」「撤销」这些入口：框里说的就是后果，不是「真的要删吗」。
+
+     几条定死的规则（不定死，后面一定会乱）：
+       ① 姓名是唯一键。名单里不允许两条同名——分组、岗位人员、临时调课、
+          大屏显示全按姓名索引，存两条同名，后半段全链路都分不清谁是谁。
+          重复输入即合并；真有同名学生，请老师写成「张伟A / 张伟B」。
+       ② 比较看人，不看顺序。同一批人换个顺序＝没变：不写库、不重排、不弹框。
+       ③ 新加的人一律排在末尾，原有顺序不动（顺序≈学号/座位）。
+       ④ 本机这份是权威。班级数据只在本机还没有名单时当初值，之后不再覆盖；
+          「名单是空的」和「还没有名单」是两件事，前者照存空数组。 */
+
+  /* 名单的全部条目，含已停用的（转走的学生）。
+     停用的也得列出来：藏起来就会出现「名单 48 人、换人只显示 45」这种
+     对不上的账，而老师没法在界面上修。 */
+  function rosterAll() {
+    var d = null;
+    var cfg = root.Store && root.Store.config ? root.Store.config() : null;
+    if (cfg && cfg.students !== undefined && cfg.students !== null) d = cfg.students;
+    else d = root.RHYTHM_DATA && root.RHYTHM_DATA.students;
     var list = [];
-    extractNames(text).forEach(function (name) {
-      var keep = byName[name];
-      list.push(keep
-        ? { id: keep.id, name: name, active: true, alias: keep.alias }
-        : { name: name, active: true });
+    if (Array.isArray(d)) list = d;
+    else if (d && Array.isArray(d.students)) list = d.students;
+
+    var out = [], seen = {};
+    list.forEach(function (s) {
+      if (s == null) return;
+      var o;
+      if (typeof s === "string" || typeof s === "number") {
+        o = { name: tidy(String(s)), active: true };
+      } else {
+        /* 走 nameOf 而不是 tidy：tidy 会把对象 String() 成 "[object Object]"，
+           这串字再进核对流程就成了一个假的「未找到的学生」。 */
+        o = { name: nameOf(s.name), active: s.active !== false };
+        if (s.id != null && String(s.id) !== "") o.id = String(s.id);
+        if (s.alias) o.alias = s.alias;
+      }
+      if (!o.name || o.name === "[object Object]") return;
+      if (seen[o.name]) return;      /* 规则 ① */
+      seen[o.name] = 1;
+      out.push(o);
     });
-    if (!list.length) return { ok: false, why: "至少要有一个姓名。" };
-    root.Store.patchConfig({ students: list });
-    return { ok: true, n: list.length };
+    return out;
+  }
+
+  /* 老师正在改的那一份。null = 还没动过，显示当前名单；
+     空数组是合法草稿（他把人都删了），所以不能用 [] 表示「没动过」。 */
+  function rosterWorking() {
+    var src = state.rosterDraft != null ? state.rosterDraft : rosterAll();
+    return src.map(function (s) {
+      return { name: s.name, active: s.active !== false };
+    });
+  }
+
+  function rosterSetDraft(list) {
+    state.rosterDraft = list.map(function (s) {
+      return { name: s.name, active: s.active !== false };
+    });
+    saveDraft();
+  }
+
+  /* 姓名合并：重复的只留第一次出现的那条（顺序由老师给的那份决定）。 */
+  function mergeNames(names) {
+    var out = [], dup = [], seen = {};
+    (names || []).forEach(function (n) {
+      var nm = tidy(n);
+      if (!nm) return;
+      if (seen[nm]) { if (dup.indexOf(nm) < 0) dup.push(nm); return; }
+      seen[nm] = 1;
+      out.push(nm);
+    });
+    return { names: out, dup: dup };
+  }
+
+  /* 草稿和现状差在哪儿。只比人，不比顺序（规则 ②）。 */
+  function rosterDiff(next) {
+    var cur = rosterAll();
+    var curNames = cur.map(function (s) { return s.name; });
+    var nextNames = (next || []).map(function (s) { return s.name; });
+    var curSet = {}, nextSet = {};
+    curNames.forEach(function (n) { curSet[n] = 1; });
+    nextNames.forEach(function (n) { nextSet[n] = 1; });
+    var added = nextNames.filter(function (n) { return !curSet[n]; });
+    var removed = curNames.filter(function (n) { return !nextSet[n]; });
+    return {
+      added: added,
+      removed: removed,
+      changed: !!(added.length || removed.length),
+      orderOnly: !added.length && !removed.length
+                 && curNames.join("\u0001") !== nextNames.join("\u0001")
+    };
+  }
+
+  /* 这几个姓名在「排班」里被引用了几次：岗位人员 / 岗位分组 / 人群组 /
+     当天临时调整。删名单本身可撤销（名字加回来，组就自动对上了），
+     清掉分组不可撤销——所以要不要清，得老师自己勾，系统不替他决定。 */
+  function rosterRefsOf(names) {
+    var hit = {}, hitList = [];
+    (names || []).forEach(function (n) { if (n) { hit[n] = 1; hitList.push(n); } });
+    var out = { roles: [], groups: [], days: 0, people: hitList };
+    if (!hitList.length) return out;
+    var c = cfg();
+    var doc = c.roles || {};
+    (doc.roles || []).forEach(function (r) {
+      if (!r) return;
+      var n = 0;
+      var pl = localStore().peopleList ? localStore().peopleList(r.people) : (r.people || []);
+      pl.forEach(function (x) { if (hit[x]) n++; });
+      if (r.peopleMap && typeof r.peopleMap === "object") {
+        Object.keys(r.peopleMap).forEach(function (k) {
+          var v = localStore().personNameOf ? localStore().personNameOf(r.peopleMap[k]) : r.peopleMap[k];
+          if (hit[v]) n++;
+        });
+      }
+      if (r.groups && typeof r.groups === "object") {
+        Object.keys(r.groups).forEach(function (k) {
+          var m = (r.groups[k] || []).filter(function (x) { return hit[x]; }).length;
+          if (m) out.groups.push({ where: (r.name || k) + " · " + k, n: m });
+        });
+      }
+      (Array.isArray(r.substitute) ? r.substitute : []).forEach(function (x) {
+        var nm = x && typeof x === "object" ? x.name : x;
+        if (hit[localStore().personNameOf ? localStore().personNameOf(nm) : nm]) n++;
+      });
+      if (n) out.roles.push({ id: r.id, name: r.name || "(未命名岗位)", n: n });
+    });
+    (c.peopleGroups || []).forEach(function (g) {
+      if (!g) return;
+      var m = (g.names || []).filter(function (x) { return hit[x]; }).length;
+      if (m) out.groups.push({ where: "分组「" + (g.name || "未命名") + "」", n: m });
+    });
+    var ov = localStore().allOverrides ? localStore().allOverrides() : {};
+    Object.keys(ov).forEach(function (k) {
+      var o = ov[k] || {}, any = 0;
+      if (o.roles && typeof o.roles === "object") {
+        Object.keys(o.roles).forEach(function (id) {
+          var r = o.roles[id];
+          if (!r || !Array.isArray(r.people)) return;
+          r.people.forEach(function (x) { if (hit[x]) any++; });
+        });
+      }
+      if (any) out.days++;
+    });
+    return out;
+  }
+
+  /* 把「老师看到的这份名单」写进本机配置。空数组也照存（规则 ④）。 */
+  function applyRosterList(list) {
+    var keep = {};
+    rosterAll().forEach(function (s) { keep[s.name] = s; });
+    var out = list.map(function (s) {
+      var old = keep[s.name];
+      var o = { name: s.name, active: s.active !== false };
+      /* 名字没变就把学号/别名留着；新加的人只带姓名，不带任何学籍信息 */
+      if (old && old.id) o.id = old.id;
+      if (old && old.alias) o.alias = old.alias;
+      return o;
+    });
+    root.Store.patchConfig({ students: out });
+    return { ok: true, n: out.length };
+  }
+
+  /* 名字多了截断显示：框里塞 45 个名字没人看得完，看前几个就够判断了。 */
+  function shortList(names, max) {
+    var n = names || [];
+    var lim = max || 6;
+    if (!n.length) return "";
+    if (n.length <= lim) return n.join("、");
+    return n.slice(0, lim).join("、") + " 等 " + n.length + " 人";
+  }
+
+  /* 只做一件事的弹框：把改动摆出来，让老师点一次。
+     不做「真的要删吗」那种二次确认——框里写的必须是后果，不是重复一遍问题。 */
+  function modal(opts) {
+    var wrap = el("div", "setup-modal");
+    var card = el("div", "setup-modal-card");
+    card.appendChild(el("h4", "setup-modal-h", opts.title || ""));
+    (opts.lines || []).forEach(function (ln) {
+      if (!ln || !ln.text) return;
+      card.appendChild(el("p", "setup-modal-line setup-modal-" + (ln.k || "info"), ln.text));
+    });
+    var checked = false;
+    if (opts.check) {
+      var lab = el("label", "setup-modal-check");
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.addEventListener("change", function () { checked = cb.checked; });
+      lab.appendChild(cb);
+      lab.appendChild(el("span", "", opts.check.label));
+      card.appendChild(lab);
+      if (opts.check.note) card.appendChild(el("p", "setup-modal-note", opts.check.note));
+    }
+    var bar = el("div", "setup-modal-bar");
+    (opts.choices || []).forEach(function (ch) {
+      var b = el("button", "setup-btn " + (ch.primary ? "primary" : "ghost"), ch.label);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        close();
+        if (ch.act) ch.act(checked);
+      });
+      bar.appendChild(b);
+    });
+    card.appendChild(bar);
+    wrap.appendChild(card);
+    box.appendChild(wrap);
+    function close() {
+      /* 优先 Element.remove()：老一体机的 Chromium 也支持，
+         比 parentNode.removeChild 少一次判空（测试桩也只实现了 remove）。 */
+      if (typeof wrap.remove === "function") { wrap.remove(); return; }
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    }
+    return { close: close };
+  }
+
+  /* 提交名单：没变就直接过；变了就弹框，说清 +N / −M / 人数，删的人牵动几个组。 */
+  function commitRoster(after) {
+    var next = rosterWorking();
+    var d = rosterDiff(next);
+    if (!d.changed) {
+      state.rosterDraft = null;
+      state.rosterPick = [];
+      state.rosterFlash = d.orderOnly
+        ? "名单没变，只是顺序不同——按原来的顺序用。"
+        : "名单没变。";
+      saveDraft();
+      render();
+      if (after) after();
+      return true;
+    }
+
+    var refs = rosterRefsOf(d.removed);
+    var hitRoles = refs.roles.filter(function (r) { return r.n; });
+    var lines = [];
+    if (d.added.length) {
+      lines.push({ k: "add", text: "加上 " + d.added.length + " 人：" + shortList(d.added) });
+    }
+    if (d.removed.length) {
+      lines.push({ k: "del", text: "删掉 " + d.removed.length + " 人：" + shortList(d.removed) });
+    }
+    lines.push({ k: "info", text: rosterAll().length + " 人 → " + next.length + " 人" });
+
+    var used = hitRoles.length;
+    var check = null;
+    if (used) {
+      var where = hitRoles.map(function (r) { return r.name; }).slice(0, 4).join("、");
+      check = {
+        label: "同时把他们从岗位和分组里清掉（" + used + " 个岗位/组）",
+        note: "不勾：这些岗位留着原样，换人时会标「缺 N」，名字加回来就自动对上。"
+              + "勾上：直接从「" + where + (used > 4 ? " 等" : "") + "」里删掉，删了加回名字也回不到原来的位置。"
+      };
+    }
+
+    var saveOne = function (prune) {
+      var list = next;
+      applyRosterList(list);
+      if (prune && d.removed.length && root.Store.prunePeople) {
+        root.Store.prunePeople(d.removed);
+      }
+      state.rosterDraft = null;
+      state.rosterPick = [];
+      state.rosterFlash = "已保存 " + list.length + " 人。"
+        + (prune ? "相关岗位和分组里也一并清掉了。" : "");
+      saveDraft();
+      render();
+      if (after) after();
+    };
+
+    /* 取消在左、确定在右；勾选项只影响确定那一下。 */
+    modal({
+      title: "确认一下这份名单",
+      lines: lines,
+      check: check,
+      choices: [{ label: "先不改" }, { label: "确定保存", primary: true, act: saveOne }]
+    });
+    return false;
+  }
+
+  /* 导入一批名字。规则：先对比，再决定要不要问老师。
+     表里盖住了现有全部人 → 只是补人，直接并入，不打扰；
+     否则（有人不在表里）→ 可能是「补几个」也可能是「换一整班」，
+     这两种后果差 45 个人，必须让老师看一眼再定。 */
+  /* 导入前先算清楚：这次是「只补人」还是「表比名单少」。
+     direct＝表里盖住了现有全部人（有增无减），并进去信息无损，不用问；
+     否则可能是「补几个」也可能是「换一整班」，两种后果差几十个人，
+     必须把差异摆出来让老师定——这就是「先对比，再决策」。 */
+  function rosterImportPlan(picked, list) {
+    var curNames = (list || []).map(function (s) { return s.name; });
+    var curSet = {}, pickSet = {};
+    curNames.forEach(function (n) { curSet[n] = 1; });
+    picked.forEach(function (n) { pickSet[n] = 1; });
+    var extra = [];
+    picked.forEach(function (n) { if (!curSet[n] && extra.indexOf(n) < 0) extra.push(n); });
+    var missing = curNames.filter(function (n) { return !pickSet[n]; });
+    return {
+      extra: extra,
+      missing: missing,
+      direct: !missing.length,
+      curCount: curNames.length,
+      pickCount: picked.length
+    };
+  }
+
+  function importNames(picked, sourceLabel) {
+    var list = rosterWorking();
+    var plan = rosterImportPlan(picked, list);
+    var extra = plan.extra;
+    var missing = plan.missing;
+    var label = sourceLabel || "这份表";
+
+    if (plan.direct) {
+      if (!extra.length) {
+        state.rosterFlash = "「" + label + "」里的人名单里都有，没有新增。";
+        saveDraft();
+        render();
+        return;
+      }
+      rosterSetDraft(list.concat(extra.map(function (n) { return { name: n, active: true }; })));
+      state.rosterFlash = "从「" + label + "」加入 " + extra.length + " 人。点「保存名单」才算数。";
+      saveDraft();
+      render();
+      return;
+    }
+
+    var curCount = plan.curCount;
+    modal({
+      title: "这份表和现在的名单不一样",
+      lines: [
+        { k: "info", text: "表里 " + plan.pickCount + " 人；名单里现在 " + curCount + " 人。" },
+        { k: "add", text: "只有表里有的 " + extra.length + " 人"
+                         + (extra.length ? "：" + shortList(extra) : "") },
+        { k: "del", text: "表里没有、名单里有的 " + missing.length + " 人"
+                         + (missing.length ? "：" + shortList(missing) : "") }
+      ],
+      choices: [
+        { label: "先不导入" },
+        {
+          label: "并进去（" + curCount + " → " + (curCount + extra.length) + "）",
+          primary: true,
+          act: function () {
+            rosterSetDraft(list.concat(extra.map(function (n) { return { name: n, active: true }; })));
+            state.rosterFlash = "从「" + label + "」加入 " + extra.length + " 人。点「保存名单」才算数。";
+            saveDraft();
+            render();
+          }
+        },
+        {
+          label: "换成导入的 " + plan.pickCount + " 人",
+          act: function () {
+            rosterSetDraft(picked.map(function (n) { return { name: n, active: true }; }));
+            state.rosterFlash = "已换成「" + label + "」里的 " + plan.pickCount + " 人。点「保存名单」才算数。";
+            saveDraft();
+            render();
+          }
+        }
+      ]
+    });
+  }
+
+  /* 整份替换（内部用）：导入面板与测试走它，界面上的增删不直接调。
+     重复姓名按规则 ① 合并，并把合并掉的名字报回去。 */
+  function saveRoster(text) {
+    var m = mergeNames(extractNames(text));
+    if (!m.names.length) return { ok: false, why: "至少要有一个姓名。" };
+    var r = applyRosterList(m.names.map(function (n) { return { name: n, active: true }; }));
+    return { ok: true, n: r.n, merged: m.dup };
   }
 
   function decodeEntities(s) {
@@ -1384,9 +1722,10 @@
       importRows: [],
       importFlash: "",
       /* null = 老师还没动过名单，页面显示当前名单；
-         有字符串 = 改了还没保存（草稿）。不能用 "" 表示「没改」，
-         否则老师真的把名单清空时，会和「没动过」分不开。 */
-      rosterText: null,
+         有数组 = 改了还没保存（草稿）。空数组是合法草稿（他把人都删了），
+         所以不能用 [] 表示「没动过」。 */
+      rosterDraft: null,
+      rosterPick: [],
       rosterFlash: "",
       timeText: "",
       timeRows: [],
@@ -1431,7 +1770,16 @@
     if (!("importHtml" in s)) s.importHtml = "";
     if (!("importRows" in s)) s.importRows = [];
     if (!("importFlash" in s)) s.importFlash = "";
-    if (!("rosterText" in s)) s.rosterText = null;
+    /* 老草稿存的是整段文本（rosterText），换成列表；不再需要那个字段。 */
+    if (!Array.isArray(s.rosterDraft)) {
+      s.rosterDraft = typeof s.rosterText === "string"
+        ? mergeNames(extractNames(s.rosterText)).names.map(function (n) {
+            return { name: n, active: true };
+          })
+        : null;
+    }
+    delete s.rosterText;
+    if (!Array.isArray(s.rosterPick)) s.rosterPick = [];
     if (!("rosterFlash" in s)) s.rosterFlash = "";
     if (!("timeText" in s)) s.timeText = "";
     if (!("timeRows" in s)) s.timeRows = [];
@@ -1558,35 +1906,147 @@
      而且入口叫「从岗位表导入」，没人会想到名单在里面。 */
   function pageRoster() {
     var p = el("div", "setup-page on");
-    var names = rosterNames();
+    var list = rosterWorking();
+    var cur = rosterAll();
+    var d = rosterDiff(list);
+    var live = list.filter(function (s) { return s.active !== false; });
 
     p.appendChild(el("h3", "setup-h", "这个班的学生"));
     p.appendChild(el("p", "setup-p",
-      !names.length
-        ? "还没有名单。换人时会找不到任何学生。"
-        : rosterFromPkg()
-          ? "班级数据里带着 " + names.length + " 人，还没保存。"
-          : "本机名单，现在 " + names.length + " 人。换人时打一个字就能找到。"));
-    p.appendChild(el("p", "setup-p",
-      "保存后，换人和大屏才认这份名单。"));
+      !cur.length
+        ? "还没有名单。换人时会找不到任何学生——在下面加第一个。"
+        : "点一下选中，再点「删除选中」；新名字加在最后。改完点「保存名单」或「下一步」，会先让你核对一遍。"));
 
-    /* 读取顺序：草稿里改过就用草稿，没改过就用当前名单。
-       null 表示「老师还没动过」，不是「名单为空」。 */
-    var text = state.rosterText != null ? state.rosterText : names.join("\n");
-    var ta = el("textarea", "setup-import-text setup-roster-input");
-    ta.rows = 10;
-    ta.value = text;
-    ta.placeholder = "一行一个姓名，例如：\n赵子墨\n钱嘉禾\n也可以从 Excel 复制整列粘进来";
-    ta.addEventListener("input", function () {
-      state.rosterText = ta.value;
-      saveDraft();
+    /* 状态行：改了什么必须看得见，不能指望老师自己记。 */
+    var status = el("div", "setup-roster-status");
+    var countEl = el("span", "setup-roster-count", "");
+    var pickEl = el("span", "setup-roster-picked", "");
+    status.appendChild(countEl);
+    status.appendChild(pickEl);
+    /* 改了又不想改的出口。它不是「防误操作的二次确认」，
+       而是任何可编辑列表都该有的「回到现状」——没有它，删错了
+       只能一个个把名字重新打回去。 */
+    if (d.changed) {
+      var undoBtn = el("button", "setup-roster-undo", "放弃改动");
+      undoBtn.type = "button";
+      undoBtn.addEventListener("click", function () {
+        state.rosterDraft = null;
+        state.rosterPick = [];
+        state.rosterFlash = "已回到原来的名单，什么都没改。";
+        saveDraft();
+        render();
+      });
+      status.appendChild(undoBtn);
+    }
+    p.appendChild(status);
+
+    var tools = el("div", "setup-roster-tools");
+    var allBtn = el("button", "setup-btn ghost setup-roster-all", "全选");
+    allBtn.type = "button";
+    var delBtn = el("button", "setup-btn ghost setup-roster-del", "删除选中");
+    delBtn.type = "button";
+    tools.appendChild(allBtn);
+    tools.appendChild(delBtn);
+    p.appendChild(tools);
+
+    var board = el("div", "setup-roster-list");
+    var items = [];
+    if (!list.length) board.appendChild(el("p", "setup-note", "名单是空的。"));
+    list.forEach(function (s) {
+      var b = el("button", "setup-roster-item" + (s.active === false ? " off" : ""), s.name);
+      b.type = "button";
+      if (s.active === false) b.appendChild(el("span", "setup-roster-tag", "已停用"));
+      b.addEventListener("click", function () {
+        var i = state.rosterPick.indexOf(s.name);
+        if (i >= 0) state.rosterPick.splice(i, 1);
+        else state.rosterPick.push(s.name);
+        b.classList.toggle("on", state.rosterPick.indexOf(s.name) >= 0);
+        paintSel();
+      });
+      items.push({ name: s.name, el: b });
+      board.appendChild(b);
     });
-    p.appendChild(ta);
+    p.appendChild(board);
 
-    var bar = el("div", "setup-actions setup-roster-bar");
+    /* 选中状态就地更新，不整页重画：48 人的列表每次点一下都跳回顶部，
+       在触摸屏上等于没法多选。 */
+    function paintSel() {
+      var picked = state.rosterPick.length;
+      countEl.textContent = d.changed
+        ? "未保存（" + [d.added.length ? "+" + d.added.length : "",
+                        d.removed.length ? "−" + d.removed.length : ""]
+            .filter(function (x) { return !!x; }).join(" ") + " 人）"
+        : "现在 " + live.length + " 人";
+      pickEl.textContent = picked ? "已选 " + picked + " 人" : "";
+      allBtn.textContent = picked && picked === list.length ? "取消全选" : "全选";
+      delBtn.textContent = picked ? "删除选中 " + picked + " 人" : "删除选中";
+      delBtn.disabled = !picked;
+    }
 
-    /* 传文件：读进来先填进框里让老师看一眼，不当场写库——
-       万一把隔壁班的表读进来，老师还有机会发现。 */
+    allBtn.addEventListener("click", function () {
+      var allOn = list.length > 0 && state.rosterPick.length === list.length;
+      state.rosterPick = allOn ? [] : list.map(function (s) { return s.name; });
+      items.forEach(function (it) {
+        it.el.classList.toggle("on", state.rosterPick.indexOf(it.name) >= 0);
+      });
+      paintSel();
+    });
+
+    delBtn.addEventListener("click", function () {
+      var kill = {}, n = state.rosterPick.length;
+      state.rosterPick.forEach(function (x) { kill[x] = 1; });
+      rosterSetDraft(list.filter(function (s) { return !kill[s.name]; }));
+      state.rosterPick = [];
+      state.rosterFlash = "已从待保存名单里移除 " + n + " 人。点「保存名单」才算数。";
+      render();
+    });
+
+    var msgEl = el("p", "setup-msg ok", state.rosterFlash || "");
+
+    /* 加人：打名字回车就加，也可以一次粘一列。加进来的永远排在末尾，
+       原有顺序不动（顺序≈学号/座位，重排一次老师就得重新认一遍）。 */
+    var addBox = el("div", "setup-roster-add");
+    var input = document.createElement("input");
+    input.className = "setup-input setup-roster-new";
+    input.type = "text";
+    input.placeholder = "打一个姓名，回车加入；也可一次粘多个";
+    var addBtn = el("button", "setup-btn setup-roster-addbtn", "加入");
+    addBtn.type = "button";
+    function doAdd() {
+      var m = mergeNames(extractNames(input.value));
+      if (!m.names.length) {
+        input.value = "";
+        msgEl.textContent = "没读出名来——一行一个，或从表格里整列复制过来。";
+        return;
+      }
+      var have = {};
+      list.forEach(function (s) { have[s.name] = 1; });
+      var fresh = m.names.filter(function (n) { return !have[n]; });
+      if (!fresh.length) {
+        input.value = "";
+        msgEl.textContent = "「" + shortList(m.names, 3) + "」已经在名单里了。";
+        return;
+      }
+      rosterSetDraft(list.concat(fresh.map(function (n) { return { name: n, active: true }; })));
+      state.rosterFlash = "加入 " + fresh.length + " 人"
+        + (m.dup.length ? "（「" + shortList(m.dup, 2) + "」重复，按一个人算）" : "")
+        + "。点「保存名单」才算数。";
+      render();
+    }
+    addBtn.addEventListener("click", doAdd);
+    input.addEventListener("keydown", function (e) {
+      if (e && e.key === "Enter") {
+        if (e.preventDefault) e.preventDefault();
+        doAdd();
+      }
+    });
+    addBox.appendChild(input);
+    addBox.appendChild(addBtn);
+
+    /* 传文件：读进来先跟现在这份比，比完才决定并入还是问老师。
+       不当场写库——万一把隔壁班的表读进来，老师还有机会发现。
+       它和「加入」是同一件事的两种输入方式，所以并在一行里，
+       不单独占一行贴到页脚边上（1366×768 上那一行正好被页脚切掉）。 */
     var file = document.createElement("input");
     file.type = "file";
     file.accept = ".xlsx,.xlsm,.docx";
@@ -1594,17 +2054,14 @@
     file.addEventListener("change", function () {
       readPickedFile(file).then(function (res) {
         if (!res) return;
-        var picked = extractNames(res.text);
-        if (!picked.length) {
+        var m = mergeNames(extractNames(res.text));
+        if (!m.names.length) {
           state.rosterFlash = "「" + res.name + "」里没读到姓名，换个文件或直接粘贴。";
           saveDraft();
           render();
           return;
         }
-        state.rosterText = picked.join("\n");
-        state.rosterFlash = "从「" + res.name + "」读到 " + picked.length + " 个姓名，确认无误后点「保存名单」。";
-        saveDraft();
-        render();
+        importNames(m.names, res.name);
       }).catch(function (err) {
         state.rosterFlash = "读不了这个文件：" + (err && err.message ? err.message : "格式不对");
         saveDraft();
@@ -1612,58 +2069,45 @@
       });
       file.value = "";
     });
-    var pick = el("button", "setup-btn setup-roster-pick", "从表格文件导入");
+    var pick = el("button", "setup-btn setup-btn-line setup-roster-pick", "从表格文件导入");
     pick.type = "button";
     pick.addEventListener("click", function () { file.click(); });
-    bar.appendChild(pick);
-    bar.appendChild(file);
+    addBox.appendChild(pick);
+    addBox.appendChild(file);
+    p.appendChild(addBox);
 
-    var save = el("button", "setup-btn primary setup-roster-save", "保存名单");
-    save.type = "button";
-    save.addEventListener("click", function () {
-      var r = saveRoster(ta.value);
-      if (!r.ok) {
-        state.rosterFlash = r.why;
-        saveDraft();
-        render();
-        return;
-      }
-      state.rosterText = null;      /* 存下了，草稿就不必再记一份 */
-      state.rosterFlash = "已保存 " + r.n + " 人。";
-      saveDraft();
-      render();
-    });
-    bar.appendChild(save);
-    p.appendChild(bar);
-
-    if (state.rosterFlash) p.appendChild(el("p", "setup-msg ok", state.rosterFlash));
-
-    /* 本机改过名单才给「恢复」：回到班级数据里那一份。 */
-    if (rosterOverride()) {
-      var back = el("button", "setup-btn ghost setup-roster-reset", "恢复成班级数据里的名单");
-      back.type = "button";
-      back.addEventListener("click", function () {
-        root.Store.patchConfig({ students: null });
-        state.rosterText = null;
-        state.rosterFlash = "已恢复班级数据里的名单。";
-        saveDraft();
-        render();
-      });
-      p.appendChild(back);
+    var bar = el("div", "setup-actions setup-roster-bar");
+    if (d.changed) {
+      var save = el("button", "setup-btn primary setup-roster-save", "保存名单（" + list.length + " 人）");
+      save.type = "button";
+      save.addEventListener("click", function () { commitRoster(); });
+      bar.appendChild(save);
+      p.appendChild(bar);
     }
+    p.appendChild(msgEl);
+
+    paintSel();
     return p;
   }
 
+  /* 从这一步往下走。有改动就弹框核对（return false 让底部别自己跳页），
+     没改动就直接过；只差顺序的草稿直接丢掉——顺序不同不算改动（规则 ②）。 */
   function leaveRoster() {
-    /* 改了名单没点保存就往下走，替老师存掉再走：
-       名单是数据不是草稿，丢了以后换人那儿就找不到人。 */
-    if (state.rosterText == null) return true;
-    if (state.rosterText === rosterNames().join("\n")) return true;
-    if (!state.rosterText.trim()) return true;
-    var r = saveRoster(state.rosterText);
-    if (!r.ok) return r.why;
-    state.rosterText = null;
-    return true;
+    var d = rosterDiff(rosterWorking());
+    if (!d.changed) {
+      if (state.rosterDraft) {
+        state.rosterDraft = null;
+        state.rosterPick = [];
+        saveDraft();
+      }
+      return true;
+    }
+    commitRoster(function () {
+      state.step++;
+      saveDraft();
+      render();
+    });
+    return false;
   }
 
   function pageTime() {
@@ -2790,10 +3234,16 @@
       next.addEventListener("click", function () {
         var step = STEPS[state.step];
         var why = step && step.canLeave ? step.canLeave() : true;
-        if (why !== true) { alertBox(why); return; }
-        state.step++;
-        saveDraft();
-        render();
+        if (why === true) {
+          state.step++;
+          saveDraft();
+          render();
+          return;
+        }
+        /* false = 这一步自己开了弹框（比如名单要核对），等老师在框里点；
+           字符串 = 一句话说清为什么走不了。以前只认 true/false，
+           两步都只能靠 alert 说一句，弹框那条路就堵死了。 */
+        if (typeof why === "string" && why) alertBox(why);
       });
       f.appendChild(next);
     } else {
@@ -3127,6 +3577,13 @@
     _matchPeople: function (text, roster) { return matchPeople(text, roster || rosterNames()); },
     _mergeRoleImport: mergeRoleImport,
     _rosterNames: rosterNames,
+    _rosterAll: rosterAll,
+    _extractNames: extractNames,
+    _mergeNames: mergeNames,
+    _applyRosterList: applyRosterList,
+    _rosterDiff: rosterDiff,
+    _rosterImportPlan: rosterImportPlan,
+    _rosterRefs: rosterRefsOf,
     _saveRoster: saveRoster,
     _parseTimeRows: parseTimeRows,
     _blocksFromTimeRows: blocksFromTimeRows,

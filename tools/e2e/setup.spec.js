@@ -83,7 +83,7 @@ test("空配置打开就进向导，不碰命令行也能配出当天的屏", as
 
   /* 空包没有名单。这一页必须仍然给得出录入框——以前名册为空时整块 return，
      老师被指到这儿却发现无处可填，问题就卡死在这里。 */
-  await expect(page.locator(".setup-roster-input")).toBeVisible();
+  await expect(page.locator(".setup-roster-new")).toBeVisible();
   await next(page);
 
   // 空包没有作息可改，这一页应该先套上一套模板，而不是一张空表

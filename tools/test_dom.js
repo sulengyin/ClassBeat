@@ -1517,20 +1517,101 @@ global.Remote.info.phone = "";
      那条路要走六层，入口还叫「从岗位表导入」，老师根本想不到名单在那儿。 */
   const stepTexts = box.querySelectorAll(".setup-step").map(s => s.textContent);
   check(/名单/.test(stepTexts[1] || ""), "第二步是名单", stepTexts.join(" / "));
-  check(box.querySelectorAll(".setup-roster-pick").length === 1
-        && box.querySelector(".setup-roster-save").textContent === "保存名单"
-        && box.querySelector(".setup-import-text.setup-roster-input"),
-    "名单步能传表格文件、也能直接粘贴");
+
+  /* 名单页是「列表 + 勾选」，不是一个装整份名单的大文本框：
+     文本框只能整份重写，老师想加三个转来的学生也得把 45 个名字抄一遍。 */
+  const roster0 = box.querySelectorAll(".setup-roster-item").length;
+  check(roster0 > 0, "名单页把每个学生列成一条（可点选）", String(roster0));
+  check(box.querySelectorAll(".setup-roster-pick").length === 1, "名单步能选表格文件");
+  check(!!box.querySelector(".setup-roster-new"), "名单步有「打一个姓名」的输入框");
+  check(!box.querySelector(".setup-roster-save"),
+    "没改动时不摆「保存名单」——省掉一个点了也没事的按钮");
 
   /* 从 Excel 整列复制会带上表头和序号。它们不是学生：
      真放进去，换人时候选里会多出一个叫「姓名」的假人。 */
-  const rosterTa = box.querySelector(".setup-roster-input");
-  rosterTa.value = "序号\t姓名\t性别\n1\t孙星野\t男\n2\t孔子墨\t男\n3\t周予宁\t男";
-  rosterTa._h.input();
-  box.querySelector(".setup-roster-save")._h.click();
-  check(/已保存 3 人/.test(box.querySelector(".setup-msg").textContent),
-    "名单页从表格粘贴只认姓名，表头与序号不进名单",
+  const addInput = box.querySelector(".setup-roster-new");
+  addInput.value = "序号\t姓名\t性别\n1\t测试甲\t男\n2\t测试乙\t男\n3\t测试丙\t男";
+  box.querySelector(".setup-roster-addbtn")._h.click();
+  check(/加入 3 人/.test(box.querySelector(".setup-msg").textContent),
+    "从表格整列粘进来只认姓名，表头与序号不进名单",
     box.querySelector(".setup-msg").textContent);
+  check(box.querySelectorAll(".setup-roster-item").length === roster0 + 3,
+    "加完当场出现在列表里（不用再找一次）",
+    String(box.querySelectorAll(".setup-roster-item").length));
+
+  /* 保存只弹一次框。框里写的是后果：加了谁、人数怎么变。 */
+  const saveBtn = box.querySelector(".setup-roster-save");
+  check(!!saveBtn && /保存名单/.test(saveBtn.textContent),
+    "有改动才出现「保存名单（N 人）」", saveBtn ? saveBtn.textContent : "(没有)");
+  saveBtn._h.click();
+  const dlg = box.querySelector(".setup-modal");
+  check(!!dlg, "点保存先弹一次确认框，不直接写库");
+  check(/加上 3 人/.test(dlg.textContent), "框里写明加了谁", dlg.textContent);
+  check(/\d+ 人 → \d+ 人/.test(dlg.textContent), "框里写明人数怎么变", dlg.textContent);
+  check(!/确定保存/.test(box.querySelector(".setup-msg").textContent),
+    "框还没点，什么都不该写进去");
+  dlg.querySelectorAll(".setup-btn").filter(b => b.textContent === "确定保存")[0]._h.click();
+  check(!box.querySelector(".setup-modal"), "点确定后框自己关掉");
+  check(/已保存/.test(box.querySelector(".setup-msg").textContent),
+    "确认之后才写库", box.querySelector(".setup-msg").textContent);
+  check(global.Store.config().students.length === roster0 + 3,
+    "名单真的落库了", String(global.Store.config().students.length));
+
+  /* 全选 → 取消全选：48 个人逐个点不现实，全选是"换一整班"的第一步 */
+  const allBtn = box.querySelector(".setup-roster-all");
+  allBtn._h.click();
+  check(box.querySelectorAll(".setup-roster-item.on").length === roster0 + 3,
+    "全选选中所有人",
+    String(box.querySelectorAll(".setup-roster-item.on").length));
+  check(allBtn.textContent === "取消全选", "全选后按钮变成「取消全选」", allBtn.textContent);
+  allBtn._h.click();
+  check(box.querySelectorAll(".setup-roster-item.on").length === 0, "再点一次取消全选");
+
+  /* 选中一个人 → 删除选中。删的是"待保存的名单"，没点保存不算数。
+     挑一个确实挂在岗位/分组里的人，才能验到「要不要一起清掉」那一步。 */
+  const roleJson = JSON.stringify(global.Runtime.config().roles || {});
+  const rosterItems = box.querySelectorAll(".setup-roster-item");
+  const targetItem = rosterItems.filter(
+    it => roleJson.indexOf(it.textContent.replace("已停用", "")) >= 0)[0] || rosterItems[0];
+  targetItem._h.click();
+  check(/已选 1 人/.test(box.querySelector(".setup-roster-picked").textContent),
+    "点一下就选中，不用先点「编辑」",
+    box.querySelector(".setup-roster-picked").textContent);
+  const delBtn = box.querySelector(".setup-roster-del");
+  check(/删除选中 1 人/.test(delBtn.textContent), "删除按钮跟着选中数走", delBtn.textContent);
+  delBtn._h.click();
+  check(box.querySelectorAll(".setup-roster-item").length === roster0 + 2,
+    "删掉后列表立刻少一条",
+    String(box.querySelectorAll(".setup-roster-item").length));
+  check(/移除 1 人/.test(box.querySelector(".setup-msg").textContent),
+    "删了还没保存，要说清楚（只差一步）",
+    box.querySelector(".setup-msg").textContent);
+
+  /* 删掉的那个人可能正挂在分组/岗位上。要不要顺手清掉，是老师的事——
+     框里给一个勾选项，默认不勾（删名单可撤销，清分组不可逆）。 */
+  box.querySelector(".setup-roster-save")._h.click();
+  const delDlg = box.querySelector(".setup-modal");
+  check(!!delDlg && /删掉 1 人/.test(delDlg.textContent), "删人时框里写明删了谁",
+    delDlg ? delDlg.textContent : "(没有框)");
+  check(!!delDlg.querySelector(".setup-modal-check"),
+    "删的人若在岗位/分组里，框里问一句「要不要一起清掉」");
+  delDlg.querySelectorAll(".setup-btn").filter(b => b.textContent === "确定保存")[0]._h.click();
+  check(global.Store.config().students.length === roster0 + 2, "删完确认后落库",
+    String(global.Store.config().students.length));
+
+  /* 改错了要能回去。这不是「二次确认」，是任何可编辑列表都该有的出口：
+     没有它，删错一个人只能把名字重新打一遍。 */
+  const afterSave = box.querySelectorAll(".setup-roster-item").length;
+  box.querySelector(".setup-roster-new").value = "临时甲";
+  box.querySelector(".setup-roster-addbtn")._h.click();
+  check(box.querySelectorAll(".setup-roster-item").length === afterSave + 1,
+    "加人后列表多一条");
+  check(!!box.querySelector(".setup-roster-undo"), "有改动时才出现「放弃改动」");
+  box.querySelector(".setup-roster-undo")._h.click();
+  check(box.querySelectorAll(".setup-roster-item").length === afterSave,
+    "放弃改动回到原样", String(box.querySelectorAll(".setup-roster-item").length));
+  check(!box.querySelector(".setup-roster-save"), "放弃之后不残留「保存名单」");
+
   next()._h.click();
 
   const tpls = box.querySelectorAll(".setup-tpl");
@@ -1830,8 +1911,8 @@ global.Remote.info.phone = "";
   next()._h.click();
   /* 空包没有名单。这一页必须仍然给得出录入框：
      以前名册为空时整块 return，老师被指到这儿却发现无处可填。 */
-  check(!!box.querySelector(".setup-roster-input"),
-    "空包进到名单页仍然有录入框，不会把人堵住");
+  check(!!box.querySelector(".setup-roster-new"),
+    "空包进到名单页仍然有加人的地方，不会把人堵住");
   next()._h.click();
   check(box.querySelectorAll(".setup-row").length > 20,
     "空包第三步已经套上一套模板，不是空表",

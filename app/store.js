@@ -243,7 +243,8 @@
   /* 把一个姓名加进本班名单。换人面板搜不到人时用它就地补——
      为了加一个人要走完整个向导（还得先找到名单在哪一步），成本高到
      老师会直接放弃，然后这个人的名字就永远进不了名单。
-     同名允许：一个班真可能有同名学生，合并掉等于凭空少一个人。 */
+     同名视为同一个人：姓名是这套系统里人的唯一键（分组、岗位人员、
+     调课、大屏全按姓名索引），存两条同名，后半段全链路都分不清谁是谁。 */
   function addStudent(name) {
     var n = personNameOf(name);
     if (!n || n === "[object Object]") return { ok: false, why: "这个名字不能用。" };
@@ -254,6 +255,99 @@
     list.push({ name: n, active: true });
     patchConfig({ students: list });
     return { ok: true, existed: false, n: list.length };
+  }
+
+  /* 把几个姓名从「排班」里彻底拿掉：岗位人员、岗位分组、人群组、当天临时调整。
+     向导里删名单是默认不做这一步的——删名单本身可撤销（名字加回来，
+     组就自动对上了），清掉分组不可撤销。所以只由老师勾选后才调用。 */
+  function prunePeople(names) {
+    var hit = {};
+    (Array.isArray(names) ? names : []).forEach(function (n) {
+      var nm = personNameOf(n);
+      if (nm && nm !== "[object Object]") hit[nm] = 1;
+    });
+    var res = { roles: 0, groups: 0, days: 0 };
+    if (!Object.keys(hit).length) return res;
+    function keep(arr) {
+      return peopleList(arr).filter(function (n) { return !hit[n]; });
+    }
+
+    var doc = config().roles;
+    if (isPlain(doc) && Array.isArray(doc.roles)) {
+      var next = clone(doc);
+      next.roles = doc.roles.map(function (r) {
+        if (!isPlain(r)) return r;
+        var o = clone(r);
+        if ("people" in o) {
+          var before = peopleList(o.people);
+          o.people = keep(before);
+          if (o.people.length !== before.length) res.roles++;
+        }
+        if (isPlain(o.peopleMap)) {
+          Object.keys(o.peopleMap).forEach(function (k) {
+            var v = personNameOf(o.peopleMap[k]);
+            if (hit[v]) { delete o.peopleMap[k]; res.roles++; }
+          });
+        }
+        if (isPlain(o.groups)) {
+          Object.keys(o.groups).forEach(function (k) {
+            var b = peopleList(o.groups[k]);
+            var a = keep(b);
+            if (a.length !== b.length) res.roles++;
+            if (a.length) o.groups[k] = a;
+            else delete o.groups[k];
+          });
+        }
+        if (Array.isArray(o.substitute)) {
+          var s0 = o.substitute.length;
+          o.substitute = o.substitute.filter(function (x) {
+            var nm = isPlain(x) ? personNameOf(x.name) : personNameOf(x);
+            return !hit[nm];
+          });
+          if (o.substitute.length !== s0) res.roles++;
+        }
+        return o;
+      });
+      patchConfig({ roles: next });
+    }
+
+    var gl = config().peopleGroups;
+    if (Array.isArray(gl)) {
+      var nextG = gl.map(function (g) {
+        if (!isPlain(g)) return g;
+        var o = clone(g);
+        var b = peopleList(o.names);
+        var a = keep(b);
+        if (a.length !== b.length) res.groups++;
+        o.names = a;
+        return o;
+      });
+      patchConfig({ peopleGroups: nextG });
+    }
+
+    /* 某一天的临时调整：patchDayOverride 是浅合并（roles 整块替换），
+       所以必须把这一天完整的 roles 交回去，不能只交被改到的那一个。 */
+    var all = allOverrides();
+    Object.keys(all).forEach(function (k) {
+      var o = all[k] || {};
+      if (!isPlain(o.roles)) return;
+      var nextRoles = null;
+      Object.keys(o.roles).forEach(function (id) {
+        var r = o.roles[id];
+        if (!isPlain(r) || !Array.isArray(r.people)) return;
+        var b = peopleList(r.people);
+        var a = keep(b);
+        if (a.length === b.length) return;
+        nextRoles = nextRoles || clone(o.roles);
+        nextRoles[id] = a.length ? { people: a } : null;
+      });
+      if (nextRoles) {
+        patchDayOverride(k, { roles: nextRoles });
+        res.days++;
+      }
+    });
+
+    return res;
   }
 
   /* ---------- 名单检索 ---------- */
@@ -582,7 +676,11 @@
   function cleanBlock(k, v) {
     if (k === "students") {
       var st = normStudents(v);
-      return st.length ? st : null;      /* 空名单等同于「没有名单」 */
+      /* 空数组要留住：「名单是空的」和「还没有名单」是两件事——
+         前者是老师把人都删了（屏上就该没人），后者才回落到班级数据。
+         以前一律折成 null，于是老师全选删除再保存，48 个人又回来了。 */
+      if (Array.isArray(v) || (isPlain(v) && Array.isArray(v.students))) return st;
+      return st.length ? st : null;
     }
     if (k === "peopleGroups") return cleanGroups(v);
     /* roles 必须是对象：写成别的东西会让引擎 buildDay 直接抛错，
@@ -1010,8 +1108,9 @@
 
     if (out.students !== undefined) {
       var st = normStudents(out.students);
-      if (st.length) out.students = st;
-      else if (Array.isArray(out.students)) delete out.students;
+      /* 同上：空数组是「空名单」，不是「没有名单」 */
+      if (st.length || Array.isArray(out.students)) out.students = st;
+      else delete out.students;
     }
 
     if (Array.isArray(out.peopleGroups)) {
@@ -1172,7 +1271,7 @@
     patchDayOverride: patchDayOverride, clearDayOverride: clearDayOverride,
     applyOverrides: applyOverrides, undo: undo, canUndo: canUndo,
     rankStudents: rankStudents, markPicked: markPicked,
-    addStudent: addStudent,
+    addStudent: addStudent, prunePeople: prunePeople,
     normStudents: normStudents, personNameOf: personNameOf, peopleList: peopleList,
     memberIdOf: memberIdOf, sanitizeConfig: sanitizeConfig,
     cleanConfig: cleanConfig, cleanOverrides: cleanOverrides,
