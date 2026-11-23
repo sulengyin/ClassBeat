@@ -1,175 +1,197 @@
 #!/usr/bin/env python3
-"""生成手机端 PWA 图标（server/icons/）。
+"""生成 ClassBeat 图标：只从唯一源图缩放，不再在本文件里绘制形状。
 
-只用标准库：手账贴纸风——奶油方格纸底、蜡笔琥珀时钟、深棕描边。
+图标固定为 tools/brand/icon-source.png（深色圆角底 + 奶油屏 + CB 时钟）。
+要换图标，替换这张源图，再跑：
+
     python3 tools/make_icons.py
-输出 192 与 512 两档；改了配色或形状，重跑一次即可。
+
+输出：
+  server/icons/icon-192.png、icon-512.png   PWA / 手机页
+  tools/launcher/classbeat.ico              0.3.x 桌面快捷方式
+  desktop/src-tauri/icons/classbeat.ico     0.5.x 安装包（目录不存在则跳过）
+
+只用标准库：PNG 读写、双线性缩放、ICO 打包都在本文件里。
 """
 
-import math
 import os
 import struct
 import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "server", "icons")
+SRC = os.path.join(ROOT, "tools", "brand", "icon-source.png")
+PWA_OUT = os.path.join(ROOT, "server", "icons")
+ICO_TARGETS = [
+    os.path.join(ROOT, "tools", "launcher", "classbeat.ico"),
+    os.path.join(ROOT, "desktop", "src-tauri", "icons", "classbeat.ico"),
+    os.path.join(ROOT, "tools", "brand", "classbeat.ico"),
+]
+PWA_SIZES = (192, 512)
+ICO_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
-BG = (251, 243, 223, 255)      # 奶油纸 #FBF3DF
-GRID = (226, 209, 176, 255)    # 格线（同色系加深一点）
-CARD = (255, 248, 231, 255)    # 表盘 #FFF8E7
-INK = (58, 42, 30, 255)        # 深棕描边 #3A2A1E
-AMBER = (239, 159, 39, 255)    # 蜡笔琥珀 #EF9F27
-TEAL = (29, 158, 117, 255)     # 分针 #1D9E75
-CLEAR = (0, 0, 0, 0)
+
+# ---------------------------------------------------------------- PNG 读写
+
+def png_read(path):
+    """读 8-bit、非隔行 PNG，返回 (w, h, RGB bytearray)。支持 5 种行过滤。"""
+    d = open(path, "rb").read()
+    if d[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("不是 PNG：%s" % path)
+    pos = 8
+    idat = bytearray()
+    w = h = depth = ctype = None
+    interlace = 0
+    while pos < len(d):
+        n = struct.unpack(">I", d[pos:pos + 4])[0]
+        tag = d[pos + 4:pos + 8]
+        body = d[pos + 8:pos + 8 + n]
+        pos += 12 + n
+        if tag == b"IHDR":
+            w, h, depth, ctype, _comp, _filt, interlace = struct.unpack(">IIBBBBB", body)
+        elif tag == b"IDAT":
+            idat += body
+        elif tag == b"IEND":
+            break
+    if depth != 8 or interlace != 0:
+        raise ValueError("只支持 8-bit 非隔行 PNG（当前 depth=%s interlace=%s）" % (depth, interlace))
+    ch = {0: 1, 2: 3, 4: 2, 6: 4}.get(ctype)
+    if ch is None:
+        raise ValueError("不支持的 PNG color type：%s" % ctype)
+    raw = zlib.decompress(bytes(idat))
+    stride = w * ch
+    prev = bytearray(stride)
+    rows = bytearray()
+    p = 0
+    for _ in range(h):
+        f = raw[p]
+        p += 1
+        line = bytearray(raw[p:p + stride])
+        p += stride
+        if f == 1:
+            for i in range(ch, stride):
+                line[i] = (line[i] + line[i - ch]) & 255
+        elif f == 2:
+            for i in range(stride):
+                line[i] = (line[i] + prev[i]) & 255
+        elif f == 3:
+            for i in range(stride):
+                a = line[i - ch] if i >= ch else 0
+                line[i] = (line[i] + ((a + prev[i]) >> 1)) & 255
+        elif f == 4:
+            for i in range(stride):
+                a = line[i - ch] if i >= ch else 0
+                b = prev[i]
+                c = prev[i - ch] if i >= ch else 0
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                pr = a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
+                line[i] = (line[i] + pr) & 255
+        rows += line
+        prev = line
+    if ch == 3:
+        rgb = rows
+    elif ch == 4:
+        rgb = bytearray(w * h * 3)
+        for i in range(w * h):
+            rgb[3 * i:3 * i + 3] = rows[4 * i:4 * i + 3]
+    else:  # 灰度
+        rgb = bytearray(w * h * 3)
+        for i in range(w * h):
+            v = rows[i]
+            rgb[3 * i] = rgb[3 * i + 1] = rgb[3 * i + 2] = v
+    return w, h, rgb
 
 
-def png_write(path, w, h, px):
-    rows = b"".join(b"\x00" + bytes(v for p in px[y] for v in p) for y in range(h))
+def png_write_rgb(path, w, h, rgb):
+    rows = b"".join(b"\x00" + bytes(rgb[y * w * 3:(y + 1) * w * 3]) for y in range(h))
 
-    def chunk(t, data):
-        c = t + data
-        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+    def chunk(tag, data):
+        body = tag + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
 
-    ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)
-    data = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
-            + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
     with open(path, "wb") as f:
-        f.write(data)
-    return data          # make_ico.py 直接拿字节装进 ICO 容器，不再读盘
+        f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+                + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
 
 
-def png_bytes(w, h, px):
-    """与 png_write 相同的编码，只返回字节不落盘（桌面图标用）。"""
-    rows = b"".join(b"\x00" + bytes(v for p in px[y] for v in p) for y in range(h))
-
-    def chunk(t, data):
-        c = t + data
-        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
-
-    ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
-            + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
-
-
-def in_round(x, y, w, h, r):
-    """圆角矩形内部判断（0<=x<w, 0<=y<h）。"""
-    if x < 0 or y < 0 or x >= w or y >= h:
-        return False
-    if x < r and y < r:
-        return (x - r) ** 2 + (y - r) ** 2 <= r * r
-    if x >= w - r and y < r:
-        return (x - (w - 1 - r)) ** 2 + (y - r) ** 2 <= r * r
-    if x < r and y >= h - r:
-        return (x - r) ** 2 + (y - (h - 1 - r)) ** 2 <= r * r
-    if x >= w - r and y >= h - r:
-        return (x - (w - 1 - r)) ** 2 + (y - (h - 1 - r)) ** 2 <= r * r
-    return True
-
-
-def dist_seg(px, py, ax, ay, bx, by):
-    """点到线段的距离。"""
-    vx, vy = bx - ax, by - ay
-    wx, wy = px - ax, py - ay
-    L = vx * vx + vy * vy
-    t = 0.0 if L == 0 else max(0.0, min(1.0, (wx * vx + wy * vy) / L))
-    return math.hypot(px - (ax + t * vx), py - (ay + t * vy))
-
-
-AMBER_DEEP = (198, 114, 24, 255)   # 环的下半段，给一点体积感
-PAPER_TOP = (255, 250, 239, 255)    # 纸面高光
-PAPER_LOW = (246, 229, 198, 255)    # 纸面收暗
-
-
-def _lerp(a, b, t):
-    t = 0.0 if t < 0 else (1.0 if t > 1 else t)
-    return (round(a[0] + (b[0] - a[0]) * t),
-            round(a[1] + (b[1] - a[1]) * t),
-            round(a[2] + (b[2] - a[2]) * t), 255)
-
-
-def build(size):
-    """奶油纸卡 + 琥珀圆弧 + 墨色时针。
-
-    2026-11-22 换掉了原来的"CB 单字 + 屏风"：那套在 16/24px 下笔画糊成一团，
-    任务栏和桌面上一眼认不出。现在主体只有一个圆，缩到 16px 仍读得出"钟"，
-    正好是这块屏在教室里干的事（看着时间走）。
-
-    小尺寸的两个坑：描边和环宽都按 512 的比例缩，到 16px 只剩零点几像素，
-    会被超采样抹成灰边。所以统一走 v(base, min_px)，给每条线一个真实像素下限。
-    """
-    S = 4 if size <= 128 else 2        # 超采样倍数：小尺寸多采几刀
-    W = size * S
-    k = size / 512.0                   # 1 个基准单位 = k 个真实像素
-
-    def v(base, min_px=0.0):
-        return max(base * k, min_px) * S
-
-    rad = v(108)
-    border = v(10, 1.7)
-    R = v(170)                         # 环外半径
-    ring = v(48, 2.5)                  # 环宽
-    hand_w = v(30, 1.9)
-    dot = v(18, 1.4)
-    cx = cy = W / 2.0
-    tipx, tipy = cx - 0.46 * R, cy - 0.37 * R        # 时针指向 10 点
-    tick_w = v(10, 1.5)              # 12/3/6/9 的刻度，只有大图才画
-    tick_a, tick_b = R - ring - v(3), R - ring - v(3) + v(26)
-
-    px = [[CLEAR] * W for _ in range(W)]
-    for y in range(W):
-        row = px[y]
-        fy = y + 0.5
-        for x in range(W):
-            if not in_round(x, y, W, W, rad):
-                continue
-            # 注意是 x - border：判的是"退进内框后"的相对坐标。
-            # 写成 x + border 会让右边和下边多出一条厚边（旧版就有这个 bug，
-            # 只是底色是深蓝所以看不出来）。
-            inner = in_round(x - border, y - border, W - 2 * border,
-                             W - 2 * border, max(1.0, rad - border))
-            if not inner:
-                row[x] = INK
-                continue
-            # 纸面：上亮下暗
-            row[x] = _lerp(PAPER_TOP, PAPER_LOW, fy / W)
-            fx = x + 0.5
-            d = math.hypot(fx - cx, fy - cy)
-            if R - ring <= d <= R:
-                row[x] = _lerp(AMBER, AMBER_DEEP, (fy / W - 0.2) / 0.7)
-            elif d < R - ring:
-                if d <= dot:
-                    row[x] = INK
-                elif dist_seg(fx, fy, cx, cy, tipx, tipy) <= hand_w / 2:
-                    row[x] = INK
-                elif size >= 96 and any(
-                        dist_seg(fx, fy, cx + tick_a * math.cos(t), cy + tick_a * math.sin(t),
-                                 cx + tick_b * math.cos(t), cy + tick_b * math.sin(t)) <= tick_w / 2
-                        for t in (0.0, math.pi / 2, math.pi, 1.5 * math.pi)):
-                    row[x] = INK
-                else:
-                    row[x] = CARD
-
-    # 超采样盒式降采样
-    out = [[None] * size for _ in range(size)]
-    for Y in range(size):
-        for X in range(size):
-            r = g = b = a = 0
-            for dy in range(S):
-                for dx in range(S):
-                    p = px[Y * S + dy][X * S + dx]
-                    r += p[0]; g += p[1]; b += p[2]; a += p[3]
-            n = S * S
-            out[Y][X] = (round(r / n), round(g / n), round(b / n), round(a / n))
+def resize(src, sw, sh, dw, dh):
+    """双线性缩放，输入输出都是 RGB bytearray。"""
+    out = bytearray(dw * dh * 3)
+    for y in range(dh):
+        fy = (y + 0.5) * sh / dh - 0.5
+        y0 = max(0, min(sh - 1, int(fy)))
+        y1 = min(sh - 1, y0 + 1)
+        ty = max(0.0, fy - y0)
+        for x in range(dw):
+            fx = (x + 0.5) * sw / dw - 0.5
+            x0 = max(0, min(sw - 1, int(fx)))
+            x1 = min(sw - 1, x0 + 1)
+            tx = max(0.0, fx - x0)
+            o = (y * dw + x) * 3
+            for c in range(3):
+                a = src[(y0 * sw + x0) * 3 + c]
+                b = src[(y0 * sw + x1) * 3 + c]
+                c0 = src[(y1 * sw + x0) * 3 + c]
+                d = src[(y1 * sw + x1) * 3 + c]
+                top = a + (b - a) * tx
+                bot = c0 + (d - c0) * tx
+                out[o + c] = int(top + (bot - top) * ty + 0.5)
     return out
 
 
+# ---------------------------------------------------------------- ICO 打包
+
+def bmp32(w, h, rgb):
+    """ICO 里的 32bpp BMP 条目：BGRA、自下而上、末尾跟全 0 的 AND mask。"""
+    hdr = struct.pack("<IiiHHIIiiII", 40, w, h * 2, 1, 32, 0, w * h * 4, 0, 0, 0, 0)
+    body = bytearray()
+    for y in range(h - 1, -1, -1):
+        base = y * w * 3
+        for x in range(w):
+            o = base + x * 3
+            body += bytes((rgb[o + 2], rgb[o + 1], rgb[o], 255))
+    mask_row = ((w + 31) // 32) * 4
+    return bytes(hdr) + bytes(body) + bytes(mask_row * h)
+
+
+def ico_bytes(sw, sh, rgb, sizes=ICO_SIZES):
+    imgs = []
+    for s in sizes:
+        small = rgb if (sw == s and sh == s) else resize(rgb, sw, sh, s, s)
+        imgs.append((s, bmp32(s, s, small)))
+    head = struct.pack("<HHH", 0, 1, len(imgs))
+    offset = 6 + 16 * len(imgs)
+    entries = bytearray()
+    data = bytearray()
+    for s, img in imgs:
+        dim = 0 if s == 256 else s
+        entries += struct.pack("<BBBBHHII", dim, dim, 0, 0, 1, 32, len(img), offset)
+        data += img
+        offset += len(img)
+    return head + bytes(entries) + bytes(data)
+
+
 def main():
-    os.makedirs(OUT, exist_ok=True)
-    for size in (192, 512):
-        px = build(size)
-        p = os.path.join(OUT, f"icon-{size}.png")
-        png_write(p, size, size, px)
-        print(f"已生成 {p}（{os.path.getsize(p)} 字节）")
+    if not os.path.isfile(SRC):
+        raise SystemExit("缺少源图：%s" % SRC)
+    w, h, rgb = png_read(SRC)
+    if w != h:
+        raise SystemExit("源图必须是正方形（当前 %dx%d）" % (w, h))
+
+    os.makedirs(PWA_OUT, exist_ok=True)
+    for s in PWA_SIZES:
+        p = os.path.join(PWA_OUT, "icon-%d.png" % s)
+        png_write_rgb(p, s, s, resize(rgb, w, h, s, s))
+        print("已生成 %s（%d 字节）" % (p, os.path.getsize(p)))
+
+    ico = ico_bytes(w, h, rgb)
+    for p in ICO_TARGETS:
+        if not os.path.isdir(os.path.dirname(p)):
+            print("跳过（目录不存在）%s" % p)
+            continue
+        with open(p, "wb") as f:
+            f.write(ico)
+        print("已生成 %s（%d 字节）" % (p, len(ico)))
 
 
 if __name__ == "__main__":
