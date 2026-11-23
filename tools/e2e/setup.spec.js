@@ -163,3 +163,43 @@ test("改班名和课表后刷新仍在，屏上抬头跟着换", async ({ page 
 
   expect(errors, "控制台不应有报错").toEqual([]);
 });
+
+test("岗位表核对时漏了人，打一个字或姓氏拼音首字母就能补进来", async ({ page }) => {
+  /* 只给一个名单的最小包：前三步不依赖具体的作息与课表内容，
+     这条只关心「核对人员」那一步的补人。 */
+  const roster = ["赵子墨", "钱嘉禾", "孙星野", "李青禾", "周梓萱", "张望舒"]
+    .map((n, i) => ({ id: "s" + (i + 1), name: n, active: true }));
+  await page.route("**/app/data.js", (route) => route.fulfill({
+    status: 200, contentType: "application/javascript",
+    body: "window.RHYTHM_DATA=" + JSON.stringify({ students: roster, texts: {} }) + ";"
+  }));
+
+  const errors = await openScreen(page, AT);
+
+  await page.locator(".setup-field input").nth(1).fill("补人测试班");
+  await next(page);   // 作息：用默认那一套
+  await next(page);   // 课表：一节课都不填也能往下走
+  await next(page);   // 岗位 / 文案
+
+  await page.locator(".setup-import-open").click();
+  await page.locator(".setup-roster-ok").click();
+
+  await page.locator(".setup-import-text").fill("岗位\t职责\t负责人\n路队长\t提醒排队\t赵子墨");
+  await page.locator(".setup-import-run").click();
+
+  await expect(page.locator(".setup-import-add").first()).toBeVisible();
+  await page.locator(".setup-import-add").first().click();
+
+  /* 打字母按姓氏拼音首字母找：z 应该出张/周，且已经在这一行里的人不再出现 */
+  await page.locator(".setup-quickadd-input").fill("z");
+  const items = page.locator(".setup-quickadd-item");
+  await expect(items.first()).toBeVisible();
+  const texts = await items.allTextContents();
+  expect(texts).toContain("张望舒");
+  expect(texts, "已经在表里的人不该再出现在候选里").not.toContain("赵子墨");
+
+  await page.locator(".setup-quickadd-item", { hasText: "张望舒" }).click();
+  await expect(page.locator(".setup-import-person.exact", { hasText: "张望舒" })).toBeVisible();
+
+  expect(errors, "控制台不应有报错").toEqual([]);
+});

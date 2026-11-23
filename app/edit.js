@@ -1531,7 +1531,7 @@
 
     var q = document.createElement("input");
     q.className = "ep-input";
-    q.placeholder = "打一个字就出人";
+    q.placeholder = "打一个字，或姓氏拼音首字母";
     wrap.appendChild(q);
 
     var grid = h("div", "ep-people");

@@ -164,6 +164,66 @@
     return typeof x === "string" ? tidy(x) : "";
   }
 
+  /* 核对结果里补一个人：打一个字、或姓氏拼音首字母，就出候选。
+     匹配用的是 Store.rankStudents —— 和值日页换人同一个函数，
+     不在这里另写「按姓氏找」。找到的人按「核对通过」写进 row.people，
+     合并时和其它对得上的姓名走同一条路。 */
+  function quickAddPerson(row, host) {
+    var box = el("div", "setup-quickadd");
+    var inp = el("input");
+    inp.className = "setup-quickadd-input";
+    inp.type = "text";
+    inp.placeholder = "补一个人：打一个字，或姓氏拼音首字母";
+    var list = el("div", "setup-quickadd-list");
+    box.appendChild(inp);
+    box.appendChild(list);
+
+    function taken() {
+      var m = {};
+      (row.people || []).forEach(function (p) {
+        var n = p.state === "exact" ? (p.resolved || p.name)
+              : (p.accepted ? (p.suggestion || p.resolved) : "");
+        if (n) m[n] = 1;
+      });
+      return m;
+    }
+
+    function paint() {
+      list.innerHTML = "";
+      var pool = rosterNames().map(function (n) { return { name: n, active: true }; });
+      if (!pool.length) {
+        list.appendChild(el("span", "setup-quickadd-none", "还没确认学生名单，先在上面确认名单"));
+        return;
+      }
+      var have = taken();
+      var res = (root.Store && root.Store.rankStudents)
+        ? root.Store.rankStudents(pool, inp.value, [], 8) : [];
+      res = res.filter(function (s) { return !have[s.name]; });
+      if (!res.length) {
+        list.appendChild(el("span", "setup-quickadd-none", "名单里没有这个人"));
+        return;
+      }
+      res.forEach(function (s) {
+        var b = el("button", "setup-quickadd-item", s.name);
+        b.type = "button";
+        b.addEventListener("click", function () {
+          row.people = (row.people || []).concat([{
+            raw: s.name, name: s.name, note: "", numbered: false,
+            suggestion: "", resolved: s.name, accepted: false, state: "exact"
+          }]);
+          saveDraft();
+          render();
+        });
+        list.appendChild(b);
+      });
+    }
+
+    inp.addEventListener("input", paint);
+    paint();
+    host.appendChild(box);
+    if (inp.focus) inp.focus();
+  }
+
   /* 老师在面板里修正过的名单，只用于姓名核对，不写回班级数据。
      存在 Store 的 config.students 里，跟作息、岗位一样属于本机配置。 */
   function rosterOverride() {
@@ -2133,6 +2193,22 @@
         }
         people.appendChild(chip);
       });
+
+      /* 名单里有、表上漏写的人：点一下补进来，不用重新上传表格 */
+      var addOne = el("button", "setup-import-add", "+ 加人");
+      addOne.type = "button";
+      addOne.title = "名单里有、但表上漏写的人；打一个字或姓氏首字母就能找";
+      addOne.addEventListener("click", function () {
+        var open = people.querySelector(".setup-quickadd");
+        if (open) {
+          var i = open.querySelector("input");
+          if (i) i.focus();
+          return;
+        }
+        quickAddPerson(row, people);
+      });
+      people.appendChild(addOne);
+
       card.appendChild(people);
 
       if (row.pending && row.pending.length) {

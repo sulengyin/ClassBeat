@@ -317,6 +317,25 @@ body[data-setup="1"] .warn{display:none}
 .setup-import-person.bad,.setup-import-person.missing,.setup-import-person.same{
   background:#FFE3DE;color:#B23A32;border-color:#E9B3AC;
 }
+/* 核对结果里补一个人：打一个字或姓氏拼音首字母就出候选 */
+.setup-import-add{
+  font-family:inherit;font-size:1.75vmin;font-weight:800;cursor:pointer;
+  border:.16vmin dashed #9AA7B4;border-radius:.9vmin;
+  background:transparent;color:#5A6B7A;padding:.35vmin 1vmin;
+}
+.setup-import-add:hover{border-color:#3C7F3A;color:#3C7F3A}
+.setup-quickadd{display:flex;flex-direction:column;gap:.6vmin;width:100%;margin-top:.6vmin}
+.setup-quickadd-input{
+  font-family:inherit;font-size:1.9vmin;padding:.5vmin 1vmin;
+  border:.16vmin solid #C7D2DC;border-radius:.9vmin;background:#fff;color:#31231A;
+}
+.setup-quickadd-list{display:flex;gap:.6vmin;flex-wrap:wrap}
+.setup-quickadd-item{
+  font-family:inherit;font-size:1.8vmin;font-weight:700;cursor:pointer;
+  border:.16vmin solid #B7D8B2;border-radius:.9vmin;
+  background:#E6F1E4;color:#3C7F3A;padding:.35vmin 1vmin;
+}
+.setup-quickadd-none{font-size:1.75vmin;color:#7A8794}
 .setup-import-use{
   font-family:inherit;font-size:1.7vmin;font-weight:800;cursor:pointer;
   border:.18vmin solid #9A5B07;border-radius:.7vmin;

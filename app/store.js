@@ -241,10 +241,56 @@
   }
 
   /* ---------- 名单检索 ---------- */
+  /* 姓氏的拼音首字母。只覆盖姓氏——老师打的就是「姓」；这不是拼音输入法，
+     而是「打一个字就出人」的省事版：不会打字/打字慢的老师打 z 也能找到
+     张、赵、周。表外的字照样走「名字里含这个字」的匹配，不会更差。
+     按首字母分组，加一个姓只改一行。多音姓按作姓时的读法归类
+     （单 Shàn→s、仇 Qiú→q、解 Xiè→x、曾 Zēng→z、翟 Zhái→z、缪 Miào→m）。 */
+  var SURNAME_GROUPS = {
+    a: "艾安敖",
+    b: "巴白包鲍贝毕边卞别薄卜步班",
+    c: "蔡曹岑柴昌常车陈成程池褚楚崔从",
+    d: "戴党邓狄刁丁董都杜段端",
+    e: "鄂",
+    f: "樊范方房费封冯凤伏扶符傅富",
+    g: "甘高郜戈葛耿弓公龚巩贡勾古谷顾关管桂郭国",
+    h: "韩杭郝何和贺衡洪侯后胡花华怀桓黄惠霍",
+    j: "姬吉纪季贾简江姜蒋焦金靳荆井景居鞠",
+    k: "阚康柯孔寇匡邝",
+    l: "赖蓝郎雷冷黎李厉利连廉梁廖林蔺凌刘柳龙娄楼卢鲁陆路吕栾罗骆",
+    m: "麻马满毛茅梅蒙孟米苗闵明缪莫牟穆",
+    n: "那倪聂宁牛农钮",
+    o: "欧",
+    p: "潘庞裴彭皮平蒲濮浦",
+    q: "戚齐祁钱强乔秦邱秋仇屈曲瞿全权阙",
+    r: "冉饶任荣茹阮芮",
+    s: "桑沙山单商尚邵佘申沈慎盛施石时史舒束双水司松宋苏宿孙索",
+    t: "谈谭汤唐陶滕田通童涂屠",
+    w: "万汪王危韦卫魏温文闻翁邬巫乌吴伍武",
+    x: "奚习席夏咸相向项萧谢辛邢幸熊徐许宣薛荀",
+    y: "严言颜晏燕杨羊阳姚叶易殷尹应尤游于余俞虞禹郁喻元袁岳云恽",
+    z: "臧曾翟詹湛张章赵甄郑支钟周朱诸祝庄卓宗邹祖左"
+  };
+
+  var SURNAME_PY = (function () {
+    var map = {};
+    Object.keys(SURNAME_GROUPS).forEach(function (k) {
+      var s = SURNAME_GROUPS[k];
+      for (var i = 0; i < s.length; i++) map[s.charAt(i)] = k;
+    });
+    return map;
+  })();
+
+  function surnameInitial(name) {
+    if (!name) return "";
+    return SURNAME_PY[String(name).charAt(0)] || "";
+  }
+
   /* 排序：本场景相关的人 → 最近点过 → 名单顺序。
      这是 2.17 定的规则，越靠前的越容易被点到。
-     输入先归一化：老师打的第一个字就是「姓」，`indexOf` 已经能命中，
-     不需要额外的拼音或首字母表。 */
+     输入先归一化：老师打的第一个字就是「姓」，`indexOf` 已经能命中；
+     打字母时按姓氏拼音首字母找（打 z 出张/赵/周），只取第一个字母——
+     打「zhang」不会比「z」更精确，但也不会突然一个都不出。 */
   function rankStudents(list, q, related, limit) {
     q = String(q == null ? "" : q).trim();
     limit = limit || 8;
@@ -260,10 +306,13 @@
       if (v && v !== "[object Object]") rel.push(v);
     });
 
+    var py = /^[a-z]/i.test(q) ? q.toLowerCase().charAt(0) : "";
     var pool = all.filter(function (s) {
       if (s.active === false) return false;
       if (!q) return true;
-      return s.name.indexOf(q) >= 0 || (s.alias && s.alias.indexOf(q) >= 0);
+      if (s.name.indexOf(q) >= 0 || (s.alias && s.alias.indexOf(q) >= 0)) return true;
+      if (py && surnameInitial(s.name) === py) return true;
+      return false;
     });
 
     var picked = read(KEY.picked, {});

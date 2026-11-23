@@ -558,5 +558,17 @@ check(zzOk.length > 0
   "常驻岗位今天指定了人，每一段都变成有名字（不再是待定）",
   JSON.stringify(zzOk.map(d => d.people)));
 
+/* 打字母按姓氏拼音首字母找人（老师打字慢，能少打就少打） */
+const pyList = [{ name: "张三" }, { name: "李四" }, { name: "赵五" }, { name: "王六" }, { name: "周七" }];
+check(S.rankStudents(pyList, "z").map(s => s.name).join("、") === "张三、赵五、周七",
+  "打 z 出所有姓张/赵/周的", S.rankStudents(pyList, "z").map(s => s.name).join("、"));
+check(S.rankStudents(pyList, "L").map(s => s.name).join("、") === "李四",
+  "大写字母也认", S.rankStudents(pyList, "L").map(s => s.name).join("、"));
+check(S.rankStudents(pyList, "wang").map(s => s.name).join("、") === "王六",
+  "多打几个字母仍按姓氏首字母找，不会突然一个都不出",
+  S.rankStudents(pyList, "wang").map(s => s.name).join("、"));
+check(S.rankStudents(pyList, "张").length === 1, "打汉字还是按名字包含匹配");
+check(S.rankStudents([{ name: "欧阳光" }], "o").length === 1, "表里有这个姓就能按首字母找到");
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);
