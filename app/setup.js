@@ -155,6 +155,22 @@
     return String(s == null ? "" : s).replace(/\u00a0/g, " ").replace(/[ \t\r\n]+/g, " ").trim();
   }
 
+  /* 人员的各种写法统一成「姓名字符串」：纯文本、对象（{name}/{label}）、
+     数组元素都见过（别人做的设置文件、手工改过的班级数据）。取不出来就当空，
+     绝不让 [object Object] 进核对流程——那会被当成一个「未找到的学生」，
+     一路写进岗位人员里，再想清掉就难了。 */
+  function nameOf(x) {
+    if (x == null) return "";
+    if (typeof x === "string") return tidy(x);
+    if (typeof x === "number") return String(x);
+    if (typeof x === "object") {
+      if (x.name != null) return nameOf(x.name);
+      if (x.label != null) return nameOf(x.label);
+      return "";
+    }
+    return "";
+  }
+
   /* 老师在面板里修正过的名单，只用于姓名核对，不写回班级数据。
      存在 Store 的 config.students 里，跟作息、岗位一样属于本机配置。 */
   function rosterOverride() {
@@ -393,14 +409,17 @@
       return arr.map(function (it) {
         if (typeof it === "string") return [it, "", ""];
         if (!it || typeof it !== "object") return [];
-        var name = it.name || it["岗位"] || it["名称"] || it.role || it["项目"] || it.title || "";
-        var duty = it.duty || it["职责"] || it["内容"] || it.desc || "";
+        var name = nameOf(it.name || it["岗位"] || it["名称"] || it.role || it["项目"] || it.title);
+        var duty = nameOf(it.duty || it["职责"] || it["内容"] || it.desc);
         var people = it.people || it["人员"] || it["负责人"] || it["姓名"] || it.members;
         if (people == null && it.peopleMap) people = Object.keys(it.peopleMap).map(function (k) { return it.peopleMap[k]; });
         if (people == null && it.groups) people = Object.keys(it.groups).map(function (k) { return it.groups[k]; });
-        if (Array.isArray(people)) people = people.join("、");
-        return [String(name == null ? "" : name), String(duty == null ? "" : duty),
-                String(people == null ? "" : people)];
+        /* 数组元素可能是对象（[{name:"张三"}]）：逐个取名字再拼，
+           直接 join 会得到一串 [object Object]。 */
+        if (Array.isArray(people)) {
+          people = people.map(nameOf).filter(function (n) { return !!n; }).join("、");
+        }
+        return [name, duty, nameOf(people)];
       }).filter(function (r) { return r.length && tidy(r[0]); });
     }
     var out = [];
@@ -821,8 +840,62 @@
     return out;
   }
 
-  /* 只认「周一…周五」列和「第 N 节」行；格子里第一段是科目，其余是任课老师。 */
-  function gridFromRows(rows) {
+  /* 一个格子里可能挤着科目和任课老师，写法五花八门：
+       「语文 王老师」「语文/王老师」「王老师 语文」
+       「语文\n王老师」（Excel 单元格内换行）
+       「语文王老师」（富文本被拼接、中间没有分隔符）
+     以前只按空白切、且认定第一段是科目：碰到「语文王老师」就把整串当科目，
+     下拉里多出一个假科目、还带不出老师；碰到「王老师 语文」就把老师当科目。
+     现在不猜位置，而是认内容：能认出科目的段是科目，剩下的才是老师。
+     「认识哪些科目」由 Subjects 一份词典决定（setup / edit 共用），
+     课表里已经出现过的本校叫法也会临时登记进去。 */
+  function splitSubjectTeacher(raw, pool) {
+    var s = tidy(raw);
+    if (!s) return { subject: "", teacher: "" };
+    if (/^[—\-－–~]+$/.test(s)) return { subject: "", teacher: "" };
+    var Sub = root.Subjects;
+    var extra = pool || [];
+    if (!Sub) return { subject: s, teacher: "" };
+
+    function isSubj(x) { return Sub.isSubject(x, extra); }
+
+    var parts = s.split(/[\s\/／、|｜]+/).filter(function (x) { return !!x; });
+
+    if (parts.length > 1) {
+      var subjects = parts.filter(isSubj);
+      if (subjects.length) {
+        var teachers = parts.filter(function (p) { return !isSubj(p); });
+        return {
+          subject: subjects.join("/"),
+          /* 老师之间保留原来的「/」写法：课表里「孙丽（双周）/李强」是两个人 */
+          teacher: teachers.join("/")
+        };
+      }
+      /* 一段科目都认不出：可能是被空格拆开的同一个科目名（「语 文」），
+         合起来正好是已知科目就合回去，别把一个科目拆成科目+老师 */
+      var joined = parts.join("");
+      if (Sub.isSubject(joined, extra)) return { subject: joined, teacher: "" };
+      /* 还是认不出：按旧规矩，第一段当科目、其余当老师，
+         但第一段本身像人名（「王老师 语文」）时不能这么切 */
+      if (!/[\u4e00-\u9fa5]{1,4}老师$/.test(parts[0])) {
+        return { subject: parts[0], teacher: parts.slice(1).join("/") };
+      }
+      return { subject: s, teacher: "" };
+    }
+
+    /* 单段粘连：先用已知科目名认前缀（「语文王老师」→ 语文 + 王老师） */
+    var pre = Sub.prefixOf(s, extra);
+    if (pre && pre.length < s.length) {
+      return { subject: pre, teacher: s.slice(pre.length).replace(/^[\s\/／·]+/, "") };
+    }
+    /* 老师写在前面（「王老师语文」） */
+    var m2 = /^([\u4e00-\u9fa5]{1,4}老师)(.+)$/.exec(s);
+    if (m2 && m2[2]) return { subject: m2[2], teacher: m2[1] };
+
+    return { subject: s, teacher: "" };
+  }
+
+  function gridFromRows(rows, pool) {
     var weekCols = {}, headerAt = -1;
     rows.forEach(function (cells, ri) {
       if (headerAt >= 0) return;
@@ -853,12 +926,12 @@
       var shift = labelCol + 1 - firstWeekCol;
       [1, 2, 3, 4, 5].forEach(function (w) {
         var idx = weekCols[w];
-        var text = idx === undefined ? "" : tidy(cells[idx + shift] || "");
-        if (!text || /^[—\-－–~]+$/.test(text)) return;
-        var bits = text.split(/\s+/);
-        var e = { weekday: w, periodNo: p, subject: bits[0] };
+        var text = idx === undefined ? "" : (cells[idx + shift] || "");
+        var st = splitSubjectTeacher(text, pool);
+        if (!st.subject) return;
+        var e = { weekday: w, periodNo: p, subject: st.subject };
         /* 任课老师只跟着这格走，不按老师身份推科目；轮流的两位老师原样留着。 */
-        if (bits.length > 1) e.teacher = bits.slice(1).join(" ");
+        if (st.teacher) e.teacher = st.teacher;
         entries.push(e);
       });
     }
@@ -1558,6 +1631,17 @@
     return p;
   }
 
+  /* 识别课表格子时能用上的科目池：常见科目 + 课表里已经排到的科目。
+     本校自己起的名字（「劳综短课」「五年级选修」）只要已经填过一格，
+     下一格粘着老师也能认出来。 */
+  function gridSubjectPool() {
+    var extra = [];
+    (state.entries || []).forEach(function (e) {
+      if (e && e.subject && extra.indexOf(e.subject) < 0) extra.push(e.subject);
+    });
+    return root.Subjects ? root.Subjects.all(extra) : extra;
+  }
+
   /* 班级课表导入：认「周一…周五」列和「第 N 节」行，老师名跟着格子存。 */
   function gridImportBox() {
     var box = el("div", "setup-import");
@@ -1606,7 +1690,7 @@
       if (!res) return;
       state.gridText = res.text;
       state.gridRows = gridCellRows(res.text);
-      var r = gridFromRows(state.gridRows);
+      var r = gridFromRows(state.gridRows, gridSubjectPool());
       state.gridFlash = "「" + res.name + "」" + (r.bad
         ? r.bad
         : "识别到 " + r.entries.length + " 格，确认后点「填入课表」");
@@ -1622,14 +1706,14 @@
 
   function runGridImport() {
     state.gridRows = gridCellRows(state.gridText);
-    var r = gridFromRows(state.gridRows);
+    var r = gridFromRows(state.gridRows, gridSubjectPool());
     state.gridFlash = r.bad || ("识别到 " + r.entries.length + " 格，确认后点「填入课表」");
     saveDraft();
     render();
   }
 
   function applyGridImport() {
-    var r = gridFromRows(state.gridRows);
+    var r = gridFromRows(state.gridRows, gridSubjectPool());
     if (r.bad) {
       state.gridFlash = r.bad;
       saveDraft();
@@ -2871,6 +2955,10 @@
     _noonBandOf: noonBandOf,
     _gridCellRows: gridCellRows,
     _gridFromRows: gridFromRows,
+    _splitSubjectTeacher: splitSubjectTeacher,
+    _knownSubjects: function (extra) {
+      return root.Subjects ? root.Subjects.all(extra) : [];
+    },
     _blockErrors: blockErrors,
     _commit: commitRolesTexts
   };

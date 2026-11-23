@@ -367,5 +367,73 @@ check(s.kind === "reading", "晨间块改成 8:00 结束：7:59 仍是晨间", s
 s = R.stateAt(movedDay, 8 * 60, {});
 check(s.kind === "break", "8:00 打铃后交给下一段，不拖到 8:10", s.kind);
 
+/* ---------- 岗位人员的来源优先级（真机反馈 2026-11-23） ----------
+   老师亲手指定了人，屏上却显示「待定」：旧规则里 people 排在 groups /
+   rotation 之后，只要配置里还留着轮换的元数据，指定的人就被忽略；
+   组里任一条没排人，整组也一起判成未知。下面这组断言把三条都钉住。 */
+const Engine = global.window.Schedule;
+function dayWith(mutate) {
+  const cfg = JSON.parse(JSON.stringify(global.window.RHYTHM_DATA));
+  mutate(cfg.roles.roles);
+  return Engine.buildDay(cfg, "2026-11-10");
+}
+function barOf(day, hhmm) {
+  const p = hhmm.split(":").map(Number);
+  return R.dutiesAt(day, p[0] * 60 + p[1]);
+}
+
+/* 周二 17:11：值日组 4 个岗位，A/B 组未确认 → 全组待定 */
+let dg = barOf(dayWith(() => {}), "17:11");
+const groupItem = dg.items.filter(x => x.name === "值日组")[0];
+check(groupItem && groupItem.unknown === true,
+  "A/B 组一个都没排时，整组仍是「待定」",
+  groupItem ? JSON.stringify(groupItem.people) : "缺失");
+
+/* 给其中一条（扫地）指定人：屏上必须能看见这个人 */
+const sweep = dayWith(roles => {
+  const r = roles.filter(x => x.name === "扫地")[0];
+  r.people = ["张三", "李四"];
+});
+dg = barOf(sweep, "17:11");
+const g2 = dg.items.filter(x => x.name === "值日组")[0];
+check(g2 && g2.people.indexOf("张三") >= 0 && g2.people.indexOf("李四") >= 0,
+  "写了 people 就压过 A/B 轮换（不再因为 groups 还在就忽略）",
+  g2 ? g2.people.join("、") : "缺失");
+check(g2 && g2.unknown === false,
+  "组里有一条排好人，整组不再判「待定」", g2 ? String(g2.unknown) : "缺失");
+check(g2 && g2.pending.indexOf("倒垃圾") >= 0,
+  "没排人的岗位记进 pending，点开详情才提示还差哪几项",
+  g2 ? g2.pending.join("、") : "缺失");
+
+/* 空数组 = 没指定，继续往下找轮换表，而不是当成「已排了 0 个人」 */
+const empty = dayWith(roles => {
+  const r = roles.filter(x => x.name === "扫地")[0];
+  r.people = [];
+});
+const g3 = barOf(empty, "17:11").items.filter(x => x.name === "值日组")[0];
+check(g3 && g3.unknown === true && g3.people.length === 0,
+  "people 是空数组时当作没指定，不会显示空白", JSON.stringify(g3 && g3.people));
+
+/* 按星期轮换：peopleMap 里写了周一的人，rotation 没确认也照样出人 */
+const rot = dayWith(roles => {
+  const r = roles.filter(x => x.name === "黑板清洁师")[0];
+  r.peopleMap = { "2": "王五" };   /* 2026-11-10 是周二 */
+  r.rotation = { kind: "weekday-map", status: "unconfirmed" };
+});
+const rb = barOf(rot, "08:15").items.filter(x => x.name === "黑板清洁师")[0];
+check(rb && rb.people.indexOf("王五") >= 0,
+  "peopleMap 有今天的人就用，不再被 rotation 未确认一票否决",
+  rb ? rb.people.join("、") : "缺失");
+
+/* 名字对象形态（{name}）不能变成 [object Object] */
+const objName = dayWith(roles => {
+  const r = roles.filter(x => x.name === "节能小队长")[0];
+  r.people = [{ name: "赵六" }];
+});
+const ob = barOf(objName, "17:11").items.filter(x => x.name === "节能小队长")[0];
+check(ob && ob.people[0] === "赵六",
+  "岗位人员写成对象时取姓名，不上屏 [object Object]",
+  ob ? JSON.stringify(ob.people) : "缺失");
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

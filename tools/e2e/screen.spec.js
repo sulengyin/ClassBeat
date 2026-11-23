@@ -109,6 +109,79 @@ test("验证码挡住乱输，答对才进设置", async ({ page, request }) => 
   await expect(page.locator("#epTitle")).toContainText(ping.class);
 });
 
+test("值日岗位指定了人，大屏就显示这个人（不再整组「待定」）", async ({ page, request }) => {
+  /* 真机反馈：老师在值日岗位里选了某某学生，大屏下方那条却还是「待定」。
+     根因是岗位人员解析把 people 排在轮换表之后，且组里任一条没排人
+     就把整组判成未知。这条用例走真实点击：点岗位 → 选人 → 长期固定
+     → 回大屏，确认那个名字真的上了屏。 */
+  await openScreen(page, "2026-11-05T17:12:00+08:00");
+  const ping = await (await request.get("/api/ping")).json();
+  const duty = page.locator("#duty");
+  await expect(duty).toContainText("值日组");
+
+  await openTools(page);
+  await unlockEdit(page, ping.class);
+  await page.locator(".ep-tab", { hasText: "值日" }).click();
+
+  // 「扫地」是带 A/B 轮换表的岗位：以前这种岗位连「固定」入口都没有
+  const row = page.locator(".ep-rowline").filter({ hasText: "扫地" }).locator(".ep-row");
+  await expect(row).toBeVisible();
+  await row.click();
+  const person = page.locator(".ep-person").first();
+  const name = (await person.innerText()).trim();
+  expect(name, "候选里要有人名").not.toBe("");
+  await person.click();
+  await page.locator(".ep-persist").click();
+  await expect(page.locator("#epFlash")).toContainText(name);
+  await page.locator(".ep-close").click();
+
+  // 大屏：选的人必须看得见
+  await expect(duty).toContainText(name);
+});
+
+test("改课务：下拉换科目就带出老师，老师还能改字", async ({ page, request }) => {
+  /* 真机反馈：上传课表后改课务，希望下拉选别的课、老师自动跳出来，
+     而且还能改。这里验证三件事：选项不重复、换科目自动带老师、
+     点老师候选/手改都能落到屏上。 */
+  await openScreen(page, "2026-11-05T08:30:00+08:00");
+  const ping = await (await request.get("/api/ping")).json();
+  await expect(page.locator("#heroMain")).toContainText("语文");
+
+  await openTools(page);
+  await unlockEdit(page, ping.class);
+  await page.locator(".ep-row").first().click();
+
+  const sel = page.locator(".ep-select").first();
+  await expect(sel).toBeVisible();
+  const opts = await sel.locator("option").allInnerTexts();
+  const keys = opts.map((o) => o.trim());
+  expect(new Set(keys).size, "科目下拉里不能有重复项：" + keys.join("/")).toBe(keys.length);
+
+  // 换成数学：老师应自动跳成课表里教数学的那位
+  await sel.selectOption("数学");
+  const tea = page.locator(".ep-tea").first();
+  const mathTeachers = await page.evaluate(() => {
+    const set = [];
+    window.Runtime.config().schedule.entries.forEach((e) => {
+      if (e.subject === "数学" && e.teacher && !set.includes(e.teacher)) set.push(e.teacher);
+    });
+    return set;
+  });
+  expect(mathTeachers.length, "样例课表里数学要有老师").toBeGreaterThan(0);
+  await expect(tea).toHaveValue(mathTeachers.join("/"));
+
+  // 老师候选点一下就填上，填完还能改字（代课）
+  await page.locator(".ep-teacher-chip").first().click();
+  await expect(tea).toHaveValue(mathTeachers[0]);
+  await tea.fill("代课·周老师");
+
+  await page.locator(".ep-lesson-save").click();
+  await page.locator(".ep-close").click();
+  await expect(page.locator("#heroMain")).toContainText("数学");
+  /* 上课时老师名在主视觉下面那行（#after），不在 #heroSub */
+  await expect(page.locator("#after")).toContainText("代课");
+});
+
 test("7:29 打铃前也归入晨间自主管理，提醒事项上屏", async ({ page }) => {
   await openScreen(page, "2026-11-05T07:29:00+08:00");
   await expect(page.locator("#bandText")).toHaveText("晨间自主管理");

@@ -21,6 +21,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -191,27 +192,69 @@ def build_day_blocks(timetable: dict, noon: dict) -> list[dict]:
 
 # ---------- 岗位 ----------
 
+def name_of(v) -> str:
+    """一个人名的各种历史写法：字符串、{name}、{label}、数组元素。
+    取不出来就当空，绝不让 [object Object] 混进屏面。"""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, dict):
+        inner = v.get("name", v.get("label", v.get("student")))
+        return name_of(inner)
+    return ""
+
+
+def name_list(v) -> list[str]:
+    """名单统一成「去重、去空的姓名数组」。
+    顺手按分隔符拆开：配置里常见 people: ["张三、李四"]，以前原样上屏
+    碰巧没错，但按 id 核对时就对不上。人名里不会出现这些符号。"""
+    if v is None:
+        return []
+    items = v if isinstance(v, list) else [v]
+    out: list[str] = []
+    for x in items:
+        n = name_of(x)
+        if not n or n == "[object Object]":
+            continue
+        for part in re.split(r"[、/／,，;；|｜]+", n):
+            p = part.strip()
+            if p and p != "[object Object]" and p not in out:
+                out.append(p)
+    return out
+
+
 def resolve_people(role: dict, group: str | None, group_reason: str | None,
-                   weekday: int) -> tuple[list[str] | None, str | None]:
-    """返回 (名单, 无法确定的理由)。宁可 unknown，也不编人名。"""
+                   weekday: int) -> tuple[list[str] | None, str | None, str]:
+    """返回 (名单, 无法确定的理由, 名单来源)。
+
+    「这个岗位今天归谁」只有一个入口。旧写法是三段 if：有 groups 就只看组、
+    有 rotation 就只看星期表，people 永远排在最后——老师亲手指定了人，
+    只要配置里还留着轮换的元数据，屏上照样「待定」；rotation.status 没确认时，
+    就算 peopleMap 里写了今天是谁也一律判成未知。现在按「越具体越优先」排：
+    老师指定 > 轮换到的那组 > 按星期表；空数组算「没指定」，继续往下找。
+    """
+    cycle = role.get("cycle") or {}
+    chosen = group or cycle.get("current")
+    candidates = [
+        ("people", role.get("people")),
+        ("group", (role.get("groups") or {}).get(chosen) if chosen else None),
+        ("weekday", (role.get("peopleMap") or {}).get(str(weekday))),
+    ]
+
+    for key, raw in candidates:
+        names = name_list(raw)
+        if names:
+            return names, None, key
+
+    # 一个都没排：原因要分得清，面板才能告诉老师下一步该点哪儿
     if "groups" in role:
-        # 组由 build() 按校历算好传进来；role.cycle.current 是老师手工钉住的覆盖值
-        chosen = group or (role.get("cycle") or {}).get("current")
-        if not chosen:
-            return None, group_reason or "cycle-group-unconfirmed"
-        return role["groups"].get(chosen, []), None
-
-    rot = role.get("rotation")
-    if rot:
-        if rot.get("status") != "confirmed":
-            return None, "rotation-unconfirmed"
-        if rot.get("kind") == "weekday-map":
-            person = role.get("peopleMap", {}).get(str(weekday))
-            if not person:
-                return None, "weekday-not-mapped"
-            return [person], None
-
-    return role.get("people", []), None
+        return None, group_reason or ("group-empty" if chosen else "cycle-group-unconfirmed"), "none"
+    if "peopleMap" in role or "rotation" in role:
+        return None, "weekday-not-mapped", "none"
+    return None, "no-people", "none"
 
 
 def role_triggers(role: dict, blocks: list[dict], noon: dict, weekday: int,
@@ -281,7 +324,7 @@ def build_duties(roles: dict, blocks: list[dict], noon: dict, weekday: int,
             unset.append(role["id"])
             continue
 
-        people, reason = resolve_people(role, group, group_reason, weekday)
+        people, reason, people_from = resolve_people(role, group, group_reason, weekday)
         triggers = role_triggers(role, blocks, noon, weekday, presents)
         if not triggers:
             continue
@@ -301,6 +344,8 @@ def build_duties(roles: dict, blocks: list[dict], noon: dict, weekday: int,
                 "end": t["end"],
                 "block": t["block"],
                 "people": people,
+                # 这次的人从哪儿来（people/group/weekday），面板据此解释「听谁的」
+                "peopleFrom": people_from,
                 "substitute": role.get("substitute", []),
                 "status": "ok" if people is not None else "unknown",
                 "reason": reason,

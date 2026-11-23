@@ -502,7 +502,7 @@
       if (d.grp) {
         if (!byKey[d.grp]) {
           byKey[d.grp] = { key: d.grp, name: d.grp, tasks: [], people: [], order: d.order,
-                           assign: d.assign, unknown: false };
+                           assign: d.assign, unknown: false, pending: [] };
           merged.push(byKey[d.grp]);
         }
         var g = byKey[d.grp];
@@ -510,18 +510,28 @@
         (d.people || []).forEach(function (p) {
           if (g.people.indexOf(p) < 0) g.people.push(p);
         });
-        if (d.status !== "ok") g.unknown = true;
+        /* 以前这里是一票否决：组里任一岗位没排人，整组就显示「待定」。
+           于是老师给扫地指定了人，屏上照样只有一个「待定」——他选的
+           那个人一个都看不见。改成先记下「哪几项还没排」，
+           整组一个人都没有时才算未知（见下面的收口）。 */
+        if (d.status !== "ok" && g.pending.indexOf(d.name) < 0) g.pending.push(d.name);
         g.order = Math.min(g.order, d.order);
         g.assign = d.assign === "self-organize" ? "self-organize" : g.assign;
         return;
       }
       if (d.freqKind === "each" || d.freqKind === "present") {
         each.push({ key: d.roleId, name: d.name, tasks: [], people: d.people || [],
-                    order: d.order, assign: d.assign, unknown: d.status !== "ok", quiet: true });
+                    order: d.order, assign: d.assign, unknown: d.status !== "ok", quiet: true,
+                    pending: [] });
         return;
       }
       merged.push({ key: d.roleId, name: d.name, tasks: [], people: d.people || [],
-                    order: d.order, assign: d.assign, unknown: d.status !== "ok" });
+                    order: d.order, assign: d.assign, unknown: d.status !== "ok", pending: [] });
+    });
+
+    /* 有人的组就不是未知：pending 只用来在详情里提示还差哪几项 */
+    merged.forEach(function (g) {
+      g.unknown = !g.people.length;
     });
 
     /* 日常岗位永远给临时任务让位，不抢同一行 */

@@ -160,16 +160,72 @@
     return out;
   }
 
+  /* ---------- 名单归一化 ---------- */
+  /* 名单在仓库里本来只有一种形状：`[{id, name, active}]`。但实际机器上见过
+     另外两种，都来自「别人做的设置文件」与「手工改过的班级数据」：
+       · 纯字符串数组 ["张三", "李四"]；
+       · name 本身是对象 {name: {name: "张三"}}。
+     不归一化，第一种会让 rankStudents 在 `s.name.indexOf` 上直接抛错
+     （换人面板整块空掉，看起来就是「打一个字不出人」）；第二种会一路
+     走到界面上显示成 [object Object]。所以在数据层收口一次。 */
+  function personNameOf(v, depth) {
+    var d = depth || 0;
+    if (v == null) return "";
+    if (typeof v === "string") return v.trim();
+    if (typeof v === "number") return String(v);
+    if (typeof v === "object" && d < 3) {
+      var inner = v.name != null ? v.name : (v.label != null ? v.label : "");
+      return personNameOf(inner, d + 1);
+    }
+    return "";
+  }
+
+  function normStudents(list) {
+    var src = list;
+    if (isPlain(src) && Array.isArray(src.students)) src = src.students;
+    if (!Array.isArray(src)) return [];
+    var out = [];
+    src.forEach(function (s) {
+      if (s == null) return;
+      if (typeof s === "string" || typeof s === "number") {
+        var raw = String(s).trim();
+        if (raw) out.push({ name: raw, active: true });
+        return;
+      }
+      if (typeof s !== "object") return;
+      var name = personNameOf(s.name);
+      /* "[object Object]" 是没有信息量的残留，不收 */
+      if (!name || name === "[object Object]") return;
+      var o = { name: name, active: s.active !== false };
+      if (s.id != null && String(s.id) !== "") o.id = String(s.id);
+      var alias = personNameOf(s.alias);
+      if (alias && alias !== "[object Object]") o.alias = alias;
+      out.push(o);
+    });
+    return out;
+  }
+
   /* ---------- 名单检索 ---------- */
   /* 排序：本场景相关的人 → 最近点过 → 名单顺序。
-     这是 2.17 定的规则，越靠前的越容易被点到。 */
+     这是 2.17 定的规则，越靠前的越容易被点到。
+     输入先归一化：老师打的第一个字就是「姓」，`indexOf` 已经能命中，
+     不需要额外的拼音或首字母表。 */
   function rankStudents(list, q, related, limit) {
-    q = (q || "").trim();
-    related = related || [];
+    q = String(q == null ? "" : q).trim();
     limit = limit || 8;
-    if (!list) return [];
+    if (!limit || limit < 1) return [];
 
-    var pool = list.filter(function (s) {
+    var all = normStudents(list);
+    if (!all.length) return [];
+
+    /* 相关人（这个岗位原来是谁）也可能带对象，一并取名字 */
+    var rel = [];
+    (Array.isArray(related) ? related : []).forEach(function (n) {
+      var v = personNameOf(n);
+      if (v && v !== "[object Object]") rel.push(v);
+    });
+
+    var pool = all.filter(function (s) {
       if (s.active === false) return false;
       if (!q) return true;
       return s.name.indexOf(q) >= 0 || (s.alias && s.alias.indexOf(q) >= 0);
@@ -177,11 +233,11 @@
 
     var picked = read(KEY.picked, {});
     var idx = {};
-    list.forEach(function (s, i) { idx[s.name] = i; });
+    all.forEach(function (s, i) { idx[s.name] = i; });
 
     pool.sort(function (a, b) {
-      var ra = related.indexOf(a.name) >= 0 ? 0 : 1;
-      var rb = related.indexOf(b.name) >= 0 ? 0 : 1;
+      var ra = rel.indexOf(a.name) >= 0 ? 0 : 1;
+      var rb = rel.indexOf(b.name) >= 0 ? 0 : 1;
       if (ra !== rb) return ra - rb;
       var ta = picked[a.name] || 0, tb = picked[b.name] || 0;
       if (ta !== tb) return tb - ta;
@@ -192,6 +248,8 @@
   }
 
   function markPicked(name) {
+    name = personNameOf(name);
+    if (!name || name === "[object Object]") return;
     var p = read(KEY.picked, {});
     p[name] = Date.now();
     var keys = Object.keys(p);
@@ -471,14 +529,32 @@
   /* ---------- 人群组（PLAN 2.18） ----------
      只落库老师显式「存成组」的点名组；排班组（source:role）的成员
      每次都从岗位实时取，不存快照。临时勾选走弹窗内存，不写这里。 */
+  /* 组员 id 只认字符串。历史上见过两种脏数据，都会一路显示成 [object Object]：
+       · 存进来的是对象 {id, name}——旧代码直接 String(m) 就成了 "[object Object]"；
+       · 已经写坏的 "[object Object]" 字面量。
+     对象能救就救（有 id 用 id，没有就用 name 走 `name:` 兜底）；
+     字面量没有信息量，只能丢——但组本身和其它成员留着，别整组消失。 */
+  function memberIdOf(m) {
+    if (m == null) return "";
+    if (typeof m === "object") {
+      var id = m.id != null ? String(m.id).trim() : "";
+      if (id && id !== "[object Object]") return id;
+      var n = personNameOf(m.name != null ? m.name : "");
+      return n && n !== "[object Object]" ? "name:" + n : "";
+    }
+    var v = String(m).trim();
+    if (!v || v === "[object Object]" || v === "name:[object Object]") return "";
+    return v;
+  }
+
   function normGroup(g) {
     if (!isPlain(g)) return null;
     if (g.source !== undefined && g.source !== "manual") return null;
-    var name = String(g.name == null ? "" : g.name).trim();
-    if (!name) return null;
+    var name = personNameOf(g.name);
+    if (!name || name === "[object Object]") return null;
     var ids = [];
-    (Array.isArray(g.memberIds) ? g.memberIds : []).forEach(function (id) {
-      var v = String(id == null ? "" : id).trim();
+    (Array.isArray(g.memberIds) ? g.memberIds : []).forEach(function (m) {
+      var v = memberIdOf(m);
       if (v && ids.indexOf(v) < 0) ids.push(v);
     });
     if (!ids.length) return null;
@@ -581,13 +657,91 @@
     return !!v && typeof v === "object" && !Array.isArray(v);
   }
 
+  /* 结构自愈：把历史上写坏的字段改回可用形状，其余原样不动。
+     三条硬约束：
+       1. 只改坏掉的那几个字段，不整块重排、不删学生、不删组；
+       2. 组名与能救回来的成员一律保留（老师看见「组没了」比看见一行
+          [object Object] 更慌，而且没法自己修）；
+       3. 只在升级与导入这两个时刻跑，不在每次读配置时跑——
+          大屏每秒重绘，读路径上做深拷贝会拖慢整屏。 */
+  function sanitizeConfig(c) {
+    if (!isPlain(c)) return c;
+    var out = clone(c);
+
+    if (out.students !== undefined) {
+      var st = normStudents(out.students);
+      if (st.length) out.students = st;
+      else if (Array.isArray(out.students)) delete out.students;
+    }
+
+    if (Array.isArray(out.peopleGroups)) {
+      out.peopleGroups = out.peopleGroups.map(function (g) {
+        if (!isPlain(g)) return g;
+        var o = clone(g);
+        var nm = personNameOf(o.name);
+        o.name = (nm && nm !== "[object Object]") ? nm : "未命名组";
+        var ids = [];
+        (Array.isArray(o.memberIds) ? o.memberIds : []).forEach(function (m) {
+          var v = memberIdOf(m);
+          if (v && ids.indexOf(v) < 0) ids.push(v);
+        });
+        o.memberIds = ids;
+        return o;
+      });
+    }
+
+    if (isPlain(out.roles) && Array.isArray(out.roles.roles)) {
+      out.roles = clone(out.roles);
+      out.roles.roles = out.roles.roles.map(function (r) {
+        if (!isPlain(r)) return r;
+        var o = clone(r);
+        function cleanName(x) {
+          var n = personNameOf(x);
+          return (n && n !== "[object Object]") ? n : null;
+        }
+        if (Array.isArray(o.people)) {
+          o.people = o.people.map(cleanName).filter(function (n) { return !!n; });
+        }
+        if (isPlain(o.peopleMap)) {
+          Object.keys(o.peopleMap).forEach(function (k) {
+            var n = cleanName(o.peopleMap[k]);
+            if (n) o.peopleMap[k] = n;
+            else delete o.peopleMap[k];
+          });
+        }
+        if (isPlain(o.groups)) {
+          Object.keys(o.groups).forEach(function (k) {
+            if (!Array.isArray(o.groups[k])) { delete o.groups[k]; return; }
+            o.groups[k] = o.groups[k].map(cleanName).filter(function (n) { return !!n; });
+          });
+        }
+        if (Array.isArray(o.substitute)) {
+          o.substitute = o.substitute.map(function (x) {
+            if (isPlain(x)) {
+              var y = clone(x);
+              y.name = cleanName(y.name);
+              return y.name ? y : null;
+            }
+            var n = cleanName(x);
+            return n ? n : null;
+          }).filter(function (x) { return !!x; });
+        }
+        return o;
+      });
+    }
+    return out;
+  }
+
   /* ---------- 配置版本与迁移 ----------
      老师的配置只活在这台机器上；格式一改，老 localStorage 必须能原地升级。
      每加一版就往 MIGRATIONS 末尾追加一个函数，输入是上一版的配置对象。 */
-  var SCHEMA_VERSION = 1;
+  var SCHEMA_VERSION = 2;
   var MIGRATIONS = [
     /* 0 → 1：早期配置没有版本号，但结构兼容，补上标记即可。 */
-    function (c) { return c; }
+    function (c) { return c; },
+    /* 1 → 2：修掉已经写坏的组员与姓名（[object Object]），名单统一成对象。
+       已污染的老机器升级后会在这里被清洗一次，不需要老师重新分组。 */
+    function (c) { return sanitizeConfig(c); }
   ];
 
   function configVersion() {
@@ -642,6 +796,9 @@
       plan.push([KEY.overrides, obj.overrides]);
     }
     if ("config" in obj) {
+      /* 先按版本迁一次。骨架校验仍然严格（见下），坏文件整份拒绝；
+         元素级的脏数据（成员是对象、姓名是对象）在校验通过后由
+         sanitizeConfig 修——这两件事别混，否则坏文件会被"修"成半份。 */
       var c = migrateConfig(obj.config, importedVersion);
       if (!isPlain(c)) return { ok: false, why: "设置里的「班级配置」格式不对" };
       if ("timetable" in c && (!isPlain(c.timetable) || !Array.isArray(c.timetable.blocks))) {
@@ -659,6 +816,9 @@
         });
         if (groupsBad) return { ok: false, why: "设置里的「人群组」格式不对" };
       }
+      /* 骨架没问题了，再修元素：字符串名单、对象成员、"未命名"组名。
+         修完写回去的就是干净数据，不会把脏东西带进这台机器。 */
+      c = sanitizeConfig(c);
       plan.push([KEY.config, c]);
       plan.push([KEY.schema, SCHEMA_VERSION]);
     }
@@ -693,6 +853,8 @@
     patchDayOverride: patchDayOverride, clearDayOverride: clearDayOverride,
     applyOverrides: applyOverrides, undo: undo, canUndo: canUndo,
     rankStudents: rankStudents, markPicked: markPicked,
+    normStudents: normStudents, personNameOf: personNameOf,
+    memberIdOf: memberIdOf, sanitizeConfig: sanitizeConfig,
     recall: recall, remember: remember, allPhrases: allPhrases, removePhrase: removePhrase,
     findTimeWords: findTimeWords,
     texts: texts, patchTexts: patchTexts, resetTexts: resetTexts,

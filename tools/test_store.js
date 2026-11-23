@@ -100,6 +100,23 @@ check(rel[0].name === "林予宁", "本岗位的人排第一位", rel.map(s => s
 const capped = S.rankStudents(stu, "", [], 8);
 check(capped.length === 8, "候选最多 8 条", capped.length + " 条");
 
+/* 别人做的设置文件里，名单可能是纯字符串数组。不归一化的话
+   `s.name.indexOf` 会直接抛错，换人面板整块空掉——看起来就是「打一个字不出人」。 */
+const strHit = S.rankStudents(["林予安", "陈子墨"], "林", [], 8);
+check(Array.isArray(strHit) && strHit.length === 1 && strHit[0].name === "林予安",
+  "名单是纯字符串数组时也能按姓氏出人", JSON.stringify(strHit));
+
+/* name 本身是对象、或者已经被写成 "[object Object]" 的老数据 */
+const objHit = S.rankStudents(
+  [{ id: "o1", name: { name: "林予宁" } }, { id: "o2", name: "[object Object]" }],
+  "林", [], 8);
+check(objHit.length === 1 && objHit[0].name === "林予宁",
+  "姓名存成对象时取出内层名字，[object Object] 不进候选", JSON.stringify(objHit));
+
+/* 相关人（这个岗位原来是谁）也可能是对象：取名字后仍要排第一位 */
+const relObj = S.rankStudents(stu, "", [{ name: "孙思远" }], 8);
+check(relObj[0].name === "孙思远", "相关人是对象时取名字排序", relObj[0].name);
+
 /* ---------- 时间词 ---------- */
 check(S.findTimeWords("今天 12:50 大扫除").join("、") === "今天、12:50",
   "抓出「今天」和「12:50」", S.findTimeWords("今天 12:50 大扫除").join("、"));
@@ -282,6 +299,27 @@ check(g0b.length === 1 && g0b[0].memberIds[0] === "s03",
   "同 id 再存是改名/换人，不新增一条", JSON.stringify(g0b[0].memberIds));
 check(S.removeGroup(g0b, "g1").length === 0, "删组按 id 只删这一条", "剩 0 条");
 
+/* 组员存成对象时，旧代码 String(m) 会写成 "[object Object]" 并永久落库
+   （真机反馈：更新后分组里还留着这个词）。有 id 用 id，没 id 用 name 兜底。 */
+var objMember = S.upsertGroup([], {
+  id: "g5", name: "对象成员",
+  memberIds: [{ id: "s01", name: "张三" }, { name: "李四" }]
+});
+check(objMember.length === 1
+      && objMember[0].memberIds.indexOf("s01") >= 0
+      && objMember[0].memberIds.indexOf("name:李四") >= 0,
+  "对象成员写成 id / name: 兜底，不落成 [object Object]",
+  JSON.stringify(objMember[0] && objMember[0].memberIds));
+
+var junkMember = S.upsertGroup([], {
+  id: "g6", name: "脏数据",
+  memberIds: ["[object Object]", "name:[object Object]", "s02"]
+});
+check(junkMember.length === 1 && junkMember[0].memberIds.length === 1
+      && junkMember[0].memberIds[0] === "s02",
+  "救不回来的 [object Object] 丢掉，组和其余成员保留",
+  JSON.stringify(junkMember[0] && junkMember[0].memberIds));
+
 var savedGroup = S.saveGroup({
   id: "g9", name: "值日组", memberIds: ["s01", "s02"], order: 0
 });
@@ -305,16 +343,73 @@ check(S.importAll(goodGroups).ok === true && S.peopleGroups().length === 1,
   "合法人群组能随备份恢复", "1 条");
 S.resetConfig();
 
+/* ---------- 旧机器上的脏数据自愈（schema 1 → 2） ----------
+   真机反馈：分组里出现过 [object Object]，更新后还在。修法是升级时
+   清洗一次，不要求老师重新分组；能救的救（对象取 id / 名字），
+   救不回来的只丢那一个成员，组名和其余成员一律保留。 */
+var dirty = {
+  meta: { klass: "脏数据班" },
+  students: ["张三", { id: "s02", name: { name: "李四" } }, { id: "s03", name: "[object Object]" }],
+  peopleGroups: [
+    { id: "g1", name: "第一组", source: "manual", memberIds: [{ id: "s01", name: "张三" }, "[object Object]"] },
+    { id: "g2", name: { name: "第二组" }, source: "manual", memberIds: ["name:李四"] }
+  ],
+  roles: { roles: [
+    { id: "r1", name: "扫地", people: [{ name: "王五" }, "[object Object]"] },
+    { id: "r2", name: "擦窗", peopleMap: { "1": { name: "赵六" }, "2": "[object Object]" } },
+    { id: "r3", name: "值日", groups: { A: [{ name: "孙七" }], B: "[object Object]" } },
+    { id: "r4", name: "替补", substitute: [{ name: "周八" }] }
+  ] }
+};
+var healed = S.sanitizeConfig(dirty);
+check(healed.students.length === 2 && healed.students[0].name === "张三"
+      && healed.students[1].name === "李四",
+  "自愈：名单归一化，[object Object] 学生丢掉",
+  JSON.stringify(healed.students.map(function (s) { return s.name; })));
+check(healed.peopleGroups.length === 2
+      && healed.peopleGroups[0].memberIds.length === 1
+      && healed.peopleGroups[0].memberIds[0] === "s01"
+      && healed.peopleGroups[1].name === "第二组",
+  "自愈：组员对象救回 id，脏成员丢弃，组名与组本身保留",
+  JSON.stringify(healed.peopleGroups));
+check(healed.roles.roles[0].people.length === 1 && healed.roles.roles[0].people[0] === "王五",
+  "自愈：岗位人员里的对象取名字", JSON.stringify(healed.roles.roles[0].people));
+check(healed.roles.roles[1].peopleMap["1"] === "赵六"
+      && healed.roles.roles[1].peopleMap["2"] === undefined,
+  "自愈：按星期轮换的对象取名字",
+  JSON.stringify(healed.roles.roles[1].peopleMap));
+check(healed.roles.roles[2].groups.A[0] === "孙七"
+      && healed.roles.roles[2].groups.B === undefined,
+  "自愈：A/B 组里的对象取名字，不是数组的丢",
+  JSON.stringify(healed.roles.roles[2].groups));
+check(healed.roles.roles[3].substitute[0].name === "周八",
+  "自愈：替补列表里的对象取名字", JSON.stringify(healed.roles.roles[3].substitute));
+check(dirty.peopleGroups[0].memberIds.length === 2 && dirty.students[0] === "张三",
+  "自愈不改原对象（纯函数）", "输入保持原样");
+
+/* 走导入这条路：别人做的设置文件里带字符串名单与对象成员，落盘前也要洗干净 */
+var dirtyFile = JSON.parse(JSON.stringify(S.exportAll()));
+dirtyFile.config.students = ["张三", "李四"];
+dirtyFile.config.peopleGroups = [
+  { id: "gx", name: "导入组", source: "manual", memberIds: [{ id: "s01", name: "张三" }] }
+];
+var impRes = S.importAll(dirtyFile);
+check(impRes.ok === true && S.config().students[0].name === "张三"
+      && S.peopleGroups()[0].memberIds[0] === "s01",
+  "导入时把字符串名单与对象成员洗干净", JSON.stringify(S.peopleGroups()));
+S.resetConfig();
+
 /* ---------- 配置版本：老备份原地升级，更高版本整份拒绝 ---------- */
-check(S.schemaVersion() === 1, "本机配置版本是 1", String(S.schemaVersion()));
-check(S.exportAll().schemaVersion === 1, "导出文件带版本号", "schemaVersion");
+/* 版本号是配置格式的契约：加迁移就要同步改这里，别让它变成同义反复 */
+check(S.schemaVersion() === 2, "本机配置版本是 2", String(S.schemaVersion()));
+check(S.exportAll().schemaVersion === 2, "导出文件带版本号", "schemaVersion");
 
 var legacy = S.exportAll();
 delete legacy.schemaVersion;
 legacy.config = { meta: { klass: "旧版班级" }, students: ["同学甲"] };
 var legacyRes = S.importAll(legacy);
 check(legacyRes.ok === true, "没有版本号的旧备份能导入", legacyRes.why || "");
-check(S.schemaVersion() === 1 && S.config().meta.klass === "旧版班级",
+check(S.schemaVersion() === 2 && S.config().meta.klass === "旧版班级",
   "导入旧备份后补上版本号，配置原样保留",
   "v" + S.schemaVersion() + "/" + S.config().meta.klass);
 
@@ -325,7 +420,7 @@ check(futureRes.ok === false && S.config().meta.klass === "旧版班级",
   "更高版本的备份整份拒绝，不动现有配置", futureRes.why || "");
 
 S.resetConfig();
-check(S.schemaVersion() === 1, "重置配置不回退版本号", "v" + S.schemaVersion());
+check(S.schemaVersion() === 2, "重置配置不回退版本号", "v" + S.schemaVersion());
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

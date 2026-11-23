@@ -32,6 +32,7 @@ function load(f) {
   new Function(fs.readFileSync(path.join(ROOT, f), "utf8"))();
 }
 load("app/templates.js");
+load("app/subjects.js");
 load("app/setup.js");
 load("app/store.js");
 
@@ -434,6 +435,31 @@ check(g.entries.filter(e => e.weekday === 3 && e.periodNo === 4)[0].subject === 
   "「五年级选修」不当成老师名");
 check(S3._gridFromRows(S3._gridCellRows("第 1 节\t英语\t语文")).bad.indexOf("周一") >= 0,
   "缺表头时拒绝");
+
+/* 格子里的科目与老师怎么分（真机反馈 2026-11-23：上传课表后改课务带不出老师）。
+   以前只按空白切、且认定第一段是科目，「语文王老师」这种富文本粘连会
+   整串变成假科目；「王老师 语文」又把老师当科目。 */
+const sp = S3._splitSubjectTeacher;
+check(sp("语文 王老师").subject === "语文" && sp("语文 王老师").teacher === "王老师",
+  "空格分隔：科目和老师各归各位", JSON.stringify(sp("语文 王老师")));
+check(sp("语文王老师").subject === "语文" && sp("语文王老师").teacher === "王老师",
+  "富文本粘在一起也能拆（靠科目词典认前缀）", JSON.stringify(sp("语文王老师")));
+check(sp("王老师 语文").subject === "语文" && sp("王老师 语文").teacher === "王老师",
+  "老师写在前面也不认错", JSON.stringify(sp("王老师 语文")));
+check(sp("语文\n王老师").subject === "语文" && sp("语文\n王老师").teacher === "王老师",
+  "单元格内换行（Excel 里 Alt+Enter）同样拆得开");
+check(sp("心理/班队 孙丽（双周）/李强").subject === "心理/班队"
+      && sp("心理/班队 孙丽（双周）/李强").teacher === "孙丽（双周）/李强",
+  "斜杠既是科目分隔也是两位老师，原样保留",
+  JSON.stringify(sp("心理/班队 孙丽（双周）/李强")));
+check(sp("五年级选修").subject === "五年级选修" && sp("五年级选修").teacher === "",
+  "认不出的整格当科目，不硬塞老师");
+check(sp("语 文").subject === "语文",
+  "被空格拆开的同一个科目名能合回去", JSON.stringify(sp("语 文")));
+check(sp("劳综短课 张明").subject === "劳综短课" && sp("劳综短课 张明").teacher === "张明",
+  "别名科目（劳综短课 = 劳动）也认得出，老师不会跑进科目里",
+  JSON.stringify(sp("劳综短课 张明")));
+
 
 const multiRole = S3._gridFromRows(S3._gridCellRows(
   "周一\t周二\t周三\n" +

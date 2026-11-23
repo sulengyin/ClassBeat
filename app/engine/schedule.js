@@ -252,24 +252,66 @@
 
   // ---------- 岗位 ----------
 
+  /* 一个人名的各种历史写法：字符串、{name}、{label}、数组。
+     取不出来就当空，绝不让 [object Object] 混进屏面。 */
+  function nameOf(v, depth) {
+    if (v == null) return "";
+    if (typeof v === "string") return v.trim();
+    if (typeof v === "number") return String(v);
+    if (typeof v === "object") {
+      if ((depth || 0) >= 3) return "";
+      var inner = v.name != null ? v.name : (v.label != null ? v.label : (v.student != null ? v.student : ""));
+      return nameOf(inner, (depth || 0) + 1);
+    }
+    return "";
+  }
+
+  /* 名单统一成「去重、去空的姓名数组」。
+     顺手按分隔符拆开：配置里常见 people: ["张三、李四"]，
+     以前原样上屏碰巧没错，但按 id 核对时就对不上。人名里不会出现这些符号。 */
+  function nameList(v) {
+    if (v == null) return [];
+    var arr = Array.isArray(v) ? v : [v];
+    var out = [];
+    arr.forEach(function (x) {
+      var n = nameOf(x, 0);
+      if (!n || n === "[object Object]") return;
+      n.split(/[、\/／,，;；|｜]+/).forEach(function (part) {
+        var p = part.trim();
+        if (p && p !== "[object Object]" && out.indexOf(p) < 0) out.push(p);
+      });
+    });
+    return out;
+  }
+
+  /* 「这个岗位今天归谁」只有一个入口。
+     旧写法是三段 if：有 groups 就只看组、有 rotation 就只看星期表，
+     people 永远排在最后——老师在面板里亲手指定了人，只要配置里还留着
+     轮换的元数据，屏上照样「待定」。而且 rotation.status 没确认时，
+     就算 peopleMap 里明明写了今天是谁，也一律判成未知。
+     现在改成候选源列表，按「越具体越优先」排：老师指定 > 轮换到的那组 >
+     按星期表；空数组算「没指定」，继续往下找。返回 [名单, 原因, 来源]，
+     前两项的契约没变，来源只用来让面板解释「这次听谁的」。 */
   function resolvePeople(role, group, groupReason, weekday) {
+    var cycle = role.cycle || {};
+    var chosen = group || cycle.current;
+    var candidates = [
+      { key: "people", names: role.people },
+      { key: "group", names: role.groups && chosen ? role.groups[chosen] : null, group: chosen },
+      { key: "weekday", names: role.peopleMap ? role.peopleMap[String(weekday)] : null }
+    ];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var names = nameList(candidates[i].names);
+      if (names.length) return [names, null, candidates[i].key];
+    }
+
+    /* 一个都没排：原因要分得清，面板才能告诉老师下一步该点哪儿 */
     if (role.groups) {
-      var chosen = group || (role.cycle || {}).current;
-      if (!chosen) return [null, groupReason || "cycle-group-unconfirmed"];
-      return [role.groups[chosen] || [], null];
+      return [null, groupReason || (chosen ? "group-empty" : "cycle-group-unconfirmed"), "none"];
     }
-
-    var rot = role.rotation;
-    if (rot) {
-      if (rot.status !== "confirmed") return [null, "rotation-unconfirmed"];
-      if (rot.kind === "weekday-map") {
-        var person = (role.peopleMap || {})[String(weekday)];
-        if (!person) return [null, "weekday-not-mapped"];
-        return [[person], null];
-      }
-    }
-
-    return [role.people || [], null];
+    if (role.peopleMap || role.rotation) return [null, "weekday-not-mapped", "none"];
+    return [null, "no-people", "none"];
   }
 
   function roleTriggers(role, blocks, noon, weekday, presents) {
@@ -345,6 +387,7 @@
       var res = resolvePeople(role, group, groupReason, weekday);
       var people = res[0];
       var reason = res[1];
+      var from = res[2] || "none";
       var triggers = roleTriggers(role, blocks, noon, weekday, presents);
       if (!triggers.length) return;
 
@@ -360,6 +403,9 @@
           end: t.end,
           block: t.block,
           people: people,
+          /* peopleFrom：这次的人是从哪儿来的（people/group/weekday）。
+             面板据此说「这人是固定指定的」还是「今天轮到 A 组」。 */
+          peopleFrom: from,
           substitute: role.substitute || [],
           status: people !== null ? "ok" : "unknown",
           reason: reason,

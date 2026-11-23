@@ -26,6 +26,7 @@ const APP_JS: &[&str] = &[
     "qr.js",
     "clock.js",
     "config.js",
+    "subjects.js",
     "rhythm.js",
     "store.js",
     "runtime.js",

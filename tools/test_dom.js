@@ -222,7 +222,7 @@ loadVendor("app/vendor/qrcode.min.js", "qrcode");
 /* 固定夹具，不读 app/data.js：本机 app/data.js 是真实班级，CI 是 sample，
    两种数据跑同一套断言必然一边红。夹具由
    `python3 tools/bundle.py --data sample --out tools/fixtures/data.sample.js` 生成。 */
-["tools/fixtures/data.sample.js", "app/version.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/update.js", "app/backup.js", "app/demo.js", "app/templates.js", "app/setup.js"]
+["tools/fixtures/data.sample.js", "app/version.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/subjects.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/update.js", "app/backup.js", "app/demo.js", "app/templates.js", "app/setup.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
@@ -820,6 +820,52 @@ const ovAfter = global.Store.getDayOverride(global.Store.dayKey());
 check(!!(ovAfter && ovAfter.lessons && Object.keys(ovAfter.lessons).length),
   "改课保存走今日覆盖", JSON.stringify(ovAfter && ovAfter.lessons));
 global.Store.clearDayOverride(global.Store.dayKey());
+
+/* 真机反馈 2026-11-23：上传课表后改课务，要能下拉选科目、自动带出老师，
+   老师还得能改；同义科目不能在列表里并列两条（选错那条就没老师）。 */
+document.querySelectorAll(".ep-row")[0]._h.click();
+const sel30 = document.querySelectorAll(".ep-select")[0];
+const seenKey = {};
+let dupSub = null;
+Array.from(sel30.children).forEach(o => {
+  const k = global.Subjects.key(o.value);
+  if (seenKey[k]) dupSub = seenKey[k] + " / " + o.value;
+  seenKey[k] = o.value;
+});
+check(!dupSub, "科目下拉里没有同义重复（道法 / 道德与法治只留一条）", dupSub || "无重复");
+const chips30 = document.querySelectorAll(".ep-teacher-chip");
+check(chips30.length > 0, "这一科的老师做成可点的按钮，不用打字",
+  chips30.length + " 个候选");
+const tea30 = document.querySelectorAll(".ep-tea")[0];
+if (chips30.length) {
+  const last = chips30[chips30.length - 1];
+  last._h.click();
+  check(tea30.value === last.textContent,
+    "点一下老师就填进输入框（填完仍可手改）", tea30.value);
+}
+
+/* 「以后都改」写课表本身，而不是只改今天 */
+const dayKey30 = global.Store.dayKey();
+const wd30 = global.Runtime.day(dayKey30).weekday;
+const p30 = global.Runtime.day(dayKey30).timeline
+  .filter(b => b.type === "class")[0].periodNo;
+const schedBefore = JSON.parse(JSON.stringify(global.Runtime.config().schedule));
+const pickSub30 = sel30.value;
+document.querySelectorAll(".ep-lesson-always")[0]._h.click();
+const entriesAfter = global.Runtime.config().schedule.entries;
+const hit30 = entriesAfter.filter(e => +e.weekday === wd30 && +e.periodNo === p30)[0];
+check(!!hit30 && hit30.subject === pickSub30,
+  "「以后都改」写进课表本身（周" + wd30 + " 第 " + p30 + " 节）",
+  hit30 ? hit30.subject : "没找到该节");
+check(entriesAfter.length === schedBefore.entries.length,
+  "改的是已有那一节，没有多塞条目", "节数 " + entriesAfter.length);
+check(!(global.Store.getDayOverride(dayKey30) || {}).lessons
+      || !(global.Store.getDayOverride(dayKey30).lessons || {})[p30],
+  "改到课表时清掉那节的「今天覆盖」，否则它还会盖住新配置");
+global.Store.patchConfig({ schedule: schedBefore });
+global.Store.clearDayOverride(dayKey30);
+document.querySelectorAll(".ep-dialog").forEach(n => n.remove());
+
 
 /* 时段常驻（0.3.23）：课间/晨间自主管理/午间各配哪些岗位整段挂出，
    自由多选；选进来的触发走 present（freq 不再另算），没选的照旧。 */

@@ -20,10 +20,10 @@
   var gateInput = "";
   var draft = { level: "normal", minutes: 10, text: "", pinned: false, timeAck: false };
 
-  var SUBJECTS = [
-    "语文", "数学", "英语", "科学", "音乐", "美术", "体育",
-    "书法", "道德与法治", "劳动", "信息科技", "班队", "自习"
-  ];
+  /* 科目词典在 app/subjects.js：向导识别课表、这里选课务、准备清单挂物品
+     用的是同一份，三处不再各记一套名字。 */
+  var Sub = root.Subjects || { list: function () { return []; }, key: function (s) { return String(s || ""); } };
+  function subjectChoices() { return Sub.list(); }
 
   /* 科目 → 任课老师：从整张课表聚合（真机反馈 2026-11-20：五年级学生
      打字找字麻烦，改课时不要手输老师名字）。同一科由两位老师执教
@@ -450,16 +450,27 @@
   }
 
   function openLessonEditor(b, key) {
+    var day = (RT && RT.day) ? RT.day(key) : null;
+    var weekday = day && day.weekday;
     var wrap = h("div", "ep-dialog");
-    wrap.appendChild(h("div", "ep-dialog-title", "第 " + b.periodNo + " 节"));
+    wrap.appendChild(h("div", "ep-dialog-title",
+      "第 " + b.periodNo + " 节" + (weekday ? " · 周" + "一二三四五六日".charAt(weekday - 1) : "")));
 
     var bind = subjectTeachers();
-    /* 学科用下拉直接选：课表里真实出现过的学科排前面（都带着任课老师），
-       其余常用科补在后面；本节当前的学科永远在列。 */
-    var opts = [];
-    if (b.subject && opts.indexOf(b.subject) < 0) opts.push(b.subject);
-    Object.keys(bind).forEach(function (s) { if (opts.indexOf(s) < 0) opts.push(s); });
-    SUBJECTS.forEach(function (s) { if (opts.indexOf(s) < 0) opts.push(s); });
+
+    /* 学科下拉：课表里真实出现过的科目排前面（它们才带着任课老师），
+       同义的写法只留一个（课表用的那个），常用科目兜底补齐。 */
+    var opts = [], seen = {};
+    function putSubject(s) {
+      var k = Sub.key(s);
+      if (!k || seen[k]) return;
+      seen[k] = 1;
+      opts.push(String(s).trim());
+    }
+    Object.keys(bind).forEach(putSubject);
+    if (b.subject) putSubject(b.subject);
+    subjectChoices().forEach(putSubject);
+
     var sub = document.createElement("select");
     sub.className = "ep-input ep-select";
     opts.forEach(function (s) {
@@ -468,38 +479,114 @@
       o.textContent = s;
       sub.appendChild(o);
     });
-    sub.value = b.subject || opts[0] || "";
+    /* 当前科目按「同一科」找对应项：今天是「道德与法治」而课表写「道法」，
+       就选中「道法」，否则一打开就没老师。 */
+    var curKey = Sub.key(b.subject);
+    var curPick = opts.filter(function (s) { return Sub.key(s) === curKey; })[0];
+    sub.value = curPick || opts[0] || "";
     wrap.appendChild(sub);
+
+    /* 这一科在课表里由谁上。同一科多位老师（心理/班队）就并列成可点的按钮，
+       点一下填进输入框；填空仍然可编辑，代课直接改字。 */
+    function teachersOf(subject) {
+      var k = Sub.key(subject);
+      var list = [];
+      Object.keys(bind).forEach(function (s) {
+        if (Sub.key(s) !== k) return;
+        (bind[s] || []).forEach(function (t) {
+          if (t && list.indexOf(t) < 0) list.push(t);
+        });
+      });
+      return list;
+    }
 
     var tea = document.createElement("input");
     tea.className = "ep-input ep-tea";
     tea.placeholder = "任课老师（可留空）";
-    tea.title = "老师和科目按课表自动对应；代课等特殊情况可以手动改";
-    function fillTeacher() {
-      var list = bind[sub.value] || [];
-      tea.value = list.length ? list.join("/") : "";
-    }
-    fillTeacher();
-    if (!tea.value && b.teacher) tea.value = b.teacher;
-    sub.addEventListener("change", fillTeacher);
+    tea.title = "老师和科目按课表自动对应；代课等特殊情况可以直接改这几个字";
     wrap.appendChild(tea);
 
+    var teaPick = h("div", "ep-teachers");
+    wrap.appendChild(teaPick);
+
+    function paintTeachers(keepTyped) {
+      var list = teachersOf(sub.value);
+      teaPick.innerHTML = "";
+      if (!list.length) {
+        teaPick.appendChild(h("span", "ep-teachers-tip", "课表里还没有这一科的老师，直接手填就行"));
+        if (!keepTyped) tea.value = "";
+        return;
+      }
+      teaPick.appendChild(h("span", "ep-teachers-tip", "点一下填上："));
+      list.forEach(function (t) {
+        var btn = h("button", "ep-teacher-chip", t);
+        btn.type = "button";
+        btn.addEventListener("click", function () {
+          tea.value = t;
+        });
+        teaPick.appendChild(btn);
+      });
+      if (!keepTyped) tea.value = list.join("/");
+    }
+
+    /* 打开时优先用今天课表上实际的人（可能已被代课改过），
+       没有才用课表聚合出来的默认值 */
+    paintTeachers(true);
+    if (b.teacher) tea.value = b.teacher;
+    sub.addEventListener("change", function () { paintTeachers(false); });
+
     wrap.appendChild(h("p", "ep-note",
-      "老师和科目按课表自动对应，不用打字；代课等特殊情况手动改就行。"));
+      "科目决定带哪些东西；老师按课表自动带出，不用打字，代课直接改。"));
 
     var row = h("div", "ep-actrow");
-    var save = h("button", "ep-primary ep-lesson-save", "保存");
-    save.addEventListener("click", function () {
+    var saveToday = h("button", "ep-primary ep-lesson-save", "只改今天");
+    saveToday.title = "只影响这一天，课表本身不动";
+    saveToday.addEventListener("click", function () {
       var lessons = (S.getDayOverride(key) || {}).lessons || {};
       lessons[b.periodNo] = { subject: sub.value.trim(), teacher: tea.value.trim() };
       S.patchDayOverride(key, { lessons: lessons });
       wrap.remove();
-      flash("第 " + b.periodNo + " 节已改");
+      flash("第 " + b.periodNo + " 节今天改成" + sub.value.trim());
       renderBody();
     });
+
+    /* 「以后都改」写课表本身：同一个星期几的同一节，以后每周都按这个来。
+       同时把今天那条临时覆盖删掉，不然它还会盖住刚写进去的课表。 */
+    var saveAlways = h("button", "ep-ghost ep-lesson-always", "以后都改");
+    saveAlways.title = weekday
+      ? "把这周" + "一二三四五六日".charAt(weekday - 1) + "第 " + b.periodNo + " 节写进课表，以后每周都这样"
+      : "写进课表，以后每周都这样";
+    saveAlways.addEventListener("click", function () {
+      if (!weekday) { flash("算不出今天是星期几，先用「只改今天」"); return; }
+      var sc = JSON.parse(JSON.stringify((RT.config() || {}).schedule || {}));
+      sc.entries = sc.entries || [];
+      var hit = sc.entries.filter(function (e) {
+        return +e.weekday === +weekday && +e.periodNo === +b.periodNo;
+      });
+      var subject = sub.value.trim(), teacher = tea.value.trim();
+      if (!hit.length) {
+        hit = [{ weekday: weekday, periodNo: b.periodNo, subject: subject }];
+        sc.entries.push(hit[0]);
+      }
+      hit.forEach(function (e) {
+        e.subject = subject;
+        if (teacher) e.teacher = teacher;
+        else delete e.teacher;
+      });
+      var lessons = (S.getDayOverride(key) || {}).lessons || {};
+      delete lessons[b.periodNo];
+      S.patchDayOverride(key, { lessons: lessons });
+      S.patchConfig({ schedule: sc });
+      wrap.remove();
+      flash("课表已改：周" + "一二三四五六日".charAt(weekday - 1)
+        + "第 " + b.periodNo + " 节以后都是" + subject);
+      renderBody();
+    });
+
     var cancel = h("button", "ep-ghost", "取消");
     cancel.addEventListener("click", function () { wrap.remove(); });
-    row.appendChild(save);
+    row.appendChild(saveToday);
+    row.appendChild(saveAlways);
     row.appendChild(cancel);
     wrap.appendChild(row);
 
@@ -1139,13 +1226,15 @@
 
   /* 岗位现在挂的是什么人：今天的换人优先，其次岗位配置里的
      people / peopleMap / groups（A/B 轮换时算总人数）。
+     顺序与引擎的 resolvePeople 一致；空数组/空表算「没写」而不是
+     「没人」——否则人在轮换表里，面板却标成「未定」。
      空数组 = 大屏会显示「待定」——常驻区靠它标注提醒老师
      （真机反馈 2026-11-20：勾了常驻的岗位却显示待选）。 */
   function rolePeopleNow(role, key) {
     var ov = (S.getDayOverride(key) || {}).roles || {};
-    if (ov[role.id] && ov[role.id].people) return ov[role.id].people;
-    if (role.people) return role.people;
-    if (role.peopleMap) {
+    if (ov[role.id] && nameText(ov[role.id].people)) return ov[role.id].people;
+    if (nameText(role.people)) return role.people;
+    if (role.peopleMap && Object.keys(role.peopleMap).length) {
       return Object.keys(role.peopleMap).map(function (k) { return role.peopleMap[k]; });
     }
     if (role.groups) {
@@ -1177,10 +1266,11 @@
       row.appendChild(h("span", "p", r.name));
 
       var who = "";
-      if (changed) who = (ov.roles[r.id].people || []).join("、");
-      else if (r.people) who = r.people.join("、");
-      else if (r.peopleMap) who = Object.keys(r.peopleMap).sort().map(function (k) { return r.peopleMap[k]; }).join("、");
-      else if (r.groups) {
+      if (changed) who = nameText(ov.roles[r.id].people);
+      else if (nameText(r.people)) who = nameText(r.people);
+      else if (r.peopleMap && Object.keys(r.peopleMap).length) {
+        who = nameText(Object.keys(r.peopleMap).sort().map(function (k) { return r.peopleMap[k]; }));
+      } else if (r.groups) {
         var filled = Object.keys(r.groups).reduce(function (n, k) {
           return n + ((r.groups[k] || []).length);
         }, 0);
@@ -1269,13 +1359,29 @@
     renderBody(role.id);
   }
 
+  /* 一组「人员」可能是名字、学号、也可能是对象（手工改过的配置）。
+     拼到界面上之前一律取名字、丢掉取不出来的，别让 [object Object] 露脸。 */
+  function nameText(list) {
+    return (list || []).map(function (x) {
+      var n = S.personNameOf ? S.personNameOf(x) : (typeof x === "string" ? x : "");
+      return (n && n !== "[object Object]") ? n : "";
+    }).filter(function (n) { return !!n; }).join("、");
+  }
+
   /* 换人时候选的排序依据：这个岗位原本是谁，就先出谁。
-     岗位的人可能在 people、peopleMap、groups 三处，三处都要算进来。 */
+     岗位的人可能在 people、peopleMap、groups 三处，三处都要算进来；
+     手工改过的配置里这些位置偶尔是对象，统一取名字，别让对象流进候选。 */
   function relatedNames(role) {
-    var out = (role.people || []).slice();
-    if (role.peopleMap) Object.keys(role.peopleMap).forEach(function (k) { out.push(role.peopleMap[k]); });
-    if (role.groups) Object.keys(role.groups).forEach(function (k) { out = out.concat(role.groups[k] || []); });
-    return out.concat(role.substitute || []);
+    var raw = (role.people || []).slice();
+    if (role.peopleMap) Object.keys(role.peopleMap).forEach(function (k) { raw.push(role.peopleMap[k]); });
+    if (role.groups) Object.keys(role.groups).forEach(function (k) { raw = raw.concat(role.groups[k] || []); });
+    raw = raw.concat(role.substitute || []);
+    var out = [];
+    raw.forEach(function (x) {
+      var n = S.personNameOf ? S.personNameOf(x) : (typeof x === "string" ? x : "");
+      if (n && n !== "[object Object]" && out.indexOf(n) < 0) out.push(n);
+    });
+    return out;
   }
 
   /* ---------- 人群组：点组带出（PLAN 2.18） ---------- */
@@ -1285,7 +1391,10 @@
   function rosterStudents() {
     var cfg = S.config ? S.config() : null;
     var d = cfg ? cfg.students : null;
-    if (d && Array.isArray(d.students)) return d.students;
+    /* 归一化收口在 Store：纯字符串名单、name 是对象的老数据都会变成
+       `{id, name, active}`。少了这一步，后面按姓名字符串比对的代码
+       会在 `s.name.indexOf` 上抛错，换人面板整块空掉。 */
+    if (S.normStudents) return S.normStudents(d);
     return Array.isArray(d) ? d : [];
   }
 
@@ -1318,8 +1427,11 @@
 
     if (role && role.grp) {
       var names = [];
-      function add(n) {
-        if (n && (keep === null || keep[n]) && names.indexOf(n) < 0) names.push(n);
+      function add(x) {
+        var n = S.personNameOf ? S.personNameOf(x) : (typeof x === "string" ? x : "");
+        if (!n || n === "[object Object]") return;
+        if (keep !== null && !keep[n]) return;
+        if (names.indexOf(n) < 0) names.push(n);
       }
       if (day) {
         (S.applyOverrides(day, S.getDayOverride(key)).duties || []).forEach(function (d) {
@@ -1401,6 +1513,21 @@
     var grid = h("div", "ep-people");
     wrap.appendChild(grid);
 
+    /* 单人岗位（如「班牌」）点一下就是选定今天，不弹二次确认；但老师
+       常常是想「以后都换成这个人」，以前没有出口，第二天又变回原样。
+       这里给一个开关：勾上再点人，写的是岗位配置而不是今天。 */
+    var pinAlways = false;
+    if (!multi) {
+      var pinBtn = h("button", "ep-ghost ep-pin-always", "以后一直用这个人");
+      pinBtn.title = "先点一下这个按钮，再点人名：会写进岗位配置，以后每天都显示，不只是一天";
+      pinBtn.addEventListener("click", function () {
+        pinAlways = !pinAlways;
+        pinBtn.classList.toggle("on", pinAlways);
+        pinBtn.textContent = pinAlways ? "现在是「以后一直用」，点人名生效" : "以后一直用这个人";
+      });
+      wrap.appendChild(pinBtn);
+    }
+
     /* 名单没录入时指一条路：候选只剩岗位现有人，完整名单要去向导补 */
     if (!rosterStudents().length) {
       wrap.appendChild(h("p", "ep-note",
@@ -1409,13 +1536,16 @@
 
     /* 换人语义先说清楚（真机反馈 2026-11-20：老师选好了人，
        常驻岗位大屏却显示「待定」——原因就是换人只改今天，
-       岗位配置里其实没人，老师以为选一次就一直有效）。 */
-    if (multi && !role.groups && !role.peopleMap && !role.rotation) {
+       岗位配置里其实没人，老师以为选一次就一直有效）。
+       2026-11-23：有轮换表的岗位也能长期指定人，所以这里不再把它们排除在外。 */
+    if (role.groups || role.peopleMap || role.rotation) {
       wrap.appendChild(h("p", "ep-note",
-        "这里选的人默认只换今天；要一直显示这些人，点下面的「长期固定」。"));
+        "这个岗位现在按" + (role.groups ? " A/B 组" : "星期") + "轮换。"
+        + "这里点的只改今天；要固定成这些人，点下面的「改为固定人员」——"
+        + "以后每天都显示他们，轮换表还留着，随时能恢复。"));
     } else if (multi) {
       wrap.appendChild(h("p", "ep-note",
-        "这个岗位按组或按星期轮换，人员由轮换表决定；这里的换人只改今天。"));
+        "这里选的人默认只换今天；要一直显示这些人，点下面的「长期固定」。"));
     } else {
       wrap.appendChild(h("p", "ep-note", "点谁就是谁：只换今天这一天。"));
     }
@@ -1448,6 +1578,18 @@
       wrap.remove();
       flash(role.name + " 今天换给 " + names.join("、"));
       renderBody(role.id);
+    }
+
+    /* 写进岗位配置（长期），不是今天的临时覆盖。
+       以前这段逻辑只挂在「长期固定」按钮上，且有轮换表的岗位根本看不到
+       那个按钮；现在抽出来，单选岗位的「以后一直用」也走同一条路。 */
+    function persistPeople(names) {
+      var docRoles = JSON.parse(JSON.stringify(roleDoc()));
+      var target = (docRoles.roles || []).filter(function (x) { return x.id === role.id; })[0];
+      if (!target) { flash("找不到岗位配置"); return false; }
+      target.people = names.slice();
+      S.patchConfig({ roles: docRoles });
+      return true;
     }
 
     /* 勾选的人名 → 名单 id；没有 id 的名单用 name: 兜底，组仍然存得住。
@@ -1525,7 +1667,18 @@
         var b = h("button", "ep-person" + (selected.indexOf(s.name) >= 0 ? " on" : ""), s.name);
         b.addEventListener("click", function () {
           S.markPicked(s.name);
-          if (!multi) { commit([s.name]); return; }
+          if (!multi) {
+            if (pinAlways) {
+              if (persistPeople([s.name])) {
+                wrap.remove();
+                flash("「" + role.name + "」以后固定给 " + s.name);
+                renderBody(role.id);
+              }
+              return;
+            }
+            commit([s.name]);
+            return;
+          }
           var i = selected.indexOf(s.name);
           if (i >= 0) selected.splice(i, 1);
           else selected.push(s.name);
@@ -1612,25 +1765,40 @@
         commit(selected);
       });
       row.appendChild(saveBtn);
-      /* 长期固定：把现在勾的人写进岗位配置（不是今天的临时换人），
-         解决「选过人但常驻/下次开机显示待定」的不同步。只给
-         直接按 people 出人的岗位用——A/B 组、按星期轮换的岗位
-         人员由轮换表决定，写了也不生效，所以不出现。 */
-      if (!role.groups && !role.peopleMap && !role.rotation) {
-        var persistBtn = h("button", "ep-ghost ep-persist", "长期固定");
-        persistBtn.title = "把现在勾选的人写进岗位配置，以后每天都显示他们";
-        persistBtn.addEventListener("click", function () {
-          if (!selected.length) { flash("先选人"); return; }
+      /* 长期固定：把现在勾的人写进岗位配置（不是今天的临时换人）。
+         以前只给「直接按 people 出人」的岗位出现——A/B 组和按星期轮换的
+         岗位根本没有这个入口，老师只能在今天改，第二天又变回「待定」。
+         现在所有岗位都有：人员解析里「指定人员」优先于轮换表，
+         写进去就生效；轮换数据留在原处，「恢复轮换」能一键退回。 */
+      var drifting = !!(role.groups || role.peopleMap || role.rotation);
+      var persistBtn = h("button", "ep-ghost ep-persist", drifting ? "改为固定人员" : "长期固定");
+      persistBtn.title = drifting
+        ? "把这个岗位固定成现在勾选的人；A/B 轮换或按星期的表会保留，之后可以「恢复轮换」"
+        : "把现在勾选的人写进岗位配置，以后每天都显示他们";
+      persistBtn.addEventListener("click", function () {
+        if (!selected.length) { flash("先选人"); return; }
+        if (!persistPeople(selected)) return;
+        flash("「" + role.name + "」已固定给 " + selected.join("、"));
+        wrap.remove();
+        renderBody(role.id);
+      });
+      row.appendChild(persistBtn);
+
+      /* 固定过的人想退回轮换表：只删人工指定，groups/peopleMap/rotation 一直都在 */
+      if (drifting && role.people && role.people.length) {
+        var backBtn = h("button", "ep-ghost ep-unpersist", "恢复轮换");
+        backBtn.title = "删掉人工指定的人，回到按组/按星期自动轮换";
+        backBtn.addEventListener("click", function () {
           var docRoles = JSON.parse(JSON.stringify(roleDoc()));
           var target = (docRoles.roles || []).filter(function (x) { return x.id === role.id; })[0];
           if (!target) { flash("找不到岗位配置"); return; }
-          target.people = selected.slice();
+          delete target.people;
           S.patchConfig({ roles: docRoles });
-          flash("「" + role.name + "」已长期固定给 " + selected.join("、"));
+          flash("「" + role.name + "」已恢复按轮换表出人");
           wrap.remove();
           renderBody(role.id);
         });
-        row.appendChild(persistBtn);
+        row.appendChild(backBtn);
       }
     }
     var clear = h("button", "ep-ghost", "恢复原样");

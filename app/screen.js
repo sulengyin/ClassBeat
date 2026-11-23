@@ -353,14 +353,27 @@
         if (s && s.id) nameMap[String(s.id)] = s.name;
       });
     }
-    var out = nameMap[String(n)];
-    return out || n;
+    /* 对象（手工改过的配置里混进来的）先取名字；"[object Object]" 是
+       已经丢了信息的残留，宁可不显示，也不要让这一行字上大屏。 */
+    if (n && typeof n === "object") {
+      var nm = (S && S.personNameOf) ? S.personNameOf(n) : "";
+      return (nm && nm !== "[object Object]") ? nm : "";
+    }
+    var s = String(n == null ? "" : n);
+    var out = nameMap[s];
+    if (out && out !== "[object Object]") return out;
+    return s === "[object Object]" ? "" : s;
+  }
+
+  /* 值日条上一次显示几个人：空名字（上面被兜成 ""）不能留成空档 */
+  function peopleText(list) {
+    return (list || []).map(personName).filter(function (x) { return !!x; }).join("、");
   }
 
   function renderDuty(day, minutes) {
     var res = R.dutiesAt(day, minutes);
     var sig = JSON.stringify(res.items.map(function (d) {
-      return [d.name, d.people, d.unknown, d.quiet, d.tasks];
+      return [d.name, d.people, d.unknown, d.quiet, d.tasks, d.pending, d.assign];
     }));
 
     if (sig === lastDutySig) return;
@@ -398,21 +411,27 @@
 
       var who = document.createElement("span");
       who.className = "who";
-      if (d.unknown) {
-        who.textContent = "待定";
-        who.classList.add("none");
+      /* 先看有没有人：老师亲手指定的人必须能看见。
+         以前「自己商量」排在人员前面，指定了人却只显示「自己商量」；
+         「待定」也一并挪到最后——只有一个人都没有时才说待定。 */
+      if (d.people && d.people.length) {
+        who.textContent = peopleText(d.people);
       } else if (d.assign === "self-organize") {
         who.textContent = "自己商量";
         who.classList.add("none");
-      } else if (d.people && d.people.length) {
-        who.textContent = d.people.map(personName).join("、");
+      } else if (d.unknown) {
+        who.textContent = "待定";
+        who.classList.add("none");
       }
       if (who.textContent) item.appendChild(who);
 
       /* 组员可以点开看，只读（PLAN 2.18）。学生能点，但点了只能看。 */
-      if (!d.unknown && d.people && d.people.length) {
-        item.dataset.people = d.people.map(personName).join("、");
+      if (d.people && d.people.length) {
+        item.dataset.people = peopleText(d.people);
         item.dataset.task = d.tasks && d.tasks.length ? d.tasks.join("、") : d.name;
+        /* 组里还有没排人的项：屏面只显示已排的人（否则老师选的人看不见），
+           点开才说还差哪几项。 */
+        item.dataset.pending = (d.pending && d.pending.length) ? d.pending.join("、") : "";
         item.addEventListener("click", function () { showDetail(item); });
       }
       return item;
@@ -443,7 +462,9 @@
   }
 
   function showDetail(item) {
-    el.dutyDetail.textContent = item.dataset.task + "：" + item.dataset.people;
+    var text = item.dataset.task + "：" + item.dataset.people;
+    if (item.dataset.pending) text += "（" + item.dataset.pending + " 还没排人）";
+    el.dutyDetail.textContent = text;
     el.dutyDetail.classList.add("show");
     clearTimeout(detailTimer);
     detailTimer = setTimeout(hideDetail, 10000);

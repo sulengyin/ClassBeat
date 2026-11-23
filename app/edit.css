@@ -144,6 +144,15 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-primary:active{transform:translateY(.2vmin)}
 .ep-ghost{font:inherit;font-size:2.4vmin;padding:1.4vmin 2.4vmin;border-radius:1.3vmin;
           border:.26vmin solid #6B5641;background:transparent;color:#C1B09A;cursor:pointer}
+/* 单人岗位的「以后一直用这个人」：勾上后变黄，和候选里的人名选中态一致 */
+.ep-pin-always{margin-top:1.1vmin;width:100%}
+.ep-pin-always.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10;font-weight:900}
+/* 课务弹窗：这一科由谁上，点一下就填进输入框，填完仍可改字 */
+.ep-teachers{display:flex;flex-wrap:wrap;gap:.7vmin;align-items:center;margin-top:1vmin}
+.ep-teachers-tip{font-size:1.9vmin;color:#8E7B66;letter-spacing:.06em}
+.ep-teacher-chip{font:inherit;font-size:2.2vmin;padding:.9vmin 1.6vmin;border-radius:1vmin;
+                 border:.24vmin solid #6B5641;background:#3D2D20;color:#E2D4BC;cursor:pointer}
+.ep-teacher-chip:active{background:#FFD64F;color:#2B1D10}
 
 .ep-rows{display:flex;flex-direction:column;gap:.8vmin;max-height:54vmin;overflow:auto}
 .ep-rowline{display:flex;align-items:center;gap:.6vmin}
