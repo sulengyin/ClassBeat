@@ -300,15 +300,19 @@ check(g0b.length === 1 && g0b[0].memberIds[0] === "s03",
 check(S.removeGroup(g0b, "g1").length === 0, "删组按 id 只删这一条", "剩 0 条");
 
 /* 组员存成对象时，旧代码 String(m) 会写成 "[object Object]" 并永久落库
-   （真机反馈：更新后分组里还留着这个词）。有 id 用 id，没 id 用 name 兜底。 */
+   （真机反馈：更新后分组里还留着这个词）。
+   2026-11-23 起改为「姓名优先、id 只作别名」：学生 id 是手写在
+   students.json 里的 s01/s02，换一份名单就全变，老师的组会整片对不上；
+   姓名才是老师认的身份。所以这里期望 name:张三 / name:李四，
+   而不再是 s01。 */
 var objMember = S.upsertGroup([], {
   id: "g5", name: "对象成员",
   memberIds: [{ id: "s01", name: "张三" }, { name: "李四" }]
 });
 check(objMember.length === 1
-      && objMember[0].memberIds.indexOf("s01") >= 0
+      && objMember[0].memberIds.indexOf("name:张三") >= 0
       && objMember[0].memberIds.indexOf("name:李四") >= 0,
-  "对象成员写成 id / name: 兜底，不落成 [object Object]",
+  "对象成员存成 name:姓名（换名单不丢），不落成 [object Object]",
   JSON.stringify(objMember[0] && objMember[0].memberIds));
 
 var junkMember = S.upsertGroup([], {
@@ -331,10 +335,16 @@ check(S.exportAll().config.peopleGroups.length === 1,
 S.resetConfig();
 check(S.peopleGroups().length === 0, "重置配置后组也没了", "0 条");
 
+/* memberIds 被写成单个值（"s01"）而不是数组：能救就救。
+   以前这里是整份拒绝——而 exportAll 又会原样导出这种数据，于是
+   「程序自己导出的备份，自己导不回来」，老师的组就这样凭空消失。 */
 var badGroups = JSON.parse(JSON.stringify(S.exportAll()));
 badGroups.config.peopleGroups = [{ name: "坏人", memberIds: "s01" }];
-check(S.importAll(badGroups).ok === false,
-  "人群组格式不对时整份拒绝导入", "memberIds 不是数组");
+var badRes = S.importAll(badGroups);
+check(badRes.ok === true && S.peopleGroups().length === 1
+      && S.peopleGroups()[0].memberIds[0] === "s01",
+  "memberIds 是单个值时救回来，不整份拒绝", badRes.why || JSON.stringify(S.peopleGroups()));
+S.resetConfig();
 var goodGroups = JSON.parse(JSON.stringify(S.exportAll()));
 goodGroups.config.peopleGroups = [
   { id: "g9", name: "值日组", source: "manual", memberIds: ["s01"] }
@@ -368,9 +378,9 @@ check(healed.students.length === 2 && healed.students[0].name === "张三"
   JSON.stringify(healed.students.map(function (s) { return s.name; })));
 check(healed.peopleGroups.length === 2
       && healed.peopleGroups[0].memberIds.length === 1
-      && healed.peopleGroups[0].memberIds[0] === "s01"
+      && healed.peopleGroups[0].memberIds[0] === "name:张三"
       && healed.peopleGroups[1].name === "第二组",
-  "自愈：组员对象救回 id，脏成员丢弃，组名与组本身保留",
+  "自愈：组员对象救回姓名，脏成员丢弃，组名与组本身保留",
   JSON.stringify(healed.peopleGroups));
 check(healed.roles.roles[0].people.length === 1 && healed.roles.roles[0].people[0] === "王五",
   "自愈：岗位人员里的对象取名字", JSON.stringify(healed.roles.roles[0].people));
@@ -395,7 +405,7 @@ dirtyFile.config.peopleGroups = [
 ];
 var impRes = S.importAll(dirtyFile);
 check(impRes.ok === true && S.config().students[0].name === "张三"
-      && S.peopleGroups()[0].memberIds[0] === "s01",
+      && S.peopleGroups()[0].memberIds[0] === "name:张三",
   "导入时把字符串名单与对象成员洗干净", JSON.stringify(S.peopleGroups()));
 S.resetConfig();
 
@@ -421,6 +431,132 @@ check(futureRes.ok === false && S.config().meta.klass === "旧版班级",
 
 S.resetConfig();
 check(S.schemaVersion() === 2, "重置配置不回退版本号", "v" + S.schemaVersion());
+
+/* ---------- 存人的字段：写入即干净，导出能导回 ----------
+   这几个用例是「自己导出的文件自己导不回来」那个死锁的最小复现：
+   写入不清洗 → 脏数据进得去；导出原样吐 → 脏数据被固化；
+   导入用元素级条件整份拒绝 → 能救的也救不回来。 */
+S.resetConfig();
+S.patchConfig({ peopleGroups: [{ id: "g9", name: { name: "一组" },
+  memberIds: [{ id: "s1", name: "张三" }, { id: "s2", name: "李四" }] }] });
+var g9 = (S.config().peopleGroups || [])[0];
+check(!!g9 && typeof g9.name === "string" && g9.name === "一组",
+  "写入时就洗净：组名不再是对象", JSON.stringify(g9 && g9.name));
+check(!!g9 && Array.isArray(g9.memberIds) && g9.memberIds.every(m => typeof m === "string"),
+  "写入时就洗净：组员 id 全是字符串", JSON.stringify(g9 && g9.memberIds));
+
+var round = S.importAll(S.exportAll());
+check(round.ok === true, "自己导出的设置能自己导回来", round.why || "");
+
+S.resetConfig();
+var ovRes = S.importAll({ format: "rhythm-config/v1", schemaVersion: 2,
+  overrides: { "2026-11-23": { roles: { sweep: { people: [{ id: "s1", name: "张三" }] } } } } });
+var ovp = ((S.getDayOverride("2026-11-23") || {}).roles || {}).sweep;
+check(ovRes.ok === true && !!ovp, "含临时调整的备份能导入", ovRes.why || "");
+check(!!ovp && Array.isArray(ovp.people) && ovp.people.every(p => typeof p === "string"),
+  "临时调整里的人也要洗净：people 全是字符串", JSON.stringify(ovp && ovp.people));
+check(!!ovp && ovp.people[0] === "张三", "对象被还原成人名，而不是丢掉", ovp && ovp.people[0]);
+
+/* 旧数据里放错地方的排班组（source:"role" 出现在 peopleGroups 里）：
+   清洗时按手动组救回来，不让老师分好的组凭空消失。
+   注意这与上面「排班组不落库」不矛盾——那条测的是老师显式存组的路径，
+   这条测的是清洗旧数据的路径，两者本来就该有不同的宽严。 */
+S.resetConfig();
+S.patchConfig({ peopleGroups: [{ id: "g10", name: "扫地组", source: "role", memberIds: ["张三", "李四"] }] });
+var keptRole = (S.config().peopleGroups || [])[0];
+check(!!keptRole && keptRole.name === "扫地组" && keptRole.source === "manual"
+      && keptRole.memberIds.length === 2,
+  "旧数据里放错地方的排班组被救成手动组，不丢", JSON.stringify(keptRole));
+
+S.resetConfig();
+var rescue = S.importAll({ format: "rhythm-config/v1", schemaVersion: 2,
+  config: { peopleGroups: [{ id: "g11", name: { name: "擦窗组" },
+    memberIds: [{ id: "s1", name: "张三" }] }] } });
+check(rescue.ok === true, "组名是对象的备份不再被整份拒绝", rescue.why || "");
+check((S.config().peopleGroups || [])[0] && (S.config().peopleGroups || [])[0].name === "擦窗组",
+  "能救回来的组名要救回来",
+  JSON.stringify((S.config().peopleGroups || []).map(g => g && g.name)));
+S.resetConfig();
+
+/* 「今天这个岗位是谁」只有引擎一个答案。
+   编辑面板现在直接调 Schedule.resolvePeople，所以这个顺序就是面板的顺序，
+   不会再出现「面板按 peopleMap 显示、大屏按 groups 显示」两套答案。 */
+const SCH = global.window.Schedule;
+const rrGroup = SCH.resolvePeople({ id: "x1", groups: { A: ["甲"], B: ["乙"] }, peopleMap: { "1": "丙" } }, "A", null, 1);
+check(rrGroup[0].join("、") === "甲" && rrGroup[2] === "group",
+  "有 A/B 组又有星期表时，按轮换组出人（不是星期表）", JSON.stringify(rrGroup));
+const rrPeople = SCH.resolvePeople({ id: "x2", people: ["丁"], groups: { A: ["甲"] }, peopleMap: { "1": "丙" } }, "A", null, 1);
+check(rrPeople[0].join("、") === "丁" && rrPeople[2] === "people",
+  "老师指定的人优先于轮换组与星期表", JSON.stringify(rrPeople));
+
+/* 临时换人的 people 被写成单个字符串（"乙"）而不是数组：
+   以前 applyOverrides 用 r.people.slice()，对字符串来说返回的还是字符串，
+   后面 peopleText 调 .map 直接抛错，整条值日条白掉。 */
+const dayStr = { timeline: [], duties: [{ roleId: "z1", name: "扫地", people: ["甲"], status: "ok" }] };
+const outStr = S.applyOverrides(dayStr, { roles: { z1: { people: "乙" } } });
+check(Array.isArray(outStr.duties[0].people) && outStr.duties[0].people[0] === "乙",
+  "临时换人的 people 是单个字符串时，归一成数组而不是把值日条弄崩",
+  JSON.stringify(outStr.duties[0].people));
+check(outStr.duties[0].peopleFrom === "override", "套用临时换人后标明来源是覆盖层",
+  String(outStr.duties[0].peopleFrom));
+
+/* 老师名：被写成对象时存成人名；已经被腌成 "[object Object]" 的口子在写入时清掉。
+   这条链是「显示故障 → 老师点确定 → 变成合法数据 → 再也洗不掉」。 */
+S.resetConfig();
+S.patchDayOverride("2026-11-23", { lessons: { 4: { subject: "语文", teacher: { name: "王老师" } } } });
+check(S.getDayOverride("2026-11-23").lessons[4].teacher === "王老师",
+  "临时调课的老师名是对象时，写入即成人名",
+  JSON.stringify(S.getDayOverride("2026-11-23").lessons[4].teacher));
+S.patchDayOverride("2026-11-23", { lessons: { 4: { subject: "语文", teacher: "[object Object]" } } });
+check(S.getDayOverride("2026-11-23").lessons[4].teacher === "",
+  "已经腌成 [object Object] 的老师名，再写入时清掉",
+  JSON.stringify(S.getDayOverride("2026-11-23").lessons[4].teacher));
+S.resetConfig();
+
+/* ---------- 数据体检：形状没坏、只是「人对不上」的那类 ---------- */
+S.resetConfig();
+check(S.auditPeople().ok === true,
+  "没录名单时不报「对不上」——那是还没填，不是错误");
+
+S.patchConfig({ students: [{ id: "s01", name: "赵子墨", active: true },
+                            { id: "s02", name: "钱嘉禾", active: true }] });
+S.patchConfig({ peopleGroups: [{ id: "ga", name: "值日组", memberIds: ["s01", "name:查无此人"] }] });
+var fixedKeys = S.fixGroupKeys();
+check(fixedKeys.fixed === 1 && S.peopleGroups()[0].memberIds[0] === "name:赵子墨",
+  "旧 id 编码就地换成姓名编码（换名单也不会整片丢人）",
+  JSON.stringify(S.peopleGroups()[0].memberIds));
+
+var audit = S.auditPeople();
+check(audit.ok === false && audit.items.length === 1
+      && audit.items[0].detail.indexOf("查无此人") >= 0,
+  "对不上名单的成员列进体检清单，不静默丢", JSON.stringify(audit.items));
+
+S.patchConfig({ roles: { roles: [{ id: "r1", name: "扫地", people: ["赵子墨", "王不存在"] }] } });
+var audit2 = S.auditPeople();
+check(audit2.items.some(function (i) { return i.kind === "role" && i.detail.indexOf("王不存在") >= 0; }),
+  "岗位人员里对不上名单的名字也列出来", JSON.stringify(audit2.items));
+S.resetConfig();
+
+/* 常驻岗位（被选进「课间」等时段、freq=unset）：配置里没人时该是 unknown，
+   老师今天指定了人之后，那一段的每一个时刻都必须显示这个人。
+   真机反馈就是这条：「值日岗位选了某某学生，大屏下方展示该岗位却显示待定」。 */
+const cfgTmp = JSON.parse(JSON.stringify({
+  timetable: D.timetable, schedule: D.schedule, content: D.content,
+  roles: D.roles, noon: D.noon, calendar: D.calendar
+}));
+cfgTmp.roles.roles.push({ id: "zz", name: "测试岗", freq: { kind: "unset" }, order: 1 });
+cfgTmp.dutyPresents = { break: ["zz"] };
+const dayTmp = SCH.buildDay(cfgTmp, "2026-11-23");
+check(dayTmp.duties.filter(d => d.roleId === "zz").every(d => d.people === null && d.status === "unknown"),
+  "常驻岗位配置里没人时是 unknown（大屏显示「待定」）",
+  JSON.stringify(dayTmp.duties.filter(d => d.roleId === "zz").map(d => d.status)));
+
+const dayOv = S.applyOverrides(dayTmp, { roles: { zz: { people: ["吴书瑶"] } } });
+const zzOk = dayOv.duties.filter(d => d.roleId === "zz");
+check(zzOk.length > 0
+      && zzOk.every(d => Array.isArray(d.people) && d.people[0] === "吴书瑶" && d.status === "ok"),
+  "常驻岗位今天指定了人，每一段都变成有名字（不再是待定）",
+  JSON.stringify(zzOk.map(d => d.people)));
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

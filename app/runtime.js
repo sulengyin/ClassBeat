@@ -30,21 +30,44 @@
     }
   };
 
+  /* 缺省值：只有这几块有安全默认，其余「缺了就是没有」，不编造。 */
+  var DEFAULTS = {
+    content: function () { return []; },
+    roles: function () { return { roles: [], dutyCycle: {} }; },
+    noon: function () { return EMPTY_NOON; },
+    calendar: function () { return { days: {} }; },
+    dutyPresents: function () { return null; }
+  };
+
+  /* 只属于「本机修正」的块，不进「生效配置」。
+     名单和人群组在 exportAll 里单独从本机配置取——出厂包里的名单是样例，
+     把它当成老师改过的名单写进备份，换包时就再也不更新了。
+     这个区分是语义上的，不能靠清单自动推出来，所以在这里显式声明。 */
+  var LOCAL_ONLY = { students: 1, peopleGroups: 1 };
+
   /* 出厂配置（data.js）+ 本机改动（localStorage），本机优先。
-     meta 逐字段合并：改了班名不该把学校名一起抹掉。 */
+     meta 逐字段合并：改了班名不该把学校名一起抹掉。
+     块清单只有一份（Store.CONFIG_BLOCKS）：以前这里的键是手写的，
+     比 Store 少几项，于是 exportAll 里要额外「补两块」——加新块就得
+     记得改两个地方，忘一处就少导一块。 */
   function config() {
     var d = data(), o = local();
-    function pick(k) { return o[k] !== undefined ? o[k] : d[k]; }
-    return {
-      meta: Object.assign({}, d.meta || {}, o.meta || {}),
-      timetable: pick("timetable"),
-      schedule: pick("schedule"),
-      content: pick("content") || [],
-      roles: pick("roles") || { roles: [], dutyCycle: {} },
-      noon: pick("noon") || EMPTY_NOON,
-      calendar: pick("calendar") || { days: {} },
-      dutyPresents: pick("dutyPresents") || null
-    };
+    var keys = (root.Store && root.Store.CONFIG_BLOCKS) || [
+      "meta", "timetable", "schedule", "roles", "content", "noon",
+      "calendar", "students", "peopleGroups", "dutyPresents"
+    ];
+    var out = {};
+    keys.forEach(function (k) {
+      if (LOCAL_ONLY[k]) return;
+      if (k === "meta") {
+        out.meta = Object.assign({}, d.meta || {}, o.meta || {});
+        return;
+      }
+      var v = o[k] !== undefined ? o[k] : d[k];
+      if (v === undefined || v === null) out[k] = DEFAULTS[k] ? DEFAULTS[k]() : v;
+      else out[k] = v;
+    });
+    return out;
   }
 
   /* 能不能算一天：作息和课表是必需的，其余都有安全默认值。

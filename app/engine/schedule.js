@@ -574,6 +574,12 @@
     weekInfo: weekInfo,
     groupFor: groupFor,
     resolveDay: resolveDay,
+    /* 「今天这个岗位归谁」只有一个答案，就是这个函数。编辑面板也调它，
+       不再自己按 people / peopleMap / groups 另算一套——那样两处的
+       优先级顺序迟早不一样（曾经就是：面板先看 peopleMap，引擎先看
+       groups，同一个岗位两处显示不同的人）。 */
+    resolvePeople: resolvePeople,
+    nameList: nameList,
     t2m: t2m,
     m2t: m2t,
     parseDate: parseDate,

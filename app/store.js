@@ -82,8 +82,11 @@
     var all = allOverrides();
     var cur = all[key] || {};
     pushHistory(key, cur);
-    all[key] = Object.assign({}, cur, patch);
-    all[key].updatedAt = new Date().toISOString();
+    /* 合完再整条过闸门：存人的地方（roles[].people / lessons[].teacher）
+       不许带着对象进来。这一步就是「腌毒链」的第④步，必须断在这里。 */
+    var next = cleanOverride(Object.assign({}, cur, patch)) || {};
+    next.updatedAt = new Date().toISOString();
+    all[key] = next;
     write(KEY.overrides, all);
     return all[key];
   }
@@ -127,7 +130,9 @@
         var L = ov.lessons[b.periodNo];
         if (!L) return;
         if (L.subject) b.subject = L.subject;
-        if (L.teacher !== undefined) b.teacher = L.teacher;
+        /* 老师名也走同一个归一：历史覆盖里可能存着对象，
+           以前原样赋给 b.teacher，屏上就是 [object Object]。 */
+        if (L.teacher !== undefined) b.teacher = personNameOf(L.teacher) || null;
         if (L.place !== undefined) b.place = L.place;
         b.overridden = true;
       });
@@ -147,10 +152,16 @@
       (out.duties || []).forEach(function (d) {
         var r = ov.roles[d.roleId];
         if (!r) return;
-        if (r.people) {
-          d.people = r.people.slice();
-          d.status = r.people.length ? "ok" : "unknown";
+        /* 用 peopleList 而不是 slice()：
+           · 对象元素会被还原成人名，而不是原样带上屏；
+           · 历史覆盖里 people 是字符串时（"张三"），slice() 得到的是字符
+             串本身，后面 peopleText 调 .map 会直接抛错，整块值日条白掉。 */
+        if ("people" in r) {
+          var names = peopleList(r.people);
+          d.people = names;
+          d.status = names.length ? "ok" : "unknown";
           d.reason = d.status === "ok" ? null : "no-people";
+          d.peopleFrom = names.length ? "override" : "none";
         }
         if (r.at) d.at = r.at;
         d.overridden = true;
@@ -167,7 +178,12 @@
        · name 本身是对象 {name: {name: "张三"}}。
      不归一化，第一种会让 rankStudents 在 `s.name.indexOf` 上直接抛错
      （换人面板整块空掉，看起来就是「打一个字不出人」）；第二种会一路
-     走到界面上显示成 [object Object]。所以在数据层收口一次。 */
+     走到界面上显示成 [object Object]。所以在数据层收口一次。
+
+     ★ 这是全项目唯一的人名归一化实现。edit / screen / setup 都调它。
+       引擎（engine/schedule.js）另有一份极小兜底，因为它要脱离 UI 独立
+       运行、并与 Python 版逐字段对拍；那份只在引擎内部整理输入用，
+       不参与写路径，永远不会把脏数据带回存储。别把它当第二套规格。 */
   function personNameOf(v, depth) {
     var d = depth || 0;
     if (v == null) return "";
@@ -178,6 +194,25 @@
       return personNameOf(inner, d + 1);
     }
     return "";
+  }
+
+  /* 一个「人的集合」→ 干净的人名数组：去空、去 [object Object]、去重，
+     顺手按分隔符拆开（配置里常见 people: ["张三、李四"]）。
+     人名里不会出现这些符号；不拆的话上屏碰巧没错，但按姓名核对时对不上。 */
+  var NAME_SEP = /[、\/／,，;；|｜]+/;
+  function peopleList(v) {
+    if (v == null) return [];
+    var arr = Array.isArray(v) ? v : [v];
+    var out = [];
+    arr.forEach(function (x) {
+      var n = personNameOf(x);
+      if (!n || n === "[object Object]") return;
+      n.split(NAME_SEP).forEach(function (part) {
+        var p = part.trim();
+        if (p && p !== "[object Object]" && out.indexOf(p) < 0) out.push(p);
+      });
+    });
+    return out;
   }
 
   function normStudents(list) {
@@ -478,12 +513,28 @@
     return out;
   }
 
+  /* 每块各自的清洗。新增「存人」的块时只在这里登记一处。 */
+  function cleanBlock(k, v) {
+    if (k === "students") {
+      var st = normStudents(v);
+      return st.length ? st : null;      /* 空名单等同于「没有名单」 */
+    }
+    if (k === "peopleGroups") return cleanGroups(v);
+    /* roles 必须是对象：写成别的东西会让引擎 buildDay 直接抛错，
+       整块大屏白掉。宁可当成「没配置」，让 roleDoc 回退到出厂岗位。 */
+    if (k === "roles") return isPlain(v) ? cleanRolesDoc(v) : null;
+    return v;                             /* 其余块不含人，原样放行 */
+  }
+
   function patchConfig(patch) {
     var cur = config();
     Object.keys(patch || {}).forEach(function (k) {
       if (CONFIG_BLOCKS.indexOf(k) < 0) return;
-      if (patch[k] === null) delete cur[k];
-      else if (patch[k] !== undefined) cur[k] = patch[k];
+      if (patch[k] === null) { delete cur[k]; return; }
+      if (patch[k] === undefined) return;
+      var v = cleanBlock(k, patch[k]);
+      if (v === null || v === undefined) delete cur[k];
+      else cur[k] = v;
     });
     write(KEY.config, cur);
     /* 大屏每秒重绘，但改完设置最好立刻看到，所以这里主动通知一次 */
@@ -534,13 +585,22 @@
        · 已经写坏的 "[object Object]" 字面量。
      对象能救就救（有 id 用 id，没有就用 name 走 `name:` 兜底）；
      字面量没有信息量，只能丢——但组本身和其它成员留着，别整组消失。 */
+  /* 组员的键：姓名优先，id 只作别名。
+     原因（2026-11-23 复盘）：学生 id 是人在 students.json 里手写的
+     （s01、s02…），系统不生成、也不保证跨文件稳定——换一份名单就全变，
+     老师「修正名单」时新加的人干脆没有 id。把它当主键，组就会「丢人」。
+     姓名才是老师实际认的身份，也是 people / groups / peopleMap 一直在用的键。
+     编码保持三种不变，老数据照样读得出来：
+       · "name:张三"  —— 现在的写入形式（换名单不丢）
+       · "s01"        —— 更早的写入形式（rosterNameIndex 反查姓名）
+       · "张三"       —— 手工写的纯姓名 */
   function memberIdOf(m) {
     if (m == null) return "";
     if (typeof m === "object") {
-      var id = m.id != null ? String(m.id).trim() : "";
-      if (id && id !== "[object Object]") return id;
       var n = personNameOf(m.name != null ? m.name : "");
-      return n && n !== "[object Object]" ? "name:" + n : "";
+      if (n && n !== "[object Object]") return "name:" + n;
+      var id = m.id != null ? String(m.id).trim() : "";
+      return (id && id !== "[object Object]") ? id : "";
     }
     var v = String(m).trim();
     if (!v || v === "[object Object]" || v === "name:[object Object]") return "";
@@ -549,6 +609,9 @@
 
   function normGroup(g) {
     if (!isPlain(g)) return null;
+    /* 排班组（source:role）的成员每次都从岗位实时取，存成快照第二天就过期。
+       这是「老师显式存组」这条路径上的有意拒绝——清洗旧数据走的是
+       cleanGroupOne，那条路会把放错地方的 role 组按手动组救回来。 */
     if (g.source !== undefined && g.source !== "manual") return null;
     var name = personNameOf(g.name);
     if (!name || name === "[object Object]") return null;
@@ -557,6 +620,8 @@
       var v = memberIdOf(m);
       if (v && ids.indexOf(v) < 0) ids.push(v);
     });
+    /* 老师新建/修改组时必须真有成员；清洗旧数据不走这里，走 cleanGroupOne
+       ——那边允许空组，因为「留个空组」比「组凭空消失」更容易解释。 */
     if (!ids.length) return null;
     return {
       id: String(g.id == null ? "" : g.id).trim(),
@@ -590,6 +655,11 @@
   }
 
   function saveGroup(g) {
+    /* 拒绝的理由要说得准：以前这里和「没名字/没成员」共用一句
+       「组名和成员都要有」，传了排班组的人看到这句会以为是自己漏填了。 */
+    if (isPlain(g) && g.source !== undefined && g.source !== "manual") {
+      return { ok: false, why: "排班组的成员每次都从岗位实时取，不需要存成组。" };
+    }
     var n = normGroup(g);
     if (!n || !n.id) return { ok: false, why: "组名和成员都要有。" };
     var next = upsertGroup(peopleGroups(), n);
@@ -601,6 +671,88 @@
     var next = removeGroup(peopleGroups(), id);
     patchConfig({ peopleGroups: next });
     return next;
+  }
+
+  /* ---------- 数据体检 ----------
+     写闸门负责把「形状坏的」改回来（对象→姓名、字面量→丢掉）。
+     但还有一类它管不了：形状没问题、只是「这个人不在名单里了」。
+     这类最容易被老师当成「功能丢了」——组还在、点开却是空的。
+     不静默修（自动认领可能认错同名学生），集中列出来给老师看。 */
+
+  /* 老编码 "s01" → 稳定的 "name:张三"。名单可用时做一次，
+     以后换名单也不会整片对不上。返回转换条数。 */
+  function fixGroupKeys() {
+    var cfg = config();
+    var stu = normStudents(cfg.students);
+    if (!stu.length || !Array.isArray(cfg.peopleGroups)) return { fixed: 0 };
+    var byId = {};
+    stu.forEach(function (s) { if (s.id) byId[String(s.id)] = s.name; });
+    var n = 0;
+    var next = cfg.peopleGroups.map(function (g) {
+      if (!isPlain(g) || !Array.isArray(g.memberIds)) return g;
+      var ids = [];
+      g.memberIds.forEach(function (m) {
+        var k = memberIdOf(m);
+        if (!k) return;
+        if (k.indexOf("name:") !== 0 && byId[k]) { k = "name:" + byId[k]; n++; }
+        if (ids.indexOf(k) < 0) ids.push(k);
+      });
+      var o = clone(g);
+      o.memberIds = ids;
+      return o;
+    });
+    if (n) patchConfig({ peopleGroups: next });
+    return { fixed: n };
+  }
+
+  /* 纯读体检。名单没录入时不判「对不上」——那不是错误，是还没填。 */
+  function auditPeople() {
+    var cfg = config();
+    var stu = normStudents(cfg.students);
+    var names = {}, ids = {};
+    stu.forEach(function (s) { names[s.name] = 1; if (s.id) ids[String(s.id)] = 1; });
+    var hasRoster = stu.length > 0;
+    var items = [];
+
+    function missingOf(v) {
+      var k = memberIdOf(v);
+      if (!k) return null;
+      if (k.indexOf("name:") === 0) {
+        var nm = k.slice(5);
+        return names[nm] ? null : nm;
+      }
+      return ids[k] ? null : k;
+    }
+
+    if (hasRoster) {
+      (cfg.peopleGroups || []).forEach(function (g) {
+        var bad = [];
+        (g.memberIds || []).forEach(function (m) {
+          var miss = missingOf(m);
+          if (miss && bad.indexOf(miss) < 0) bad.push(miss);
+        });
+        if (bad.length) {
+          items.push({ kind: "group", name: g.name, detail: bad.join("、") + " 不在当前名单里" });
+        }
+      });
+
+      ((cfg.roles || {}).roles || []).forEach(function (r) {
+        var raw = peopleList(r.people);
+        if (r.peopleMap) Object.keys(r.peopleMap).forEach(function (k) {
+          raw = raw.concat(peopleList(r.peopleMap[k]));
+        });
+        if (r.groups) Object.keys(r.groups).forEach(function (k) {
+          raw = raw.concat(peopleList(r.groups[k]));
+        });
+        var bad = [];
+        raw.forEach(function (n) { if (!names[n] && bad.indexOf(n) < 0) bad.push(n); });
+        if (bad.length) {
+          items.push({ kind: "role", name: r.name, detail: bad.join("、") + " 不在当前名单里" });
+        }
+      });
+    }
+
+    return { ok: items.length === 0, hasRoster: hasRoster, items: items };
   }
 
   /* ---------- 偏好 ---------- */
@@ -636,8 +788,9 @@
        少了这份，班级作息课表就接不上。 */
     var full = (root.Runtime && root.Runtime.config) ? root.Runtime.config() : null;
     var out = Object.assign({}, full || config());
-    /* 名册修正只存在本机 config 里，Runtime 不认识 students，
-       不单独并进来，换机器备份时老师的修正就丢了。 */
+    /* 名单与人群组只取「本机修正过的」那份：Runtime.config 按 LOCAL_ONLY
+       故意不含它们（出厂包里的名单是样例，写进备份就等于把它冻结了，
+       以后换新包再也不更新）。 */
     var local = read(KEY.config, {});
     if (local && local.students) out.students = local.students;
     if (local && local.peopleGroups) out.peopleGroups = local.peopleGroups;
@@ -653,18 +806,140 @@
     };
   }
 
-  function isPlain(v) {
-    return !!v && typeof v === "object" && !Array.isArray(v);
+  /* ---------- 写闸门 ----------
+     为什么要有这一层（2026-11-23 复盘）：
+
+     「人」这个实体以前在系统里有五种写法同时在流转——"张三"、{name}、
+     {id,name}、id 串、"name:张三"——于是每个读它的人都得自己猜一遍，
+     全项目猜出了五份 nameOf。更糟的是写入路径毫无约束：patchConfig /
+     patchDayOverride / importAll 谁拿到什么就存什么，脏数据进得去；
+     exportAll 又原样吐出来，把脏数据固化进备份；importAll 反过来用
+     元素级条件整份拒绝，能救的也救不回来。四条路拼成一个死锁。
+
+     修法不是给每条路各加一个兜底，而是：凡是落进存储的「存人字段」，
+     一律先过这里。清洗是写入口的固有属性，不再靠 schema 版本号触发——
+     版本号只能洗一次，写闸门每次写都生效。
+
+     清洗（宽）与校验（严）分工：
+       · 清洗发生在写之前，尽量把旧数据救回来，救不回的也不静默删；
+       · 校验只查骨架（是不是数组、是不是对象），不查元素类型——
+         元素长什么样是清洗的责任，校验越权就会把能救的文件判死。 */
+
+  /* 岗位文档：people / peopleMap / groups / substitute 四处都存人 */
+  function cleanRoleOne(r) {
+    if (!isPlain(r)) return null;
+    var o = clone(r);
+    if ("people" in o) o.people = peopleList(o.people);
+    if (o.peopleMap !== undefined) {
+      if (!isPlain(o.peopleMap)) delete o.peopleMap;
+      else Object.keys(o.peopleMap).forEach(function (k) {
+        var names = peopleList(o.peopleMap[k]);
+        if (names.length) o.peopleMap[k] = names[0];
+        else delete o.peopleMap[k];
+      });
+    }
+    if (o.groups !== undefined) {
+      if (!isPlain(o.groups)) delete o.groups;
+      else Object.keys(o.groups).forEach(function (k) {
+        var names = peopleList(o.groups[k]);
+        if (names.length) o.groups[k] = names;
+        else delete o.groups[k];
+      });
+    }
+    if (o.substitute !== undefined) {
+      /* 替补不是「人名列表」，是「人 + 备注」的记录（data.js 里 r11 的
+         {"name":"陈静姝","note":"特殊情况帮忙擦黑板"}），tools/check_p1.py
+         也按 s["name"] 读。所以只清洗 name，不能拍平成字符串数组。 */
+      o.substitute = (Array.isArray(o.substitute) ? o.substitute : [o.substitute])
+        .map(function (x) {
+          if (isPlain(x)) {
+            var y = clone(x);
+            y.name = personNameOf(y.name);
+            return y.name ? y : null;
+          }
+          var n = personNameOf(x);
+          return n ? { name: n } : null;
+        })
+        .filter(function (x) { return !!x; });
+    }
+    return o;
   }
 
-  /* 结构自愈：把历史上写坏的字段改回可用形状，其余原样不动。
-     三条硬约束：
-       1. 只改坏掉的那几个字段，不整块重排、不删学生、不删组；
-       2. 组名与能救回来的成员一律保留（老师看见「组没了」比看见一行
-          [object Object] 更慌，而且没法自己修）；
-       3. 只在升级与导入这两个时刻跑，不在每次读配置时跑——
-          大屏每秒重绘，读路径上做深拷贝会拖慢整屏。 */
-  function sanitizeConfig(c) {
+  function cleanRolesDoc(doc) {
+    if (!isPlain(doc)) return doc;
+    var out = clone(doc);
+    if (Array.isArray(out.roles)) {
+      out.roles = out.roles.map(cleanRoleOne).filter(function (r) { return !!r; });
+    }
+    return out;
+  }
+
+  /* 人群组：组名与成员都可能被写坏。能救的救，救不回的保留空组，
+     由 P4 的确认清单报给老师，不在这里静默丢弃。 */
+  function cleanGroupOne(g) {
+    if (!isPlain(g)) return null;
+    var o = clone(g);
+    var nm = personNameOf(o.name);
+    o.name = (nm && nm !== "[object Object]") ? nm : "未命名组";
+    var ids = [];
+    /* memberIds 偶尔被写成单个值而不是数组（"s01"）。当单值救回来，
+       比当成空数组丢掉整组好。 */
+    var raw = Array.isArray(o.memberIds) ? o.memberIds
+            : (o.memberIds == null ? [] : [o.memberIds]);
+    raw.forEach(function (m) {
+      var v = memberIdOf(m);
+      if (v && ids.indexOf(v) < 0) ids.push(v);
+    });
+    o.memberIds = ids;
+    /* peopleGroups 里装的就是手动组；历史脏数据里的 source:"role"
+       属于放错了地方，按手动组救回来，别让整组消失。 */
+    o.source = "manual";
+    return o;
+  }
+
+  function cleanGroups(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(cleanGroupOne).filter(function (g) { return !!g; });
+  }
+
+  /* 某一天的临时调整：roles[id].people 与 lessons[periodNo].teacher */
+  function cleanOverride(o) {
+    if (!isPlain(o)) return null;
+    var out = clone(o);
+    if (isPlain(out.roles)) {
+      Object.keys(out.roles).forEach(function (id) {
+        var r = out.roles[id];
+        if (!isPlain(r)) { delete out.roles[id]; return; }
+        if ("people" in r) r.people = peopleList(r.people);
+      });
+    }
+    if (isPlain(out.lessons)) {
+      Object.keys(out.lessons).forEach(function (p) {
+        var L = out.lessons[p];
+        if (!isPlain(L)) { delete out.lessons[p]; return; }
+        if (L.teacher !== undefined) {
+          /* 已经被腌进去的字面量 "[object Object]" 顺手清成空：
+             它是显示故障留下的残渣，不是老师输入的老师名。 */
+          var tn = personNameOf(L.teacher);
+          L.teacher = tn === "[object Object]" ? "" : tn;
+        }
+      });
+    }
+    return out;
+  }
+
+  function cleanOverrides(all) {
+    if (!isPlain(all)) return {};
+    var out = {};
+    Object.keys(all).forEach(function (k) {
+      var o = cleanOverride(all[k]);
+      if (isPlain(o) && Object.keys(o).length) out[k] = o;
+    });
+    return out;
+  }
+
+  /* 整份班级配置 */
+  function cleanConfig(c) {
     if (!isPlain(c)) return c;
     var out = clone(c);
 
@@ -675,61 +950,19 @@
     }
 
     if (Array.isArray(out.peopleGroups)) {
-      out.peopleGroups = out.peopleGroups.map(function (g) {
-        if (!isPlain(g)) return g;
-        var o = clone(g);
-        var nm = personNameOf(o.name);
-        o.name = (nm && nm !== "[object Object]") ? nm : "未命名组";
-        var ids = [];
-        (Array.isArray(o.memberIds) ? o.memberIds : []).forEach(function (m) {
-          var v = memberIdOf(m);
-          if (v && ids.indexOf(v) < 0) ids.push(v);
-        });
-        o.memberIds = ids;
-        return o;
-      });
+      out.peopleGroups = cleanGroups(out.peopleGroups);
     }
 
-    if (isPlain(out.roles) && Array.isArray(out.roles.roles)) {
-      out.roles = clone(out.roles);
-      out.roles.roles = out.roles.roles.map(function (r) {
-        if (!isPlain(r)) return r;
-        var o = clone(r);
-        function cleanName(x) {
-          var n = personNameOf(x);
-          return (n && n !== "[object Object]") ? n : null;
-        }
-        if (Array.isArray(o.people)) {
-          o.people = o.people.map(cleanName).filter(function (n) { return !!n; });
-        }
-        if (isPlain(o.peopleMap)) {
-          Object.keys(o.peopleMap).forEach(function (k) {
-            var n = cleanName(o.peopleMap[k]);
-            if (n) o.peopleMap[k] = n;
-            else delete o.peopleMap[k];
-          });
-        }
-        if (isPlain(o.groups)) {
-          Object.keys(o.groups).forEach(function (k) {
-            if (!Array.isArray(o.groups[k])) { delete o.groups[k]; return; }
-            o.groups[k] = o.groups[k].map(cleanName).filter(function (n) { return !!n; });
-          });
-        }
-        if (Array.isArray(o.substitute)) {
-          o.substitute = o.substitute.map(function (x) {
-            if (isPlain(x)) {
-              var y = clone(x);
-              y.name = cleanName(y.name);
-              return y.name ? y : null;
-            }
-            var n = cleanName(x);
-            return n ? n : null;
-          }).filter(function (x) { return !!x; });
-        }
-        return o;
-      });
+    if (isPlain(out.roles)) {
+      out.roles = cleanRolesDoc(out.roles);
     }
+
     return out;
+  }
+
+  /* 老名字：迁移与导入都在用，行为与 cleanConfig 完全一致 */
+  function sanitizeConfig(c) {
+    return cleanConfig(c);
   }
 
   /* ---------- 配置版本与迁移 ----------
@@ -793,32 +1026,30 @@
     }
     if ("overrides" in obj) {
       if (!isPlain(obj.overrides)) return { ok: false, why: "设置里的「临时调整」格式不对" };
-      plan.push([KEY.overrides, obj.overrides]);
+      /* 临时调整里也存人（roles[].people / lessons[].teacher）。
+         以前这里一句校验都没有：对象原样落库、原样套到当天数据上，
+         靠大屏 personName 兜底才没露字——但那只是把症状推迟到显示层。 */
+      plan.push([KEY.overrides, cleanOverrides(obj.overrides)]);
     }
     if ("config" in obj) {
-      /* 先按版本迁一次。骨架校验仍然严格（见下），坏文件整份拒绝；
-         元素级的脏数据（成员是对象、姓名是对象）在校验通过后由
-         sanitizeConfig 修——这两件事别混，否则坏文件会被"修"成半份。 */
+      /* 先按版本迁一次，拿到的仍是「结构可能不完整」的对象。 */
       var c = migrateConfig(obj.config, importedVersion);
       if (!isPlain(c)) return { ok: false, why: "设置里的「班级配置」格式不对" };
+      /* 顺序很重要：先清洗，再只查骨架。
+         反过来的话，「组名是对象」这种 cleanGroupOne 明明能救的情况，
+         会被 `typeof g.name !== "string"` 整份拒绝——程序自己导出的
+         文件自己导不回来，就是这么来的。 */
+      c = cleanConfig(c);
       if ("timetable" in c && (!isPlain(c.timetable) || !Array.isArray(c.timetable.blocks))) {
         return { ok: false, why: "设置里的「作息表」格式不对" };
       }
       if ("schedule" in c && (!isPlain(c.schedule) || !Array.isArray(c.schedule.entries))) {
         return { ok: false, why: "设置里的「课表」格式不对" };
       }
-      if ("peopleGroups" in c) {
-        if (!Array.isArray(c.peopleGroups)) {
-          return { ok: false, why: "设置里的「人群组」格式不对" };
-        }
-        var groupsBad = c.peopleGroups.some(function (g) {
-          return !isPlain(g) || typeof g.name !== "string" || !Array.isArray(g.memberIds);
-        });
-        if (groupsBad) return { ok: false, why: "设置里的「人群组」格式不对" };
+      /* 人群组只查骨架：元素长什么样已经由 cleanGroups 处理完了。 */
+      if ("peopleGroups" in c && !Array.isArray(c.peopleGroups)) {
+        return { ok: false, why: "设置里的「人群组」格式不对" };
       }
-      /* 骨架没问题了，再修元素：字符串名单、对象成员、"未命名"组名。
-         修完写回去的就是干净数据，不会把脏东西带进这台机器。 */
-      c = sanitizeConfig(c);
       plan.push([KEY.config, c]);
       plan.push([KEY.schema, SCHEMA_VERSION]);
     }
@@ -846,6 +1077,11 @@
   }
 
   upgrade();
+  /* 把组员的旧 id 编码（"s01"）就地换成姓名编码（"name:张三"）：
+     换一份名单，id 就全变了，老师的组会整片对不上。幂等——没有可转的就
+     不写盘，所以不需要靠版本号触发一次。放在 upgrade 之后单独跑，
+     因为升级只在版本落后时执行，而这台机器上可能早就是 v2 了。 */
+  fixGroupKeys();
 
   var api = {
     KEY: KEY, dayKey: dayKey, clone: clone,
@@ -853,8 +1089,10 @@
     patchDayOverride: patchDayOverride, clearDayOverride: clearDayOverride,
     applyOverrides: applyOverrides, undo: undo, canUndo: canUndo,
     rankStudents: rankStudents, markPicked: markPicked,
-    normStudents: normStudents, personNameOf: personNameOf,
+    normStudents: normStudents, personNameOf: personNameOf, peopleList: peopleList,
     memberIdOf: memberIdOf, sanitizeConfig: sanitizeConfig,
+    cleanConfig: cleanConfig, cleanOverrides: cleanOverrides,
+    cleanRolesDoc: cleanRolesDoc, cleanGroups: cleanGroups,
     recall: recall, remember: remember, allPhrases: allPhrases, removePhrase: removePhrase,
     findTimeWords: findTimeWords,
     texts: texts, patchTexts: patchTexts, resetTexts: resetTexts,
@@ -863,6 +1101,7 @@
     reorderRoles: reorderRoles,
     peopleGroups: peopleGroups, saveGroup: saveGroup, deleteGroup: deleteGroup,
     upsertGroup: upsertGroup, removeGroup: removeGroup,
+    fixGroupKeys: fixGroupKeys, auditPeople: auditPeople,
     schemaVersion: configVersion,
     exportAll: exportAll, importAll: importAll,
     makeChallenge: makeChallenge, lockState: lockState,

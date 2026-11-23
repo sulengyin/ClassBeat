@@ -6,6 +6,7 @@
   "use strict";
 
   var S = root.Store;
+  var SCH = root.Schedule;
   var DATA = root.RHYTHM_DATA || {};
   var RT = root.Runtime;
   var R = root.Rhythm;
@@ -25,6 +26,15 @@
   var Sub = root.Subjects || { list: function () { return []; }, key: function (s) { return String(s || ""); } };
   function subjectChoices() { return Sub.list(); }
 
+  /* 老师名上屏/进输入框前一律过这里。课表里的 teacher 可能是对象，
+     而 `textContent = 对象` 会得到 "[object Object]"、`input.value = 对象`
+     也一样——然后老师一按保存，它就被腌成合法数据。
+     [object Object] 是没有信息量的残留，宁可不显示。 */
+  function teacherText(v) {
+    var t = S.personNameOf ? S.personNameOf(v) : (typeof v === "string" ? v : "");
+    return t === "[object Object]" ? "" : t;
+  }
+
   /* 科目 → 任课老师：从整张课表聚合（真机反馈 2026-11-20：五年级学生
      打字找字麻烦，改课时不要手输老师名字）。同一科由两位老师执教
      （如心理/班队）就并列「张老师/李老师」，改课时自动带出。 */
@@ -33,7 +43,10 @@
     if (RT && RT.config) {
       ((RT.config().schedule || {}).entries || []).forEach(function (e) {
         if (!e.subject) return;
-        var t = (e.teacher || "").trim();
+        /* 课表里的 teacher 可能是对象（别人做的设置文件、手工改过的
+           班级数据）。以前这里直接 .trim()，对象没有 trim，一进门就抛
+           TypeError——整个「改课务」面板打不开，下拉和老师都带不出来。 */
+        var t = teacherText(e.teacher);
         var list = map[e.subject] || (map[e.subject] = []);
         if (t && list.indexOf(t) < 0) list.push(t);
       });
@@ -361,7 +374,7 @@
         var row = h("button", "ep-row" + (changed ? " changed" : ""));
         row.appendChild(h("span", "p", "第 " + b.periodNo + " 节"));
         row.appendChild(h("span", "s", b.subject || "—"));
-        row.appendChild(h("span", "t", b.teacher || ""));
+        row.appendChild(h("span", "t", teacherText(b.teacher)));
         row.appendChild(h("span", "x", changed ? "已改" : "改"));
         row.addEventListener("click", function () { openLessonEditor(b, key); });
         list.appendChild(row);
@@ -530,9 +543,13 @@
     }
 
     /* 打开时优先用今天课表上实际的人（可能已被代课改过），
-       没有才用课表聚合出来的默认值 */
+       没有才用课表聚合出来的默认值。
+       赋进输入框之前必须归一到人名字符串：以前直接把对象赋上去，
+       输入框里就显示 "[object Object]"，老师一点「只改今天」，
+       这四个字就从显示故障变成了落库的合法值，从此再也洗不掉。 */
     paintTeachers(true);
-    if (b.teacher) tea.value = b.teacher;
+    var curTeacher = S.personNameOf ? S.personNameOf(b.teacher) : (b.teacher || "");
+    if (curTeacher && curTeacher !== "[object Object]") tea.value = curTeacher;
     sub.addEventListener("change", function () { paintTeachers(false); });
 
     wrap.appendChild(h("p", "ep-note",
@@ -1224,27 +1241,35 @@
     return DATA.roles || { roles: [] };
   }
 
-  /* 岗位现在挂的是什么人：今天的换人优先，其次岗位配置里的
-     people / peopleMap / groups（A/B 轮换时算总人数）。
-     顺序与引擎的 resolvePeople 一致；空数组/空表算「没写」而不是
-     「没人」——否则人在轮换表里，面板却标成「未定」。
-     空数组 = 大屏会显示「待定」——常驻区靠它标注提醒老师
-     （真机反馈 2026-11-20：勾了常驻的岗位却显示待选）。 */
+  /* 「这个岗位今天是谁」——只有引擎一个答案。
+     两段与覆盖层的语义一致：今天的临时换人（override）在外层，没换人
+     才看岗位配置里的轮换规则。
+     以前这里自己按 people → peopleMap → groups 算一遍，而引擎是
+     people → groups → peopleMap：同一个岗位，面板说「按星期的那个人」，
+     大屏说「A 组的那个人」。老师看到的就是「我明明选了人，屏上却是别人」。
+     groups 全组的总人数由 roleGroupSize 单独给，不混进「今天是谁」。 */
   function rolePeopleNow(role, key) {
-    var ov = (S.getDayOverride(key) || {}).roles || {};
-    if (ov[role.id] && nameText(ov[role.id].people)) return ov[role.id].people;
-    if (nameText(role.people)) return role.people;
-    if (role.peopleMap && Object.keys(role.peopleMap).length) {
-      return Object.keys(role.peopleMap).map(function (k) { return role.peopleMap[k]; });
+    var ovr = ((S.getDayOverride(key) || {}).roles || {})[role.id];
+    /* 老师今天明确设过（包括清空）就以今天为准 */
+    if (ovr && "people" in ovr) return S.peopleList(ovr.people);
+
+    if (!SCH || !SCH.resolvePeople) return S.peopleList(role.people);
+    var day = (RT && RT.day) ? RT.day(key) : null;
+    var res = SCH.resolvePeople(role, day ? day.group : null, null, day ? day.weekday : 1);
+    return (res && res[0]) || [];
+  }
+
+  /* 轮换岗位的总人数（只是给面板说「A/B 组（8 人）」用，不参与「今天是谁」） */
+  function roleRosterSize(role) {
+    var n = 0;
+    var seen = {};
+    function add(v) {
+      S.peopleList(v).forEach(function (x) { if (!seen[x]) { seen[x] = 1; n++; } });
     }
-    if (role.groups) {
-      var all = [];
-      Object.keys(role.groups).forEach(function (k) {
-        all = all.concat(role.groups[k] || []);
-      });
-      return all;
-    }
-    return [];
+    add(role.people);
+    if (role.peopleMap) Object.keys(role.peopleMap).forEach(function (k) { add(role.peopleMap[k]); });
+    if (role.groups) Object.keys(role.groups).forEach(function (k) { add(role.groups[k]); });
+    return n;
   }
 
   function renderDuty(ov, key) {
@@ -1265,17 +1290,15 @@
       var row = h("button", "ep-row" + (changed ? " changed" : ""));
       row.appendChild(h("span", "p", r.name));
 
-      var who = "";
-      if (changed) who = nameText(ov.roles[r.id].people);
-      else if (nameText(r.people)) who = nameText(r.people);
-      else if (r.peopleMap && Object.keys(r.peopleMap).length) {
-        who = nameText(Object.keys(r.peopleMap).sort().map(function (k) { return r.peopleMap[k]; }));
-      } else if (r.groups) {
-        var filled = Object.keys(r.groups).reduce(function (n, k) {
-          return n + ((r.groups[k] || []).length);
-        }, 0);
-        who = filled ? "A/B 组" : "A/B 组（成员还没填）";
-      }
+      /* 谁：只有 rolePeopleNow 一个来源（引擎答案 + 今天的临时换人）。
+         轮换岗位额外标出「A/B 组」，让老师知道明天会换人——
+         只写人名的话，老师会以为这就是长期安排。 */
+      var names = rolePeopleNow(r, key);
+      var who = nameText(names);
+      if (r.groups && who) who = "A/B 组 · " + who;
+      else if (!who && r.groups) {
+        who = roleRosterSize(r) ? "A/B 组（今天这组没人）" : "A/B 组（成员还没填）";
+      } else if (!who && r.peopleMap) who = "星期表里今天没人";
 
       row.appendChild(h("span", "s", who || "未定"));
       row.appendChild(h("span", "x", changed ? "已换" : "换"));
@@ -1361,25 +1384,29 @@
 
   /* 一组「人员」可能是名字、学号、也可能是对象（手工改过的配置）。
      拼到界面上之前一律取名字、丢掉取不出来的，别让 [object Object] 露脸。 */
+  /* 一组人拼成屏上一行字。归一化交给 Store.peopleList —— 和写闸门、
+     引擎同一份实现；这里只负责拼接。以前这里自己「取名字」、写闸门
+     「按分隔符拆开」，同一份数据在两处被理解成不同的东西。 */
   function nameText(list) {
-    return (list || []).map(function (x) {
-      var n = S.personNameOf ? S.personNameOf(x) : (typeof x === "string" ? x : "");
-      return (n && n !== "[object Object]") ? n : "";
-    }).filter(function (n) { return !!n; }).join("、");
+    if (S.peopleList) return S.peopleList(list).join("、");
+    return (Array.isArray(list) ? list : [])
+      .map(function (x) { return typeof x === "string" ? x : ""; })
+      .filter(function (n) { return !!n; }).join("、");
   }
 
   /* 换人时候选的排序依据：这个岗位原本是谁，就先出谁。
-     岗位的人可能在 people、peopleMap、groups 三处，三处都要算进来；
-     手工改过的配置里这些位置偶尔是对象，统一取名字，别让对象流进候选。 */
+     岗位的人可能在 people、peopleMap、groups、substitute 四处，
+     四处都要算进来；归一化统一交给 Store.peopleList，
+     别在这里再写一套「取名字、挡 [object Object]」。 */
   function relatedNames(role) {
-    var raw = (role.people || []).slice();
-    if (role.peopleMap) Object.keys(role.peopleMap).forEach(function (k) { raw.push(role.peopleMap[k]); });
-    if (role.groups) Object.keys(role.groups).forEach(function (k) { raw = raw.concat(role.groups[k] || []); });
-    raw = raw.concat(role.substitute || []);
-    var out = [];
-    raw.forEach(function (x) {
-      var n = S.personNameOf ? S.personNameOf(x) : (typeof x === "string" ? x : "");
-      if (n && n !== "[object Object]" && out.indexOf(n) < 0) out.push(n);
+    var out = S.peopleList(role.people);
+    function addAll(v) {
+      S.peopleList(v).forEach(function (n) { if (out.indexOf(n) < 0) out.push(n); });
+    }
+    if (role.peopleMap) Object.keys(role.peopleMap).forEach(function (k) { addAll(role.peopleMap[k]); });
+    if (role.groups) Object.keys(role.groups).forEach(function (k) { addAll(role.groups[k]); });
+    (Array.isArray(role.substitute) ? role.substitute : []).forEach(function (x) {
+      addAll(x && typeof x === "object" ? x.name : x);
     });
     return out;
   }
@@ -1404,6 +1431,8 @@
       if (!s || !s.name || s.active === false) return;
       if (s.id) byId[s.id] = s.name;
       byId["name:" + s.name] = s.name;
+      /* 手工写的配置里组员可能只存了姓名，没有编号前缀 */
+      byId[s.name] = s.name;
     });
     return byId;
   }
@@ -1428,10 +1457,10 @@
     if (role && role.grp) {
       var names = [];
       function add(x) {
-        var n = S.personNameOf ? S.personNameOf(x) : (typeof x === "string" ? x : "");
-        if (!n || n === "[object Object]") return;
-        if (keep !== null && !keep[n]) return;
-        if (names.indexOf(n) < 0) names.push(n);
+        S.peopleList(x).forEach(function (n) {
+          if (keep !== null && !keep[n]) return;
+          if (names.indexOf(n) < 0) names.push(n);
+        });
       }
       if (day) {
         (S.applyOverrides(day, S.getDayOverride(key)).duties || []).forEach(function (d) {
@@ -1439,15 +1468,10 @@
           (d.people || []).forEach(add);
         });
       }
-      var ov = (S.getDayOverride(key) || {}).roles || {};
       (roleDoc().roles || []).forEach(function (r) {
         if (r.grp !== role.grp) return;
-        var people = (ov[r.id] && ov[r.id].people) ? ov[r.id].people : [];
-        if (!people.length && r.people) people = r.people;
-        if (!people.length && r.peopleMap) {
-          people = Object.keys(r.peopleMap).sort().map(function (k) { return r.peopleMap[k]; });
-        }
-        people.forEach(add);
+        /* 同组其他岗位今天是谁：问同一个入口，别在这儿再算一遍 */
+        rolePeopleNow(r, key).forEach(add);
       });
       if (names.length) {
         out.push({ id: "role:" + role.grp, name: role.grp, source: "role", names: names });
@@ -1846,6 +1870,52 @@
     renderBackup();
   }
 
+  /* 数据体检：形状坏掉的由 Store 的写闸门自动修；这里列的是
+     「形状没问题、只是这个人不在名单里了」——组还在、点开却是空的，
+     老师最容易把这一类当成「功能丢了」。不自动认领（可能认错同名），
+     只把清单摆出来，能修的给一个按钮。 */
+  function renderAudit(sec) {
+    var box = h("div", "ep-audit");
+    box.appendChild(h("div", "ep-slot-title", "名单与分组对得上吗"));
+
+    var a = S.auditPeople ? S.auditPeople() : { ok: true, hasRoster: false, items: [] };
+    if (!a.hasRoster) {
+      box.appendChild(h("p", "ep-note",
+        "还没录入班级名单，先不检查。到向导里补上名单后，这里会告诉你哪些人对不上。"));
+      sec.appendChild(box);
+      return;
+    }
+    if (a.ok) {
+      box.appendChild(h("p", "ep-note", "都对得上：分组和岗位里的人都在当前名单里。"));
+      sec.appendChild(box);
+      return;
+    }
+
+    box.appendChild(h("p", "ep-note",
+      "下面这些名字写在配置里，但不在当前名单里——多半是名单重录过，或者当初手打错了。"
+      + "组和人不会因为这条提示消失，改一下名单或点下面的按钮就行。"));
+    var list = h("div", "ep-rows");
+    a.items.forEach(function (it) {
+      var row = h("div", "ep-row static");
+      row.appendChild(h("span", "p", (it.kind === "group" ? "分组 · " : "岗位 · ") + it.name));
+      row.appendChild(h("span", "s", it.detail));
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+
+    var fix = h("button", "ep-mini ep-audit-fix", "修一遍能修的");
+    fix.title = "把组员里旧的学生编号（s01）换成姓名，换名单也不会整片丢人；认不出的不动";
+    fix.addEventListener("click", function () {
+      var r = S.fixGroupKeys ? S.fixGroupKeys() : { fixed: 0 };
+      flash(r.fixed
+        ? "已把 " + r.fixed + " 个旧编号换成姓名"
+        : "没有能自动修的，剩下的请对照名单手动改");
+      renderBody();
+    });
+    box.appendChild(fix);
+    sec.appendChild(box);
+  }
+
   /* ---------- 备份 / 迁移 ---------- */
   /* 老师改的文字只在这台机器的浏览器里。想换机器、或者请人重新打包，
      得先把它导出来——不然对面拿到的永远是出厂文案。 */
@@ -1895,6 +1965,7 @@
     renderAutoBackup(sec);
 
     bodyEl.appendChild(sec);
+    renderAudit(sec);
   }
 
   /* 本机自动备份：大屏开着就每天存一份，这里只负责「看有哪些、点一下恢复」。

@@ -155,20 +155,13 @@
     return String(s == null ? "" : s).replace(/\u00a0/g, " ").replace(/[ \t\r\n]+/g, " ").trim();
   }
 
-  /* 人员的各种写法统一成「姓名字符串」：纯文本、对象（{name}/{label}）、
-     数组元素都见过（别人做的设置文件、手工改过的班级数据）。取不出来就当空，
-     绝不让 [object Object] 进核对流程——那会被当成一个「未找到的学生」，
-     一路写进岗位人员里，再想清掉就难了。 */
+  /* 人名归一化只有 Store 一份实现（app/store.js 的 personNameOf）。
+     这里以前自带第三套：它不递归、也不挡 [object Object]，
+     `tidy(s.name)` 遇到对象就直接产出字符串 "[object Object]"，
+     再当成一个「未找到的学生」一路走进核对结果。 */
   function nameOf(x) {
-    if (x == null) return "";
-    if (typeof x === "string") return tidy(x);
-    if (typeof x === "number") return String(x);
-    if (typeof x === "object") {
-      if (x.name != null) return nameOf(x.name);
-      if (x.label != null) return nameOf(x.label);
-      return "";
-    }
-    return "";
+    if (root.Store && root.Store.personNameOf) return root.Store.personNameOf(x);
+    return typeof x === "string" ? tidy(x) : "";
   }
 
   /* 老师在面板里修正过的名单，只用于姓名核对，不写回班级数据。
@@ -189,7 +182,10 @@
       if (!s) return;
       if (typeof s === "string") { out.push(s); return; }
       if (s.active === false) return;
-      if (s.name) out.push(tidy(s.name));
+      /* 走 nameOf 而不是 tidy：tidy 会把对象 String() 成 "[object Object]"，
+         这个名字再进核对流程就成了一个假的「未找到的学生」。 */
+      var nm = nameOf(s.name);
+      if (nm) out.push(nm);
     });
     return out.filter(function (n) { return n; });
   }
