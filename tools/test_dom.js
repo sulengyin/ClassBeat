@@ -2177,10 +2177,15 @@ global.Remote.info.phone = "";
   const exitModal = document.getElementById("exitModal");
   document.getElementById("btn-exit")._h.click();
   check(exitModal.hidden === false, "点退出程序先弹确认");
+  /* 0.5.3 起看门狗与 .bat 启动器已退役，退出这条路也不能再提它们（0.5.6 真机反馈：
+     弹窗还在说「看门狗一起停；手机发消息的服务不受影响」，两句话都已不成立） */
+  const exitSpec = document.getElementById("exitText").textContent;
+  check(!/看门狗|\.bat/.test(exitSpec), "退出提示不提已退役的看门狗 / .bat", exitSpec);
+  check(exitSpec.includes("手机也发不了消息"), "退出提示说清手机服务会一起停", exitSpec);
   global.location = { search: "", protocol: "file:", hostname: "", port: "" };
   document.getElementById("exitGo")._h.click();
-  check(document.getElementById("exitText").textContent.includes("退出大屏.bat"),
-    "没有本地服务时提示用退出大屏.bat", document.getElementById("exitText").textContent);
+  check(document.getElementById("exitText").textContent.includes("直接关掉窗口"),
+    "没有本地服务时提示直接关窗口", document.getElementById("exitText").textContent);
   document.getElementById("exitCancel")._h.click();
   check(exitModal.hidden === true, "确认框能取消");
 

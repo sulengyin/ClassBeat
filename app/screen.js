@@ -1111,7 +1111,7 @@
       el.exitModal.hidden = false;
       el.exitGo.disabled = false;
       el.exitGo.textContent = "退出";
-      el.exitText.innerHTML = "大屏窗口会关闭，看门狗一起停；手机发消息的服务不受影响。<br>要再打开，双击桌面上的 ClassBeat 图标就行。";
+      el.exitText.innerHTML = "退出后大屏会关，手机也发不了消息。<br>要再打开，双击桌面上的 ClassBeat 图标就行。";
     }
     function closeExit() { if (el.exitModal) el.exitModal.hidden = true; }
 
@@ -1128,7 +1128,7 @@
         el.exitText.textContent = msg;
       }
       if (!hasServer() || !root.fetch) {
-        fail("本地服务没在跑，这里退不了。请双击大屏文件夹里的「退出大屏.bat」。");
+        fail("这个版本没有后台服务，直接关掉窗口就行。");
         return;
       }
       el.exitGo.disabled = true;
@@ -1138,14 +1138,14 @@
           .then(function (res) { return res.json(); })
           .then(function (data) {
             if (data && data.ok) {
-              /* 服务线程正在等看门狗退场再关窗，页面这边只需要把话说清 */
-              el.exitText.textContent = "正在退出：窗口马上会自己关闭。要回来，双击桌面上的 ClassBeat 图标。";
+              /* 服务已认下退出请求：它会停掉自己，壳子收到退出标记后关窗、退进程 */
+              el.exitText.textContent = "正在退出：窗口马上会自己关闭。";
             } else {
-              fail("退出没成功。请双击大屏文件夹里的「退出大屏.bat」。");
+              fail("没退成功。右键托盘里的 ClassBeat 图标，选「退出 ClassBeat」。");
             }
           })
-          .catch(function () { fail("退出没成功。请双击大屏文件夹里的「退出大屏.bat」。"); });
-      } catch (e) { fail("退出没成功。请双击大屏文件夹里的「退出大屏.bat」。"); }
+          .catch(function () { fail("没退成功。右键托盘里的 ClassBeat 图标，选「退出 ClassBeat」。"); });
+      } catch (e) { fail("没退成功。右键托盘里的 ClassBeat 图标，选「退出 ClassBeat」。"); }
     });
 
     el.btnFull.addEventListener("click", function () {
