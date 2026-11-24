@@ -1,6 +1,6 @@
 [package]
 name = "classbeat-tools"
-version = "0.5.6"
+version = "0.5.7"
 edition = "2021"
 rust-version = "1.77"
 description = "ClassBeat 构建与验收工具（取代 desktop/scripts/*.py 与 tools/bundle.py）"
