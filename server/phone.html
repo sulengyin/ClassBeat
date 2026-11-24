@@ -239,8 +239,7 @@
 
 <div class="card" id="cfgCard">
   <div class="label">改教室设置</div>
-  <div class="cfgHint">读取大屏当前的班名、作息和课表，改完发回去，屏上几十秒内生效。
-  名册等学生信息不会离开大屏，手机上看不到也改不了。</div>
+  <div class="cfgHint">改完发回去，屏上几十秒生效；学生名单不上手机。</div>
   <button class="cfgbtn" id="cfgLoad">读取教室当前设置</button>
 
   <div id="cfgEditor" hidden>
@@ -250,8 +249,7 @@
     <div class="label">作息时间</div>
     <div id="cfgBlocks"></div>
     <button class="cfgbtn cfgMini" id="cfgBlockAdd">＋ 在最后加一段</button>
-    <div class="cfgHint">删某一段会把它的时长并给前一段，保持全天首尾相接；
-    删「第 N 节」会同时清掉课表里那一节，后面的节次自动往前排。</div>
+    <div class="cfgHint">删掉的时长并给前一段；删「第 N 节」会连课表一起清。</div>
 
     <div class="label">课表（科目 / 任课老师）</div>
     <div id="cfgTable"></div>
@@ -267,8 +265,7 @@
     <button class="send" id="cfgSave">改完，发到大屏</button>
   </div>
 
-  <div class="cfgHint">改更大规模的（换课程包、名册修正、调中间的时段），还是在大屏上最稳妥；
-  或者把导出的设置文件发过去：</div>
+  <div class="cfgHint">大改动还是在大屏上做；也可以把设置文件发过来。</div>
   <input id="cfgFile" type="file" accept=".json,application/json" hidden>
   <button class="cfgbtn" id="cfgSend">选择设置文件发送</button>
 </div>

@@ -307,7 +307,7 @@
     var sec1 = h("section", "ep-sec");
     sec1.appendChild(h("h3", null, "发一条通知"));
     if (!day) {
-      sec1.appendChild(h("p", "ep-note", "今天的课表算不出来，先看配置是不是缺了文件。"));
+      sec1.appendChild(h("p", "ep-note", "今天算不出课表，先检查班级配置。"));
     }
 
     var ta = document.createElement("textarea");
@@ -570,9 +570,6 @@
     var curTeacher = S.personNameOf ? S.personNameOf(b.teacher) : (b.teacher || "");
     if (curTeacher && curTeacher !== "[object Object]") tea.value = curTeacher;
     sub.addEventListener("change", function () { paintTeachers(false); });
-
-    wrap.appendChild(h("p", "ep-note",
-      "科目决定带哪些东西；老师按课表自动带出，不用打字，代课直接改。"));
 
     var row = h("div", "ep-actrow");
     var saveToday = h("button", "ep-primary ep-lesson-save", "只改今天");
@@ -840,7 +837,7 @@
     var sec0 = h("section", "ep-sec wide");
     sec0.appendChild(h("h3", null, "晨间自主管理 · 放学 · 休息日"));
     sec0.appendChild(h("p", "ep-note",
-      "晨间这两句跟着作息里的晨间段时间走；放学和休息日不在作息表里。留空就是原来的话。"));
+      "留空就用原来的话。"));
     STAGES.forEach(function (st) {
       var cur = (T.stage || {})[st.key] || {};
       if (st.key === "before") {
@@ -860,8 +857,6 @@
 
     var sec1 = h("section", "ep-sec wide");
     sec1.appendChild(h("h3", null, "课间这一屏"));
-    sec1.appendChild(h("p", "ep-note",
-      "大字是第一眼看到的，下面是两行：先做什么、带什么。"));
     sec1.appendChild(field("课间 · 大字", "课间", T.breakTitle,
       function (v) { S.patchTexts({ breakTitle: v.trim() || null }); }));
     sec1.appendChild(field("第一行（用逗号隔开）", "喝水，上厕所",
@@ -870,16 +865,12 @@
     sec1.appendChild(field("第二行开头", "准备好", T.prepLabel,
       function (v) { S.patchTexts({ prepLabel: v.trim() || null }); }));
     sec1.appendChild(prepLeadRow());
-    sec1.appendChild(h("p", "ep-note",
-      "下课前多少分钟开始提示下一节要带什么。默认 10 分钟，1–30 分钟都可以；"
-      + "清空输入框就回到默认。普通课间、大课间都按这个提前量，改完大屏立刻跟着变。"));
+    sec1.appendChild(h("p", "ep-note", "提前 1–30 分钟，默认 10；留空回默认。"));
     bodyEl.appendChild(sec1);
 
     var sec2 = h("section", "ep-sec wide");
     sec2.appendChild(h("h3", null, "各时段的提示语"));
-    sec2.appendChild(h("p", "ep-note",
-      "每段默认每天显示同一句；哪天有特别安排就点掉星期、或展开写不同的话。"
-      + "晨间自主管理那一格就是屏上的黄色贴纸。留空就是原来的话。"));
+    sec2.appendChild(h("p", "ep-note", "留空用原来的话；也能只给某几天。"));
     blockNames().forEach(function (seg) {
       sec2.appendChild(tipSeg(seg));
     });
@@ -887,7 +878,7 @@
 
     var sec3 = h("section", "ep-sec wide");
     sec3.appendChild(h("h3", null, "每科要带什么"));
-    sec3.appendChild(h("p", "ep-note", "用逗号隔开。改了之后，「准备好」那一行跟着变。"));
+    sec3.appendChild(h("p", "ep-note", "用逗号隔开。"));
     (DATA.content || []).forEach(function (s) {
       var cur = (T.prep || {})[s.key];
       sec3.appendChild(field(s.key, (s.items || []).join("，"),
@@ -903,7 +894,6 @@
     bodyEl.appendChild(sec3);
 
     var sec4 = h("section", "ep-sec wide");
-    sec4.appendChild(h("p", "ep-note", "改动只存在这台机器上，不影响别人的班。"));
     var reset = h("button", "ep-ghost", "全部恢复系统默认");
     reset.addEventListener("click", function () {
       S.resetTexts();
@@ -1030,8 +1020,7 @@
     var tt = timetableNow();
     var sec = h("section", "ep-sec wide");
     sec.appendChild(h("h3", null, "一天的作息"));
-    sec.appendChild(h("p", "ep-note",
-      "改完立刻生效，不用重新打包。相邻两段必须首尾相接——中间留空，屏上那段时间就没有状态。"));
+    sec.appendChild(h("p", "ep-note", "相邻两段必须首尾相接，中间不能留空。"));
 
     if (!tt) {
       sec.appendChild(h("p", "ep-note", "没有读到作息表。"));
@@ -1246,8 +1235,7 @@
 
     var classCount = blocks.filter(function (b) { return b.type === "class"; }).length;
     sec.appendChild(h("p", "tt-sum",
-      "共 " + blocks.length + " 段，其中 " + classCount + " 节正课。正课段的数量跟课表绑着，要加减节次得先改课表。"));
-    sec.appendChild(h("p", "ep-note", "改完点右上角「完成」回大屏。"));
+      "共 " + blocks.length + " 段，其中 " + classCount + " 节正课。正课跟着课表，要加减先改课表。"));
 
     bodyEl.appendChild(sec);
   }
@@ -1974,11 +1962,11 @@
   function renderPhrase() {
     var sec = h("section", "ep-sec");
     sec.appendChild(h("h3", null, "通知话术"));
-    sec.appendChild(h("p", "ep-note", "勾了「记住」的排前面，系统自己留最近 5 条。"));
+    sec.appendChild(h("p", "ep-note", "「记住」的排前面，自动留最近 5 条。"));
 
     var list = S.recall("notice");
     if (!list.length) {
-      sec.appendChild(h("p", "ep-note", "还没有。在「今天」里发一条通知就会出现在这里。"));
+      sec.appendChild(h("p", "ep-note", "发一条通知就会出现在这里。"));
     }
     var wrap = h("div", "ep-rows");
     list.forEach(function (p) {
@@ -2009,20 +1997,18 @@
 
     var a = S.auditPeople ? S.auditPeople() : { ok: true, hasRoster: false, items: [] };
     if (!a.hasRoster) {
-      box.appendChild(h("p", "ep-note",
-        "还没录入班级名单，先不检查。到向导里补上名单后，这里会告诉你哪些人对不上。"));
+      box.appendChild(h("p", "ep-note", "还没有名单，先不检查。"));
       sec.appendChild(box);
       return;
     }
     if (a.ok) {
-      box.appendChild(h("p", "ep-note", "都对得上：分组和岗位里的人都在当前名单里。"));
+      box.appendChild(h("p", "ep-note", "都对得上。"));
       sec.appendChild(box);
       return;
     }
 
     box.appendChild(h("p", "ep-note",
-      "下面这些名字写在配置里，但不在当前名单里——多半是名单重录过，或者当初手打错了。"
-      + "组和人不会因为这条提示消失，改一下名单或点下面的按钮就行。"));
+      "这些名字不在名单里。改名单，或点下面按钮修旧编号。"));
     var list = h("div", "ep-rows");
     a.items.forEach(function (it) {
       var row = h("div", "ep-row static");
@@ -2051,17 +2037,13 @@
   function renderBackup() {
     var sec = h("section", "ep-sec wide");
     sec.appendChild(h("h3", null, "本机备份与恢复"));
-    sec.appendChild(h("p", "ep-note",
-      "班级、名单、课表都存在这台电脑上，大屏开着时每天自动存一份快照。"
-      + "改坏了、误删了，点下面的「恢复」回到那一天就行——更新版本也不需要做任何事。"));
+    sec.appendChild(h("p", "ep-note", "大屏开着每天自动存；改坏了点「恢复」。"));
 
     /* 先给「恢复」：大多数时候老师要的是把配置找回来，不是搬去别处。 */
     renderAutoBackup(sec);
 
     sec.appendChild(h("h3", null, "换电脑时用"));
-    sec.appendChild(h("p", "ep-note",
-      "要把配置带到另一台电脑（或换一体机），才用下面这两种方式。"
-      + "同一台电脑上升级，数据会自己留着，不用导文件。"));
+    sec.appendChild(h("p", "ep-note", "换电脑才用；本机升级不用管。"));
 
     var text = JSON.stringify(S.exportAll(), null, 2);
 
@@ -2140,10 +2122,9 @@
         var warn = h("div", "ep-warn");
         var last = root.Backup.lastExport();
         warn.appendChild(h("p", null, last
-          ? "上次导出设置是 " + Math.floor((Date.now() - last) / 86400000)
-            + " 天前。双击打开时配置只在这个浏览器里，换目录或清缓存就会清零。"
-          : "还没导出过设置。双击打开时配置只在这个浏览器里，"
-            + "换目录、清缓存或换电脑就会清零。"));
+          ? "上次导出是 " + Math.floor((Date.now() - last) / 86400000)
+            + " 天前。这种打开方式下，清缓存就没了。"
+          : "还没导出过。这种打开方式下，清缓存就没了。"));
         var exp = h("button", "ep-mini", "现在导出一份");
         exp.addEventListener("click", function () {
           doExport(JSON.stringify(S.exportAll(), null, 2));
@@ -2151,9 +2132,7 @@
         warn.appendChild(exp);
         box.appendChild(warn);
       }
-      box.appendChild(h("p", "ep-note",
-        "当前是双击文件打开的，写不进磁盘。用桌面版（桌面上的 ClassBeat 图标）"
-        + "打开才有每日备份；这里最多留一格浏览器副本。"));
+      box.appendChild(h("p", "ep-note", "双击打开的没有每日备份；用桌面上的图标打开才有。"));
       return;
     }
 
@@ -2161,8 +2140,7 @@
     root.Backup.list(function (items) {
       box.textContent = "";
       if (!items.length) {
-        box.appendChild(h("p", "ep-note",
-          "还没有备份。大屏开着就会每天自动存一份，留最近 14 天。"));
+        box.appendChild(h("p", "ep-note", "大屏开着就会每天存一份，留最近 14 天。"));
       } else {
         items.forEach(function (it) {
           var row = h("div", "ep-backup");
@@ -2177,9 +2155,7 @@
           box.appendChild(row);
         });
       }
-      box.appendChild(h("p", "ep-note",
-        "备份在电脑上的 backups/config 里，含学生名册：别把这个文件夹转给别人，"
-        + "要分享请发原始安装包。"));
+      box.appendChild(h("p", "ep-note", "备份里有学生名册，别整个文件夹转给别人。"));
     });
   }
 

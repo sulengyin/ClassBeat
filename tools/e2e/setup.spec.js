@@ -28,10 +28,10 @@ function stored(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem("rhythm.config.v1") || "{}"));
 }
 
-test("向导第一步就能导入旧设置，不用先填班名（0.3.x 跨代升级）", async ({ page }) => {
-  /* 0.3.x 的数据在浏览器 localStorage 里，只能导出/导入。以前导入入口在第 4 步，
-     第一步还强制先填班级名——从网页版升上来的老师得先编一个班名再绕回去。
-     这个用例钉住：入口在第一步、点得到、导入后直接跳到最后一页。 */
+test("第一步只说班级；旧设置从末页「换电脑时用」导入", async ({ page }) => {
+  /* 以前第一步顶上挂着一块「以前用网页版（0.3.x）？导出成 JSON 再导进来」，
+     把版本号和技术词摆在老师第一眼看到的地方，而它做的事末页本来就有。
+     2026-11-24 删掉那块：这条用例钉住「第一步干净」和「导入能力没丢」。 */
   await page.route("**/app/data.js", (route) =>
     route.fulfill({ status: 200, contentType: "application/javascript", body: "window.RHYTHM_DATA={};" }));
 
@@ -39,13 +39,22 @@ test("向导第一步就能导入旧设置，不用先填班名（0.3.x 跨代�
   await expect(page.locator("#setup")).toHaveClass(/open/);
   await expect(page.locator(".setup-step")).toHaveCount(5);
 
-  const legacy = page.locator(".setup-legacy");
-  await expect(legacy).toBeVisible();
-  await expect(legacy).toContainText("导出设置");
-  const btn = page.locator(".setup-legacy-btn");
-  await expect(btn).toHaveText("导入旧设置 JSON");
+  const first = page.locator(".setup-page.on");
+  await expect(first).toContainText("先告诉屏，这是哪个班");
+  // 四个格子：学校 / 班级 / 班主任 / 开学日，不多不少
+  await expect(first.locator(".setup-field")).toHaveCount(4);
+  const firstText = await first.innerText();
+  expect(firstText, "第一步不该再出现版本号").not.toMatch(/0\.3/);
+  expect(firstText, "第一步不该再出现 JSON 这类技术词").not.toContain("JSON");
+  await expect(page.locator(".setup-legacy")).toHaveCount(0);
 
-  /* 用程序自己导出的格式造一份"旧设置"，保证走的是真格式而不是测试自造的字段。 */
+  // 走到末页：导入入口在那儿，和「导出成文件」并排。
+  // 第一步的班级名是必填的（不是所有人都能跳），先填上再往下走。
+  await first.locator(".setup-field input").nth(1).fill("占位班");
+  for (let i = 0; i < 4; i += 1) await next(page);
+  await expect(page.locator(".setup-page.on")).toContainText("换电脑时用");
+
+  /* 用程序自己导出的格式造一份设置，保证走的是真格式而不是测试自造的字段。 */
   const payload = await page.evaluate(() => {
     const o = window.Store.exportAll();
     o.config = o.config || {};
@@ -53,15 +62,16 @@ test("向导第一步就能导入旧设置，不用先填班名（0.3.x 跨代�
     return o;
   });
 
-  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), btn.click()]);
+  const importBtn = page.locator(".setup-btn", { hasText: "从文件导入" });
+  await expect(importBtn).toBeVisible();
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), importBtn.click()]);
   await chooser.setFiles({
-    name: "旧版设置.json",
+    name: "设置.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(payload), "utf8"),
   });
 
-  // 导入成功 → 直接跳到最后一页，只剩点「完成」
-  await expect(page.locator(".setup-step").nth(4)).toHaveClass(/on/);
+  await expect(page.locator(".setup-page.on")).toContainText("已导入");
   expect(await page.evaluate(() => window.Store.config().meta.klass)).toBe("导入来的班");
   expect(await page.evaluate(() => window.Store.config().meta.klass)).not.toBe("空包测试班");
   expect(errors, "控制台不应有报错").toEqual([]);

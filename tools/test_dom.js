@@ -2283,14 +2283,21 @@ global.Remote.info.phone = "";
         && editSrc2.includes("其中几天要写不同的话"),
     "编辑面板：每段有星期展开器（默认收起，保证简洁）");
 
-  /* 跨代升级：0.3.x 的用户装完 0.5.x 第一次打开就是向导第一步，
-     旧数据只有「导出设置 → 导入设置」一条路，入口必须在第一步，
-     而不是让人先填班名走完四步再翻到最后一页。 */
+  /* 第一步只留四个格子（2026-11-24）：原来的「以前用网页版（0.3.x）？
+     导出成 JSON 再导进来」整块删了——它把版本号和技术词摆在老师第一眼
+     看到的地方，而它做的事末页「换电脑时用 → 从文件导入」本来就有。
+     这里反过来钉住：第一步不许再冒出这类词。 */
   const setupSrc = fs.readFileSync(path.join(ROOT, "app/setup.js"), "utf8");
   const pageClassSrc = setupSrc.slice(setupSrc.indexOf("function pageClass"),
     setupSrc.indexOf("function pageTime"));
-  check(pageClassSrc.includes("setup-legacy") && pageClassSrc.includes("pickImport"),
-    "向导第一步：有「导入旧设置 JSON」入口，且复用已有的 pickImport");
+  check(!pageClassSrc.includes("setup-legacy") && !pageClassSrc.includes("JSON"),
+    "向导第一步：没有旧设置导入那块，也没有 JSON 字样");
+  check(!/0\.3/.test(pageClassSrc),
+    "向导第一步：不出现版本号");
+  /* 导入能力本身没丢：末页那个入口仍然调同一个 pickImport。 */
+  const tailSrc = setupSrc.slice(setupSrc.indexOf("换电脑时用"));
+  check(tailSrc.includes("pickImport"),
+    "向导末页：换电脑时用 → 从文件导入，仍然复用 pickImport");
   /* 断言意图而不是实现：以前这里钉的是 "state.step = 3;"，
      等于用一条用例把「最后一页的序号是 3」焊死了——加一步就得改用例，
      而用例本该告诉我们「加一步之后行为还对不对」。 */

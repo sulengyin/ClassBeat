@@ -1164,9 +1164,7 @@ body[data-demo="1"] .corner{bottom:calc(var(--demo-h) + 1.2vmin)}
 <div class="cd-modal" id="cdModal" hidden>
   <section class="cd-card" role="dialog" aria-modal="true" aria-labelledby="cdTitle">
     <h3 id="cdTitle">倒计时显示哪些时段？</h3>
-    <p class="cd-note">倒计时就是屏上的小数字：课间是「还有几分钟上课」，午餐、午间是「还剩几分钟」。
-      推荐做法是课间、午餐、午间、活动这几段显示，上课、眼保健操这类安静时段不显示。
-      想改哪段显示，直接勾选就行。</p>
+    <p class="cd-note">勾上的时段才显示倒计时。安静时段一般不用显示。</p>
     <div class="cd-list" id="cdList"></div>
     <div class="cd-foot">
       <button id="cdAuto" type="button">恢复按推荐</button>
@@ -1236,11 +1234,10 @@ body[data-demo="1"] .corner{bottom:calc(var(--demo-h) + 1.2vmin)}
     </div>
     <p class="qr-change" id="qr-change" hidden></p>
     <p class="qr-empty" id="qr-empty" hidden>
-      还没找到手机能用的地址。<br>
-      先在一台电脑上双击「启动手机服务.bat」，<br>
-      再用它打印的那行地址打开大屏。
+      没找到可用的局域网地址。<br>
+      先确认这台电脑连上了 WiFi。
     </p>
-    <p class="qr-tip">手机和这台电脑连同一个 WiFi。第一次启动时 Windows 会问“是否允许访问网络”，要点「允许」。<br>地址一般不会变；哪天打不开，点上面「复制地址」重新发一次。</p>
+    <p class="qr-tip">手机连同一个 WiFi；问网络权限就允许。</p>
     <button id="qr-close">关闭</button>
   </div>
 </div>

@@ -62,6 +62,19 @@ jobs:
       - name: 校历与轮岗
         run: python3 tools/test_calendar.py
 
+      # 图标必须是透明的：2026-11-24 真机上桌面快捷方式顶着四个白三角，
+      # 根因是源图画在白纸上（没有 alpha）、生成脚本也只写 RGB。两处都改了，
+      # 这里回读像素守住——"生成成功"这四个字看不出透明度。
+      - name: 图标透明度
+        run: python3 tools/test_icons.py
+
+      # 图标是生成物，仓库里存的是成品。改了源图却忘了重跑脚本，
+      # 装出来的就还是旧图标；这条把"忘记"变成一个红的 check。
+      # 比的是解码后的像素不是文件字节——PNG 是 zlib 压过的，Windows 和
+      # Linux（CI）的 zlib 版本不同，压出来的字节可以不一样，按字节比会误报。
+      - name: 图标与源图一致
+        run: python3 tools/make_icons.py --compare
+
       # 下面这些 Python 只当「参考实现」用，不进发布包：
       #   tools/build_day.py   把一天编译成时间线，引擎对拍（test_engine.js）的基准由它冻出来
       #   tools/check_p1.py    规则自洽性（轮换、午间槽位、未知项不猜）

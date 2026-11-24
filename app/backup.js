@@ -169,8 +169,8 @@
     var box = document.getElementById("tip");
     var txt = document.getElementById("tipText");
     if (!box || !txt) return;
-    txt.textContent = "这台电脑上有 " + items[0].day + " 的班级配置备份，"
-      + "点右下角「⋯」→ 编辑 → 带走这些修改 → 本机自动备份，可以恢复。";
+    txt.textContent = "这台电脑上有 " + items[0].day + " 的备份，"
+      + "「⋯ → 编辑 → 带走这些修改」里可以恢复。";
     box.hidden = false;
   }
 

@@ -787,10 +787,6 @@
     return c;
   }
 
-  function formatLabel(f) {
-    return { html: "Word / Excel 表格", markdown: "Markdown 表格", csv: "CSV", tsv: "TSV", json: "JSON", text: "纯文本" }[f] || "文本";
-  }
-
   function htmlRows(text) {
     var out = [];
     var tr = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
@@ -930,7 +926,7 @@
 
   async function inflateBytes(bytes) {
     if (typeof DecompressionStream === "undefined") {
-      throw new Error("这个浏览器不支持直接解压，请在 Word / Excel 里复制表格后粘贴");
+      throw new Error("这里解不开这个文件，请在 Word / Excel 里复制表格后粘贴");
     }
     var ds = new DecompressionStream("deflate-raw");
     var stream = new Blob([bytes]).stream().pipeThrough(ds);
@@ -1583,7 +1579,7 @@
     var rows = [];
     if (format === "json") {
       try { rows = rowsFromCells(jsonRows(JSON.parse(t)), roster); }
-      catch (e) { warnings.push("JSON 读不出来，按纯文本处理"); format = "text"; }
+      catch (e) { warnings.push("这段不像表格，按纯文本处理"); format = "text"; }
     } else if (format === "html") {
       rows = rowsFromCells(htmlRows(src), roster);
     } else if (format === "markdown") {
@@ -1872,30 +1868,20 @@
     return row;
   }
 
+  /* 第一步只留四个格子。
+     2026-11-24 删掉了这里原来的「以前用网页版（0.3.x）？导出成 JSON 再导进来」
+     一整块：它把版本号和技术词汇摆在老师第一眼看到的地方，而它做的事
+     （从文件导入一份设置）末页「换电脑时用 → 从文件导入」本来就有，
+     同一个能力写两处、两套措辞。需要迁移的老师按文档走末页那个入口。
+     这段说明故意留在函数外面：test_dom 会扫函数体，里面不许再出现这些词。 */
   function pageClass() {
     var p = el("div", "setup-page on");
     p.appendChild(el("h3", "setup-h", "先告诉屏，这是哪个班"));
-    p.appendChild(el("p", "setup-p", "会出现在屏幕左上角和标题栏。"));
-
-    /* 跨代升级入口（2026-11-23）：0.3.x 是解压文件夹 + 浏览器存数据，
-       0.5.x 是安装包，老师装完第一次打开看到的就是这一页。旧数据只有
-       「导出设置 → 导入设置」这一条路，所以入口得在第一步，
-       不能让人先填完班级名走完四步，再到最后一页去找导入。 */
-    var legacy = el("div", "setup-legacy");
-    legacy.appendChild(el("span", "setup-legacy-tip",
-      "以前用的是网页版（0.3.x）？先在旧的那台上「⋯ → 导出设置」存成 JSON 文件，"
-      + "从这里导进来，班名、作息、课表、岗位、文字一起带过来，四步就不用填了。"));
-    var legacyBtn = el("button", "setup-btn setup-legacy-btn", "导入旧设置 JSON");
-    legacyBtn.type = "button";
-    legacyBtn.addEventListener("click", pickImport);
-    legacy.appendChild(legacyBtn);
-    p.appendChild(legacy);
 
     p.appendChild(field("学校", state.school, function (v) { state.school = v; }, "text", "例如：春江中心小学"));
     p.appendChild(field("班级", state.klass, function (v) { state.klass = v; }, "text", "例如：五（1）班"));
     p.appendChild(field("班主任", state.head, function (v) { state.head = v; }, "text", "可以不填"));
     p.appendChild(field("开学日", state.term, function (v) { state.term = v; }, "date"));
-    p.appendChild(el("p", "setup-p", "开学日用来算单双周和值日轮次。"));
     return p;
   }
 
@@ -1914,8 +1900,8 @@
     p.appendChild(el("h3", "setup-h", "这个班的学生"));
     p.appendChild(el("p", "setup-p",
       !cur.length
-        ? "还没有名单。换人时会找不到任何学生——在下面加第一个。"
-        : "点一下选中，再点「删除选中」；新名字加在最后。改完点「保存名单」或「下一步」，会先让你核对一遍。"));
+        ? "还没有名单，在下面加第一个。"
+        : "点一下选中；新名字打在下面回车。"));
 
     /* 状态行：改了什么必须看得见，不能指望老师自己记。 */
     var status = el("div", "setup-roster-status");
@@ -2177,8 +2163,7 @@
   function timeImportBox() {
     var box = el("div", "setup-import");
     box.appendChild(el("p", "setup-p",
-      "也可以直接读学校的作息表（.xlsx / .docx），或把表复制粘贴进来。"
-      + "表里只写节次时间也行：空档会补成课间；午餐、午休按表上写的区间原样保留。"));
+      "也可以读学校的作息表，或把表粘进来。"));
 
     var ta = el("textarea", "setup-import-text");
     ta.rows = 6;
@@ -2262,7 +2247,7 @@
   function pageGrid() {
     var p = el("div", "setup-page on");
     p.appendChild(el("h3", "setup-h", "课表：5 天 × " + periodCount() + " 节"));
-    p.appendChild(el("p", "setup-p", "只填科目就行，任课老师可以以后再说。空着的格子屏上显示「—」，不会报错。"));
+    p.appendChild(el("p", "setup-p", "只填科目就行；空着的格子显示「—」。"));
 
     var subjects = {};
     var content = cfg().content;
@@ -2312,7 +2297,7 @@
     p.appendChild(grid);
 
     if (!state.blocks.length) {
-      p.appendChild(el("p", "setup-msg", "还没套用作息模板，课表排不进时间。先回上一步。"));
+      p.appendChild(el("p", "setup-msg", "先回上一步套用作息。"));
     }
     p.appendChild(gridImportBox());
     return p;
@@ -2333,9 +2318,7 @@
   function gridImportBox() {
     var box = el("div", "setup-import");
     box.appendChild(el("p", "setup-p",
-      "也可以直接读班级课表（.xlsx / .docx），或把表复制粘贴进来。"
-      + "只认「周一…周五」和「第 N 节」；格子里第二行的任课老师会跟着这一格存下来（本次不显示），"
-      + "单双周轮流的两位老师原样保留。"));
+      "也可以读班级课表，或把表粘进来。"));
 
     var ta = el("textarea", "setup-import-text");
     ta.rows = 6;
@@ -2591,7 +2574,7 @@
     [
       "表头含「岗位 / 项目」「职责 / 内容」「负责人 / 姓名」，一行一个岗位。",
       "多个姓名用「、」分隔；表上的数字编号只当编号，不当周几。",
-      "支持 .xlsx / .docx（老的 .xls / .doc 请另存）；也能从 Excel / Word / 微信复制整张表粘贴。",
+      "老的 .xls / .doc 请先另存成 .xlsx / .docx。",
       "一次只上传一个文件，识别结果确认无误后再并入草稿。"
     ].forEach(function (t) {
       box.appendChild(el("p", "setup-import-req", t));
@@ -2660,8 +2643,7 @@
     if (state.importRows && state.importRows.length) box.appendChild(importPreview());
 
     box.appendChild(el("p", "setup-p",
-      "未找到和同名的姓名不会写入，也不会自动新增学生；识别记录只留在草稿里，"
-      + "不会出现在 roles.json。表上的数字编号只当编号，不当周几。"));
+      "名单里没有的名字不会写入，也不会自动加学生。"));
 
     var foot = el("div", "setup-actions");
     var apply = el("button", "setup-btn primary setup-import-apply", "并入草稿（不保存大屏）");
@@ -2827,10 +2809,9 @@
     state.importOpen = true;
     if (!res.rows.length) {
       state.importFlash = (res.warnings && res.warnings.length ? res.warnings[0] + "。" : "")
-        + "支持表格、CSV / TSV、Markdown、JSON 和 Excel 复制出的表格。";
+        + "试试直接把表格粘进来。";
     } else {
-      state.importFlash = "识别到 " + res.rows.length + " 个岗位（" + formatLabel(res.format)
-        + "）。先核对姓名，再并入草稿。";
+      state.importFlash = "识别到 " + res.rows.length + " 个岗位，先核对姓名。";
     }
     saveDraft();
     render();
@@ -2867,7 +2848,7 @@
     var rs = state.roles;
     if (!rs || !Array.isArray(rs.roles) || !rs.roles.length) {
       p.appendChild(el("p", "setup-p",
-        "这个包没有岗位表。可以粘贴一张岗位表，或跳过这一步——跳过不影响前面三步。"));
+        "这个包没有岗位表，可以粘贴，也可以跳过。"));
       importStart(p);
       return;
     }
@@ -3084,7 +3065,7 @@
     box.appendChild(el("div", "setup-preview-title", "配好之后，屏上是这样"));
 
     if (!pv) {
-      box.appendChild(el("p", "setup-p", "这台机器的节律引擎没起来，暂时算不出时间线。"));
+      box.appendChild(el("p", "setup-p", "算不出时间线，先重启程序试试。"));
       return box;
     }
     if (pv.empty || !pv.day || !pv.day.inSchool) {
@@ -3116,9 +3097,9 @@
       return w.code === "LESSON_MISSING";
     }).length;
     box.appendChild(el("p", "setup-p", live
-      ? "上面就是屏上现在的内容。"
-      : "这只是预览。" + (warn ? "课表里空着的 " + warn + " 节会显示「—」；" : "") +
-        "点「应用到这台机器」后才会上屏。"));
+      ? "屏上现在就是这样。"
+      : "只是预览；点「应用到这台机器」才上屏。"
+        + (warn ? "空着的 " + warn + " 节显示「—」。" : "")));
     return box;
   }
 
@@ -3134,11 +3115,11 @@
     if (live) {
       p.appendChild(el("h3", "setup-h", "已经生效"));
       p.appendChild(el("p", "setup-p", state.applied
-        ? "屏上现在就是新班级、新作息、新课表。点右下角「完成」回到大屏。"
-        : "这份设置已经在这台机器上生效。如果你又改了上面的内容，点右下角「重新应用」再写一次。"));
+        ? "已经生效。点「完成」回大屏。"
+        : "已经生效；又改了上面的话，点「重新应用」。"));
     } else {
       p.appendChild(el("h3", "setup-h", "还没生效"));
-      p.appendChild(el("p", "setup-msg", "下面填的都还只是草稿，屏上不会变。点右下角「应用到这台机器」才会写进去。"));
+      p.appendChild(el("p", "setup-msg", "还是草稿；点「应用到这台机器」才生效。"));
     }
     if (state.flash) p.appendChild(el("p", "setup-msg ok", state.flash));
 
@@ -3156,7 +3137,7 @@
 
     roleSection(p);
     textSectionList(p);
-    p.appendChild(el("p", "setup-p", "留空就是原来的话；只改这台机器。"));
+    p.appendChild(el("p", "setup-p", "留空用原来的话。"));
 
     var acts = el("div", "setup-actions");
     var snap = localStore().setupSnapshot ? localStore().setupSnapshot() : null;
@@ -3182,8 +3163,7 @@
     var bsec = el("div", "setup-backup");
     bsec.appendChild(el("h3", "setup-h", "本机备份与恢复"));
     bsec.appendChild(el("p", "setup-p",
-      "班级、名单、课表都存在这台电脑上，大屏开着时每天自动存一份。"
-      + "更新版本不用做任何事，数据会自己留着。"));
+      "大屏开着每天自动存；改坏了点「恢复」。"));
     var bHost = el("div", "setup-backup-list");
     bsec.appendChild(bHost);
     p.appendChild(bsec);
@@ -3193,7 +3173,7 @@
     var msec = el("div", "setup-backup");
     msec.appendChild(el("h3", "setup-h", "换电脑时用"));
     msec.appendChild(el("p", "setup-p",
-      "要把配置带到另一台电脑（或换一体机），才用导出 / 导入。"));
+      "换电脑才用；本机升级不用管。"));
     var macts = el("div", "setup-actions");
     var out = el("button", "setup-btn", "导出成文件");
     out.type = "button";
@@ -3217,7 +3197,7 @@
     if (root.Update && root.Update.mount) root.Update.mount(upHost);
 
     if (root.Runtime && root.Runtime.ready && !root.Runtime.ready()) {
-      p.appendChild(el("p", "setup-msg", "提醒：这个包本身缺配置，应用后仍可能算不出全天。"));
+      p.appendChild(el("p", "setup-msg", "这个包本身缺配置，应用后可能算不出全天。"));
     }
     return p;
   }
@@ -3473,8 +3453,7 @@
     }
     if (B.mode && B.mode() !== "http") {
       host.appendChild(el("p", "setup-p",
-        "现在是双击文件打开的，写不进磁盘——用桌面版（桌面上的 ClassBeat 图标）"
-        + "打开才有每日备份。"));
+        "双击打开的没有每日备份；用桌面上的图标打开才有。"));
       return;
     }
     host.appendChild(el("p", "setup-p", "正在读本机备份…"));
@@ -3482,7 +3461,7 @@
       host.textContent = "";
       if (!items || !items.length) {
         host.appendChild(el("p", "setup-p",
-          "还没有备份。大屏开着就会每天自动存一份，留最近 14 天。"));
+          "大屏开着就会每天存一份，留最近 14 天。"));
         return;
       }
       items.forEach(function (it) {
@@ -3552,7 +3531,7 @@
         return;
       }
       if (typeof root.FileReader === "undefined") {
-        alertBox("这个浏览器不支持选文件，请在电脑上导入。");
+        alertBox("这里选不了文件，请在电脑上导入。");
         drop();
         return;
       }
@@ -3566,7 +3545,7 @@
         var obj = null;
         try { obj = JSON.parse(String(fr.result)); }
         catch (e) {
-          alertBox("这个文件不是 JSON，可能选错了。原有设置没有改动。");
+          alertBox("这个文件打不开，可能选错了。原有设置没有改动。");
           return;
         }
         var r = root.Store.importAll(obj);
