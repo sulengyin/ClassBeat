@@ -32,6 +32,17 @@
   !error "找不到 installer\stop-legacy.ps1（期望在 ${CB_STOP_PS1}）。"
 !endif
 
+; 图标文件：编译时从 src-tauri/icons/classbeat.ico 固化路径。
+; 桌面快捷方式读这个 .ico 文件，不依赖 exe 内嵌图标的 Windows 缓存
+; （覆盖安装后 exe 路径没变，系统按路径缓存旧图标，就是"桌面图标依然是
+; 错误的"的根因——0.5.3 真机反馈）。
+!define CB_ICON "${__FILEDIR__}\..\icons\classbeat.ico"
+!if /FILEEXISTS "${CB_ICON}"
+  ; 找到了，继续编译
+!else
+  !error "找不到 icons\classbeat.ico（期望在 ${CB_ICON}）。"
+!endif
+
 !macro CB_LOG msg
   FileWrite $9 "${msg}$\r$\n"
 !macroend
@@ -134,8 +145,17 @@
   ; 桌面图标：老师习惯从桌面起。
   ; 注意不能指望模板里的 CreateOrUpdateDesktopShortcut —— 它遇到"更新模式"
   ; （已经有安装记录）会直接 Return，桌面图标就没了；所以这里自己建，幂等。
-  CreateShortCut "$DESKTOP\ClassBeat.lnk" "$INSTDIR\classbeat.exe" "" "$INSTDIR\classbeat.exe" 0
-  !insertmacro CB_LOG "已建桌面图标"
+  ;
+  ; 图标用独立的 .ico 文件，不从 exe 取：NSIS 覆盖安装后 exe 路径没变，
+  ; Windows 按路径缓存了旧版图标（0.5.1 重绘过 ico，但桌面快捷方式仍显示旧的）。
+  ; .ico 文件每次安装都覆盖，再刷一次图标缓存，系统就会重读。
+  SetOutPath $INSTDIR
+  File /oname=classbeat.ico "${CB_ICON}"
+  CreateShortCut "$DESKTOP\ClassBeat.lnk" "$INSTDIR\classbeat.exe" "" "$INSTDIR\classbeat.ico" 0
+  !insertmacro CB_LOG "已建桌面图标（读 classbeat.ico，不靠 exe 缓存）"
+  ; 刷新 Windows 图标缓存：覆盖安装后系统仍按路径缓存旧图标。
+  ; ie4uinit.exe -show 是 Win10/11 的标准刷新命令。
+  nsExec::Exec 'ie4uinit.exe -show'
 
   ; ---- 5. 装完自检：主程序必须真的在 $INSTDIR 里 ----
   ; 这条是为了让"装完了却没有 exe"这种失败当场暴露（踩过一次：

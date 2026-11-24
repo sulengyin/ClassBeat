@@ -84,6 +84,16 @@ pub fn run() {
             logging::info(&format!("程序目录 {}", paths.install_root.display()));
             logging::info(&format!("数据目录 {}", paths.data.display()));
 
+            // WebView2 的 localStorage / IndexedDB 默认落在 exe 同级目录，
+            // NSIS 覆盖安装时被清——这是更新后班级、名单、课表全部丢失的根因。
+            // 把它指到 %APPDATA%\ClassBeat\webview，与 hooks.nsh 保护范围一致。
+            // 环境变量是进程级的，必须在 WebView 创建之前设（server::boot 还没
+            // 起，窗口还没开，此刻最安全）。
+            let webview_data = paths.data.join("webview");
+            let _ = std::fs::create_dir_all(&webview_data);
+            std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_data);
+            logging::info(&format!("WebView2 数据目录 {}", webview_data.display()));
+
             app.manage(AppState {
                 paths,
                 server: server::ServerState::new(),
