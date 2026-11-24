@@ -295,11 +295,25 @@
   function resolvePeople(role, group, groupReason, weekday) {
     var cycle = role.cycle || {};
     var chosen = group || cycle.current;
-    var candidates = [
-      { key: "people", names: role.people },
-      { key: "group", names: role.groups && chosen ? role.groups[chosen] : null, group: chosen },
-      { key: "weekday", names: role.peopleMap ? role.peopleMap[String(weekday)] : null }
-    ];
+
+    /* 岗位写了出人方式就只认这一种（edit 面板的「固定 / A·B 组 / 按星期」
+       开关写的就是它）。这样切方式不用删数据：切回轮流，原来的组和星期表
+       都还在。没写 mode 的老配置照旧按候选项优先级找，行为不变。 */
+    var list;
+    if (role.mode === "fixed") {
+      list = [{ key: "people", names: role.people }];
+    } else if (role.mode === "ab") {
+      list = [{ key: "group", names: role.groups && chosen ? role.groups[chosen] : null, group: chosen }];
+    } else if (role.mode === "weekday") {
+      list = [{ key: "weekday", names: role.peopleMap ? role.peopleMap[String(weekday)] : null }];
+    } else {
+      list = [
+        { key: "people", names: role.people },
+        { key: "group", names: role.groups && chosen ? role.groups[chosen] : null, group: chosen },
+        { key: "weekday", names: role.peopleMap ? role.peopleMap[String(weekday)] : null }
+      ];
+    }
+    var candidates = list;
 
     for (var i = 0; i < candidates.length; i++) {
       var names = nameList(candidates[i].names);
@@ -307,10 +321,13 @@
     }
 
     /* 一个都没排：原因要分得清，面板才能告诉老师下一步该点哪儿 */
-    if (role.groups) {
+    var mode = role.mode;
+    if (mode === "ab" || (!mode && role.groups)) {
       return [null, groupReason || (chosen ? "group-empty" : "cycle-group-unconfirmed"), "none"];
     }
-    if (role.peopleMap || role.rotation) return [null, "weekday-not-mapped", "none"];
+    if (mode === "weekday" || (!mode && (role.peopleMap || role.rotation))) {
+      return [null, "weekday-not-mapped", "none"];
+    }
     return [null, "no-people", "none"];
   }
 

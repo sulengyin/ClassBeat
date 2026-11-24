@@ -222,7 +222,7 @@ loadVendor("app/vendor/qrcode.min.js", "qrcode");
 /* 固定夹具，不读 app/data.js：本机 app/data.js 是真实班级，CI 是 sample，
    两种数据跑同一套断言必然一边红。夹具由
    `python3 tools/bundle.py --data sample --out tools/fixtures/data.sample.js` 生成。 */
-["tools/fixtures/data.sample.js", "app/version.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/subjects.js", "app/rhythm.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/update.js", "app/backup.js", "app/demo.js", "app/templates.js", "app/setup.js"]
+["tools/fixtures/data.sample.js", "app/version.js", "app/engine/schedule.js", "app/qr.js", "app/clock.js", "app/config.js", "app/subjects.js", "app/rhythm.js", "app/pinyin.js", "app/store.js", "app/runtime.js", "app/screen.js", "app/remote.js", "app/phoneui.js", "app/edit.js", "app/update.js", "app/backup.js", "app/demo.js", "app/templates.js", "app/setup.js"]
   .forEach(loadBrowserScript);
 
 check(!!global.Screen, "screen.js 注册成功");
@@ -232,7 +232,7 @@ check(!!global.Screen, "screen.js 注册成功");
 check(!!global.CFG, "config.js 注册成功");
 check(CFG.klass() === window.RHYTHM_DATA.meta.klass, "班名取自数据", CFG.klass());
 /* 班名以数据里那个为准，这样真数据、示例数据都能查同一件事 */
-const pageFiles = ["app/index.html", "app/screen.js", "app/edit.js", "app/config.js", "app/rhythm.js", "app/store.js"];
+const pageFiles = ["app/index.html", "app/screen.js", "app/edit.js", "app/config.js", "app/rhythm.js", "app/pinyin.js", "app/store.js"];
 const KNAME = (window.RHYTHM_DATA.meta || {}).klass;
 const hard = pageFiles.filter(f => fs.readFileSync(path.join(ROOT, f), "utf8").includes(KNAME));
 check(!!KNAME && hard.length === 0, "页面里没有写死的班名", hard.join(", ") || "无");
@@ -992,119 +992,216 @@ check(idx14 >= 0 && idx14 < idx18,
   "▲ 调完顺序立刻进本机配置，且排到同一时刻更前面",
   "r14=" + idx14 + "，r18=" + idx18);
 
-/* 人群组：换人弹窗里点组一次带出整组；临时勾选不落库，显式存组才落库。
-   2026-11-19 真机反馈②后名单只认本机配置（样例不再兜底），
-   夹具先模拟向导已录名单。 */
+/* ---------- 换人面板（0.5.6 重构） ----------
+   候选名单在最上面、已选人名紧贴着；打姓或名的拼音都能出人；
+   固定 / A·B 轮流 / 按星期在同一屏里互切。 */
 global.Store.patchConfig({ students: global.window.RHYTHM_DATA.students });
+global.__rhythmDate = "2026-11-09";
 const cleanLine = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+check(cleanLine.children[0].querySelectorAll(".ep-namechip").length === 8,
+  "值日行上的人名各自是一个按钮（点谁就改谁）",
+  cleanLine.children[0].textContent.replace(/\s+/g, " "));
 cleanLine.children[0]._h.click();
 
-/* B：打开面板先只列「今天这一轮」，不铺整份名单。
-   以前 paint() 一上来就把 24 个候选铺出来，于是「这个岗位已经分过组」
-   在界面上完全看不出来；点组又直接把整组塞进 selected，底下那句
-   「已选 15 人」对老师来说像是凭空冒出来的。 */
 const openedPeople = document.querySelectorAll(".ep-person").map(b => b.textContent);
 const allRoster = global.Store.config().students.map(s => s.name);
-check(openedPeople.length < allRoster.length,
-  "打开面板不铺整份名单，只列今天这一轮的人",
+check(openedPeople.length > 0 && openedPeople.length <= 16 && openedPeople.length < allRoster.length,
+  "打开面板不铺整份名单（候选最多 16 个）",
   openedPeople.length + " 人 / 名单 " + allRoster.length + " 人");
-check(document.querySelectorAll(".ep-person.on").length === 0,
-  "打开时一个都不预先勾上：没选就不该显示「已选 N 人」");
-const statusTxt = (document.querySelector(".ep-pickstatus") || {}).textContent || "";
-check(/今天这一轮|今天还没排人/.test(statusTxt),
-  "状态行说明现在列的是哪批人", statusTxt);
+check(document.querySelectorAll(".ep-pickchip").length === 8,
+  "已选区同时列出这个岗位现在的人",
+  document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、"));
+check(document.querySelectorAll(".ep-person.on").length === document.querySelectorAll(".ep-pickchip").length,
+  "候选人里在岗的有按下态，和已选区对得上",
+  document.querySelectorAll(".ep-person.on").length + " 人");
 
-/* 只点一个人，按钮就该只说一个人 */
-const onePerson = document.querySelectorAll(".ep-person")[0];
-onePerson._h.click();
-check(/用这 1 人/.test(document.querySelector(".ep-primary").textContent),
-  "只点一个人时按钮就说一个人，不会莫名变成一整组",
-  document.querySelector(".ep-primary").textContent);
-onePerson._h.click();
-check(document.querySelectorAll(".ep-person.on").length === 0, "再点一下取消选择");
+/* 姓名检索：打完整拼音只出这个姓；打名的拼音也找得到人 */
+const qEl = document.querySelector(".ep-input");
+qEl.value = "zhou";
+qEl._h.input();
+const zhouHits = document.querySelectorAll(".ep-person").map(b => b.textContent);
+check(zhouHits.length > 0 && zhouHits.every(n => n.charAt(0) === "周"),
+  "打 zhou 只出姓周的（以前赵、郑、朱也一起出来）", zhouHits.join("、"));
+qEl.value = "yu";
+qEl._h.input();
+const yuHits = document.querySelectorAll(".ep-person").map(b => b.textContent);
+check(yuHits.indexOf("周予宁") >= 0 && yuHits.indexOf("杨望舒") < 0,
+  "打 yu 能找到「予宁」，不再出姓杨的", yuHits.join("、"));
 
+/* 候选人点一下加、再点一下减；已选区的人名点一下也去掉 */
+qEl.value = "孔子墨";
+qEl._h.input();
+const addOne = document.querySelectorAll(".ep-person")[0];
+check(addOne.textContent === "孔子墨", "命中的人排在候选最前面", addOne.textContent);
+addOne._h.click();
+check(document.querySelectorAll(".ep-pickchip").length === 9,
+  "点候选人就加进已选区", document.querySelectorAll(".ep-pickchip").length + " 人");
+document.querySelectorAll(".ep-person")[0]._h.click();
+check(document.querySelectorAll(".ep-pickchip").length === 8,
+  "同一个人在候选里再点一下就从已选区去掉",
+  document.querySelectorAll(".ep-pickchip").length + " 人");
+document.querySelectorAll(".ep-pickchip")[0]._h.click();
+check(document.querySelectorAll(".ep-pickchip").length === 7,
+  "点已选区的人名也能去掉", document.querySelectorAll(".ep-pickchip").length + " 人");
+qEl.value = "";
+qEl._h.input();
+
+/* 保存 = 写岗位配置（以后都这样） */
+document.querySelector(".ep-primary")._h.click();
+const r14 = global.Store.config().roles.roles.filter(r => r.id === "r14")[0];
+check(r14.people.length === 7, "「保存」把结果写进岗位配置", r14.people.join("、"));
+check(document.querySelectorAll(".ep-dialog.picker").length === 0, "保存后自动关窗回到列表");
+
+/* 只改今天：写当天覆盖，岗位配置一个字不动 */
+const confBeforeToday = JSON.stringify(global.Store.config().roles.roles.filter(r => r.id === "r14")[0].people);
+document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("擦窗户") >= 0)[0].children[0]._h.click();
+const todayPick = document.querySelectorAll(".ep-person").filter(b => !b.classList.contains("on"))[0];
+const todayName = todayPick.textContent;
+todayPick._h.click();
+document.querySelector(".ep-todayonly")._h.click();
+const r14ov = (global.Store.getDayOverride("2026-11-09") || {}).roles || {};
+check(!!r14ov.r14 && r14ov.r14.people.indexOf(todayName) >= 0,
+  "「只改今天」写当天的临时覆盖", JSON.stringify(r14ov.r14));
+check(JSON.stringify(global.Store.config().roles.roles.filter(r => r.id === "r14")[0].people) === confBeforeToday,
+  "「只改今天」不动岗位配置");
+
+/* 保存会把今天的临时覆盖清掉，否则屏上还是旧人，老师以为没保存上 */
+document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("擦窗户") >= 0)[0].children[0]._h.click();
+document.querySelector(".ep-primary")._h.click();
+const ovAfterSave = ((global.Store.getDayOverride("2026-11-09") || {}).roles || {}).r14;
+check(!ovAfterSave, "保存岗位配置时顺手清掉今天的临时覆盖");
+
+/* ---------- 出人方式：固定 ⇄ A/B ⇄ 按星期，同一屏里双向切 ---------- */
+const energyLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
+energyLine.children[0]._h.click();
+const modeBtns = document.querySelectorAll(".ep-modebtn");
+check(modeBtns.length === 3, "面板里有固定 / A·B 轮流 / 按星期三种方式",
+  modeBtns.map(b => b.textContent).join("、"));
+const onMode = modeBtns.filter(b => b.classList.contains("on"))[0];
+check(!!onMode && onMode.textContent === "固定", "当前方式是「固定」时那个按钮按下去",
+  onMode ? onMode.textContent : "没有按下态");
+modeBtns.filter(b => b.textContent === "A/B 轮流")[0]._h.click();
+check(document.querySelectorAll(".ep-seat").length === 2,
+  "切到 A/B 轮流后出现两个槽位",
+  document.querySelectorAll(".ep-seat").map(b => b.textContent).join("、"));
+check(document.querySelectorAll(".ep-seat.on")[0].textContent.indexOf("A 组") === 0,
+  "自动落到 A 组（新方式的第一格）",
+  document.querySelectorAll(".ep-seat.on")[0].textContent);
+check(document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、").indexOf("吕雨桐") === 0,
+  "原来固定的人整批搬进 A 组，不丢",
+  document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、"));
+document.querySelector(".ep-primary")._h.click();
+const r02 = global.Store.config().roles.roles.filter(r => r.id === "r02")[0];
+check(r02.mode === "ab" && (r02.groups.A || []).join("、") === "吕雨桐",
+  "保存后这个岗位按 A/B 组出人，A 组是原来那个人",
+  JSON.stringify({ mode: r02.mode, A: r02.groups.A }));
+
+/* 反向：A/B 的岗位也能改回固定，取全并集 */
+document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("节能小队长") >= 0)[0].children[0]._h.click();
+check(document.querySelectorAll(".ep-modebtn").filter(b => b.classList.contains("on"))[0].textContent === "A/B 轮流",
+  "再打开时按下去的是 A/B 轮流（方式已经存进岗位配置）");
+document.querySelectorAll(".ep-modebtn").filter(b => b.textContent === "固定")[0]._h.click();
+check(document.querySelector(".ep-seats").hidden === true, "切回固定后槽位区收起");
+document.querySelector(".ep-primary")._h.click();
+const r02b = global.Store.config().roles.roles.filter(r => r.id === "r02")[0];
+check(r02b.mode === "fixed" && r02b.people.join("、") === "吕雨桐",
+  "切回固定：把 A/B 组的人合成一份",
+  JSON.stringify({ mode: r02b.mode, people: r02b.people }));
+
+/* 按星期的岗位：五个槽位，点哪格就看哪格 */
+document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("黑板清洁师") >= 0)[0].children[0]._h.click();
+check(document.querySelectorAll(".ep-modebtn").filter(b => b.classList.contains("on"))[0].textContent === "按星期",
+  "按星期的岗位打开就是「按星期」按下去");
+check(document.querySelectorAll(".ep-seat").length === 5, "五个槽位：周一到周五",
+  document.querySelectorAll(".ep-seat").map(b => b.textContent).join("、"));
+const tueSeat = document.querySelectorAll(".ep-seat").filter(b => b.textContent.indexOf("周二") === 0)[0];
+tueSeat._h.click();
+check(document.querySelectorAll(".ep-pickchip").length === 1
+      && document.querySelector(".ep-picked-t").textContent.indexOf("周二") === 0,
+  "点周二槽位，已选区只显示周二那个人",
+  document.querySelector(".ep-picked-t").textContent + " / "
+  + document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、"));
+document.querySelector(".ep-dialog-close")._h.click();
+
+/* 常用组：点一下就整组带进当前槽 */
+document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("擦窗户") >= 0)[0].children[0]._h.click();
 const groupChips = document.querySelectorAll(".ep-group-chip");
 const roleGroupChip = groupChips.filter(c => c.textContent.indexOf("值日组") === 0)[0];
 check(!!roleGroupChip && groupChips.length >= 1,
-  "换人弹窗里有「点组带出」，排班组按当天值日实时出人",
+  "面板里有「常用组」，排班组按当天值日实时出人",
   groupChips.map(c => c.textContent).join("、"));
 const groupsBefore = global.Store.peopleGroups().length;
 roleGroupChip._h.click();
-const groupPicked = document.querySelectorAll(".ep-person.on");
-check(groupPicked.length === 8 && global.Store.peopleGroups().length === groupsBefore,
-  "点「值日组」把整组 8 人一次选上，且没有自动落库",
-  groupPicked.length + " 人，配置里 " + groupsBefore + " 组");
-/* 点组会重建整排 chip，所以要重新查一次节点，不能拿点之前那个引用 */
-const chipAfter = document.querySelectorAll(".ep-group-chip")
-  .filter(c => c.textContent.indexOf("值日组") === 0)[0];
-check(!!chipAfter && chipAfter.classList.contains("on"),
-  "点过的组有「按下去」的样子——以前点完毫无变化，老师不知道带入了没有",
-  chipAfter ? chipAfter.className : "没找到 chip");
-check(/已带入「值日组」/.test(document.querySelector(".ep-pickstatus").textContent),
-  "状态行写明已带入哪一组",
-  document.querySelector(".ep-pickstatus").textContent);
-check(!!document.querySelector(".ep-pickstatus-x"),
-  "带入之后给「重新挑」的出口，不必关掉窗口重来");
-const confirmBtn = document.querySelector(".ep-primary");
-check(!!confirmBtn && /确定.*8/.test(confirmBtn.textContent),
-  "多选岗位才保留「确定」，并显示已选人数",
-  confirmBtn ? confirmBtn.textContent : "没有确定按钮");
-check(document.querySelector(".ep-group-modify").style.display === "none",
-  "还没点已存组时「保存修改」不出现，避免误改旧组");
-document.querySelector(".ep-group-name").value = "放学留下";
-document.querySelector(".ep-group-save-btn")._h.click();
+const dutyGroupN = global.Store.config().roles.roles.filter(r => r.id === "r14")[0].people.length;
+check(document.querySelectorAll(".ep-pickchip").length === dutyGroupN
+      && global.Store.peopleGroups().length === groupsBefore,
+  "点「值日组」把整组 " + dutyGroupN + " 人带进当前槽，且不会自己存成一个新组",
+  document.querySelectorAll(".ep-pickchip").length + " 人，配置里 " + groupsBefore + " 组");
+
+/* 存为组：点开才出现名字框，不占屏幕 */
+document.querySelectorAll(".ep-group-chip").filter(c => c.textContent.indexOf("存为组") >= 0)[0]._h.click();
+const gNameInput = document.querySelector(".ep-group-name");
+check(!!gNameInput, "点「＋ 存为组」才出现名字输入框");
+gNameInput.value = "放学留下";
+document.querySelectorAll(".ep-mini").filter(b => b.textContent === "存")[0]._h.click();
 const savedGroup = global.Store.peopleGroups();
 check(savedGroup.length === 1 && savedGroup[0].name === "放学留下"
-      && savedGroup[0].memberIds.length === 8,
-  "点「另存为新组」才写入本机配置，成员不重复",
+      && savedGroup[0].memberIds.length === dutyGroupN,
+  "存下来的组进本机配置，成员不重复",
   savedGroup.length + " 组，" + (savedGroup[0] || {}).memberIds.length + " 人");
 const manualChip = document.querySelectorAll(".ep-group-chip")
   .filter(c => c.textContent.indexOf("放学留下") === 0)[0];
-check(!!manualChip, "存好的组立刻出现在「点组带出」里");
-
-/* 回归：已存的组要能就地改成员，不新增重复组 */
-manualChip._h.click();
-const modifyBtn = document.querySelector(".ep-group-modify");
-check(!!modifyBtn && modifyBtn.textContent === "保存修改" && modifyBtn.style.display === "",
-  "点已存组后出现「保存修改」，写回原组");
-document.querySelectorAll(".ep-person.on")[0]._h.click();
-check(document.querySelectorAll(".ep-person.on").length === 7,
-  "再点一下能减掉一个人", document.querySelectorAll(".ep-person.on").length + " 人");
-check(global.Store.peopleGroups()[0].memberIds.length === 8,
-  "没点保存前改动不落库", global.Store.peopleGroups()[0].memberIds.length + " 人");
-modifyBtn._h.click();
-const updatedGroup = global.Store.peopleGroups();
-check(updatedGroup.length === 1 && updatedGroup[0].name === "放学留下"
-      && updatedGroup[0].memberIds.length === 7,
-  "「保存修改」更新原组成员，不新增重复组",
-  updatedGroup.length + " 组，" + (updatedGroup[0] || {}).memberIds.length + " 人");
-
+check(!!manualChip, "存好的组立刻出现在常用组里");
 document.querySelectorAll(".ep-group-del")[0]._h.click();
 check(global.Store.peopleGroups().length === 0,
   "删组只删这一条，不动名单", global.Store.peopleGroups().length + " 组");
 
-/* 2026-11-19 真机反馈②：名单没录入时绝不拿样例名单冒充本班学生，
-   候选退化为岗位现有的人。 */
+/* 组里有人不在名单：数量写在 chip 上（一体机没有悬停） */
+const stud0 = window.RHYTHM_DATA.students[0];
+global.Store.patchConfig({ peopleGroups: [{ id: "g-test", name: "擦黑板组",
+  memberIds: [stud0.id, "ghost-id-404"], order: 0 }] });
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("擦窗户") >= 0)[0].children[0]._h.click();
+const warnChip = document.querySelectorAll(".ep-group-chip")
+  .filter(c => c.textContent.indexOf("擦黑板组") === 0)[0];
+check(!!warnChip && warnChip.classList.contains("ep-group-warn"),
+  "成员 id 失配的组仍在常用组里显示，并带警示标记");
+check(!!warnChip && warnChip.textContent.indexOf("缺1") >= 0,
+  "失配组的 chip 上直接写「缺 1」，不靠悬停提示", warnChip ? warnChip.textContent : "");
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+global.Store.patchConfig({ peopleGroups: null });
+
+/* 名单整份换掉（新学年、新接一个班）时，排班组也不能消失 */
+global.Store.patchConfig({ students: [{ name: "新同学甲" }, { name: "新同学乙" }] });
+const swapLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
+swapLine.children[0]._h.click();
+const roleChipAfterSwap = document.querySelectorAll(".ep-group-chip")
+  .filter(c => c.textContent.indexOf("值日组") === 0)[0];
+check(!!roleChipAfterSwap,
+  "名单整份换掉后，排班组仍在常用组里，不会无声消失");
+check(!!roleChipAfterSwap && roleChipAfterSwap.classList.contains("ep-group-warn"),
+  "组员全对不上时给警示标记，而不是假装这组是空的",
+  roleChipAfterSwap ? roleChipAfterSwap.className : "没找到 chip");
+document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
+global.Store.patchConfig({ students: window.RHYTHM_DATA.students });
+
+/* 2026-11-19 真机反馈②：名单没录入时绝不拿样例名单冒充本班学生 */
 global.Store.patchConfig({ students: null });
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 const bareLine = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
 bareLine.children[0]._h.click();
-const bareNames = Array.from(document.querySelectorAll(".ep-person"))
-  .map(b => b.textContent);
-check(bareNames.length > 0
-      && bareNames.every(n => window.RHYTHM_DATA.students
-        .some(s => s.name === n))
+const bareNames = Array.from(document.querySelectorAll(".ep-person")).map(b => b.textContent);
+check(bareNames.length > 0 && bareNames.every(n => window.RHYTHM_DATA.students.some(s => s.name === n))
       && bareNames.indexOf("吕雨桐") >= 0,
   "名单没录入时候选只含岗位现有的人（节能小队长是吕雨桐）",
   bareNames.join("、"));
 
-/* 光有一句「去配置班级补录」不算解决：老师被指到那条路，而那条路上
-   名册为空时连录入框都不渲染。这里改成就地能加——打字找不到人时，
-   按钮就在下面。 */
-const bareQ = Array.from(document.querySelectorAll(".ep-input"))
-  .filter(i => /打一个字/.test(i.placeholder || ""))[0];
+/* 光有一句「去配置班级补录」不算解决：打字找不到人时就地能加 */
+const bareQ = document.querySelectorAll(".ep-input")[0];
 bareQ.value = "新转来的同学";
 bareQ._h.input();
 const addBtn = document.querySelectorAll(".ep-addperson")[0];
@@ -1113,60 +1210,13 @@ check(!!addBtn && /加进名单/.test(addBtn.textContent),
   addBtn ? addBtn.textContent : "没有按钮");
 addBtn._h.click();
 check(global.Store.config().students.some(s => s.name === "新转来的同学"),
-  "点一下就写进本班名单",
-  JSON.stringify(global.Store.config().students));
-check(Array.from(document.querySelectorAll(".ep-person"))
-        .some(b => b.textContent === "新转来的同学"),
+  "点一下就写进本班名单", JSON.stringify(global.Store.config().students));
+check(Array.from(document.querySelectorAll(".ep-person")).some(b => b.textContent === "新转来的同学"),
   "加完立刻出现在候选里，不用关窗口重来");
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 global.Store.patchConfig({ students: window.RHYTHM_DATA.students });
 
-/* 组不消失（0.3.25 真机反馈："之前分好的组后来没了"）：
-   memberIds 跟名单对不上（名单重录、学生 id 变更）时组 chip 仍显示，
-   并提示有几人对不上，不让老师以为组被丢了。 */
-const stud0 = window.RHYTHM_DATA.students[0];
-global.Store.patchConfig({ peopleGroups: [{ id: "g-test", name: "擦黑板组",
-  memberIds: [stud0.id, "ghost-id-404"], order: 0 }] });
-const warnLine = document.querySelectorAll(".ep-rowline")
-  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
-warnLine.children[0]._h.click();
-const warnChip = document.querySelectorAll(".ep-group-chip")
-  .filter(c => c.textContent.indexOf("擦黑板组") === 0)[0];
-check(!!warnChip && warnChip.classList.contains("ep-group-warn"),
-  "成员 id 失配的组仍在「点组带出」里显示，并带警示标记");
-check(warnChip && warnChip.textContent.indexOf("缺1") >= 0,
-  "失配组的 chip 上直接写「缺 1」，不靠悬停提示", warnChip ? warnChip.textContent : "");
-document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
-global.Store.patchConfig({ peopleGroups: null });
-
-/* 名单整份换掉（新学年、新接一个班）时，排班组也不能消失。
-   以前它被名单过滤成空数组，整排 chip 无声消失——老师看到的就是
-   「我分好的组丢了」，而数据其实一直在岗位配置里。 */
-global.Store.patchConfig({ students: [{ name: "新同学甲" }, { name: "新同学乙" }] });
-const swapLine = document.querySelectorAll(".ep-rowline")
-  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
-swapLine.children[0]._h.click();
-const swapChips = document.querySelectorAll(".ep-group-chip");
-const roleChipAfterSwap = swapChips.filter(c => c.textContent.indexOf("值日组") === 0)[0];
-check(!!roleChipAfterSwap,
-  "名单整份换掉后，排班组仍在「点组带出」里，不会无声消失",
-  swapChips.map(c => c.textContent).join(" / "));
-check(!!roleChipAfterSwap && roleChipAfterSwap.classList.contains("ep-group-warn"),
-  "组员全对不上时给警示标记，而不是假装这组是空的");
-/* 缺几个人必须写在屏上。以前这句只进 chip 的 title，一体机没有悬停，
-   教室里永远看不到（红线 7）；现在点开这组，状态行直接说。 */
-roleChipAfterSwap._h.click();
-const missStatus = document.querySelector(".ep-pickstatus");
-check(!!missStatus && /另有 \d+ 人不在名单里/.test(missStatus.textContent),
-  "点开缺人的组，状态行写出有几人不在名单里",
-  missStatus ? missStatus.textContent : "(没有状态行)");
-check(!!missStatus && !!missStatus.querySelector(".ep-help"),
-  "补人的办法收在「?」里，不铺成一段文字");
-document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
-global.Store.patchConfig({ students: window.RHYTHM_DATA.students });
-
-/* 屏面人名解析（0.3.25 真机反馈："点进去除了人名还有英文字母串"）：
-   岗位成员里存了学生 id 时，上屏前用名册解析成人名。 */
+/* 屏面人名解析：岗位成员里存了学生 id 时，上屏前用名册解析成人名 */
 const rolesBackup = JSON.parse(JSON.stringify(global.Runtime.config().roles));
 const rolesMutated = JSON.parse(JSON.stringify(global.Runtime.config().roles));
 const r07 = rolesMutated.roles.find(r => r.id === unsetRole.id);
@@ -1187,9 +1237,7 @@ check(idDetail && idDetail.dataset.people === "赵子墨",
 global.Store.patchConfig({ roles: rolesBackup, dutyPresents: null });
 global.Screen.render();
 
-/* 常驻区标注 + 长期固定（0.3.25 同步问题）：没选人的岗位在
-   「哪些岗位整段常驻」里当场标出来，不让老师勾完才发现大屏是「待定」；
-   换人弹窗给「长期固定」出口，选的人不再只对今天生效。 */
+/* 常驻区标注：没选人的岗位在「哪些岗位整段常驻」里当场标出来 */
 const rolesEmpty = JSON.parse(JSON.stringify(global.Runtime.config().roles));
 rolesEmpty.roles.find(r => r.id === unsetRole.id).people = [];
 global.Store.patchConfig({ roles: rolesEmpty });
@@ -1199,64 +1247,24 @@ check(!!warnOpt && warnOpt.textContent.indexOf("还没选人") >= 0,
   "常驻区当场标出没选人的岗位（还没选人）", warnOpt ? warnOpt.textContent : "缺失");
 global.Store.patchConfig({ roles: rolesBackup });
 document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
-const linePersist = document.querySelectorAll(".ep-rowline")
-  .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
-linePersist.children[0]._h.click();
-/* 语义仍然要写清楚，但不必占满一屏：页面上留一句短提示，
-   「只改今天 / 想长期怎么办」收进「?」——一体机没有悬停，点开才看到。 */
-const hintTxt25 = (document.querySelector(".ep-pickhint-t") || {}).textContent || "";
-const tipTxt25 = Array.from(document.querySelectorAll(".ep-helptip"))
-  .map(n => n.textContent).join("｜");
-check(hintTxt25.indexOf("确定") >= 0 && hintTxt25.length <= 20,
-  "换人弹窗页面上只留一句短提示", hintTxt25);
-check(tipTxt25.indexOf("只改今天") >= 0 && /固定人员|长期固定/.test(tipTxt25),
-  "「只改今天 / 想长期怎么办」收进「?」，内容没丢", tipTxt25.slice(0, 50));
-const rolesBeforePersist = JSON.parse(JSON.stringify(global.Runtime.config().roles));
-const pick25 = document.querySelectorAll(".ep-person")
-  .filter(b => !b.classList.contains("on"))[0];
-const pickName25 = pick25.textContent;
-pick25._h.click();
-document.querySelector(".ep-persist")._h.click();
-const r14p = global.Runtime.config().roles.roles.find(r => r.name === "擦窗户");
-check(!!r14p && r14p.people.indexOf(pickName25) >= 0,
-  "「长期固定」把人写进岗位配置（不是今天覆盖）",
-  r14p ? r14p.people.join("、") : "缺失");
-global.Store.patchConfig({ roles: rolesBeforePersist });
-document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 
-/* 回归：单选岗位点一下就该选定，不该再要求点「就是 TA」二次确认 */
+/* 单选岗位：点人就是换人（不是追加） */
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
-const energyLine = document.querySelectorAll(".ep-rowline")
+const energyRow2 = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("节能小队长") >= 0)[0];
-check(!!energyLine, "值日页找得到单选岗位「节能小队长」");
-energyLine.children[0]._h.click();
-/* 回归：点确定后不能跳回顶部，要停在用户刚才那个岗位 */
-document.querySelector(".ep-rows").scrollTop = 120;
-document.querySelector(".ep-body").scrollTop = 40;
-const firstMate = document.querySelectorAll(".ep-person")[0];
-const pickName = firstMate.textContent;
-firstMate._h.click();
-const pickOv = global.Store.getDayOverride("2026-11-09") || {};
-const pickedPeople = (pickOv.roles && pickOv.roles.r02) ? pickOv.roles.r02.people : [];
-check(pickedPeople.length === 1 && pickedPeople[0] === pickName,
-  "单选岗位点候选人就直接写入，不用再点一次确认",
-  pickName + " → " + pickedPeople.join("、"));
-check(document.querySelector(".ep-rows").scrollTop === 120
-      && document.querySelector(".ep-body").scrollTop === 40,
-  "确定后岗位列表与整页滚动位置都保留，不跳回顶部",
-  "rows=" + document.querySelector(".ep-rows").scrollTop
-  + " body=" + document.querySelector(".ep-body").scrollTop);
-check(document.querySelectorAll(".ep-rowline")
-  .filter(l => l.dataset.roleId === "r02").length === 1,
-  "重绘后的行仍然带着岗位 id，锚点找得到");
-check(document.querySelectorAll(".ep-dialog.picker").length === 0,
-  "点完自动关窗回到岗位列表");
-check(document.querySelectorAll(".ep-primary")
-  .filter(b => b.textContent.indexOf("就是") >= 0).length === 0,
-  "单选岗位的换人弹窗不再出现「就是 TA」");
+energyRow2.children[0]._h.click();
+const beforeSingle = document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、");
+const another = document.querySelectorAll(".ep-person").filter(b => !b.classList.contains("on"))[0];
+const anotherName = another.textContent;
+another._h.click();
+const afterSingle = document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、");
+check(afterSingle.indexOf(anotherName) === 0 && document.querySelectorAll(".ep-pickchip").length === 1,
+  "单人岗位上点谁就是换谁，不会越点越多",
+  beforeSingle + " → " + afterSingle);
+document.querySelector(".ep-primary")._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 0, "保存后自动关窗");
 
-/* 回归：换人卡片要有明确的关闭入口，且同一时刻只能存在一张
-   一体机上没有鼠标，旧卡叠在新卡下面时用户只能再操作一次。 */
+/* 回归：卡片要有明确关闭入口，同一时刻只能有一张，遮罩与 Esc 都能关 */
 const shutRow = document.querySelectorAll(".ep-rowline")
   .filter(l => l.textContent.indexOf("擦窗户") >= 0)[0];
 const shutRoleId = shutRow.dataset.roleId;
@@ -1274,7 +1282,6 @@ check(document.querySelectorAll(".ep-dialog.picker").length === 0
       && document.querySelectorAll(".ep-picker-mask").length === 0,
   "点「关闭」后卡片和遮罩都消失");
 
-/* 叠加根因：openPicker 只 append 不清理旧卡，且没有遮罩拦背后点击 */
 shutRow.children[0]._h.click();
 shutRow.children[0]._h.click();
 check(document.querySelectorAll(".ep-dialog.picker").length === 1,
@@ -1287,13 +1294,23 @@ check(document.querySelectorAll(".ep-dialog.picker").length === 1,
   "开着一张卡时再点别的岗位，也只留一张",
   document.querySelectorAll(".ep-dialog.picker").length + " 张");
 document.querySelector(".ep-picker-mask")._h.click();
-check(document.querySelectorAll(".ep-dialog.picker").length === 0,
-  "点遮罩能关掉卡片");
+check(document.querySelectorAll(".ep-dialog.picker").length === 0, "点遮罩能关掉卡片");
 
 otherRow.children[0]._h.click();
 (docHandlers.keydown || []).forEach(fn => fn({ key: "Escape" }));
-check(document.querySelectorAll(".ep-dialog.picker").length === 0,
-  "按 Esc 能关掉卡片");
+check(document.querySelectorAll(".ep-dialog.picker").length === 0, "按 Esc 能关掉卡片");
+
+/* 点人名格子进来：直接落到他所在的那个槽位 */
+const focusRoleLine = document.querySelectorAll(".ep-rowline")
+  .filter(l => l.textContent.indexOf("黑板清洁师") >= 0)[0];
+const focusChip = focusRoleLine.children[0].querySelectorAll(".ep-namechip")[0];
+const focusName0 = focusChip.textContent;
+focusChip._h.click();
+check(document.querySelectorAll(".ep-dialog.picker").length === 1,
+  "点值日行上的人名就能打开面板");
+check(document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、").indexOf(focusName0) >= 0,
+  "打开后已经定位到这个人（已选区里就有他）", focusName0);
+document.querySelector(".ep-dialog-close")._h.click();
 
 /* 取消不写配置；关掉卡片后岗位列表和滚动位置都还在 */
 document.querySelector(".ep-rows").scrollTop = 77;
@@ -1302,7 +1319,7 @@ const ovBeforeClose = JSON.stringify(global.Store.getDayOverride("2026-11-09") |
 shutRow.children[0]._h.click();
 document.querySelectorAll(".ep-person")[0]._h.click();
 check(JSON.stringify(global.Store.getDayOverride("2026-11-09") || {}) === ovBeforeClose,
-  "只勾选还没确定，配置不变");
+  "只勾选还没保存，配置不变");
 document.querySelector(".ep-dialog-close")._h.click();
 check(JSON.stringify(global.Store.getDayOverride("2026-11-09") || {}) === ovBeforeClose,
   "点关闭后这次选择没写进配置", "role=" + shutRoleId);
@@ -1887,7 +1904,7 @@ global.Remote.info.phone = "";
   /* 用一个完全干净的 window 重放页面脚本，等价于刷新 */
   const fresh = { console, localStorage: global.localStorage };
   fresh.window = fresh; fresh.self = fresh;
-  ["app/data.js", "app/engine/schedule.js", "app/clock.js", "app/config.js", "app/store.js", "app/runtime.js"]
+  ["app/data.js", "app/engine/schedule.js", "app/clock.js", "app/config.js", "app/pinyin.js", "app/store.js", "app/runtime.js"]
     .forEach(f => new Function("window", "self", "module", "exports", "localStorage", "console",
       fs.readFileSync(path.join(ROOT, f), "utf8"))(fresh, fresh, undefined, undefined, global.localStorage, console));
   check(fresh.Runtime.config().meta.klass === "测试二班", "刷新后班名还在",

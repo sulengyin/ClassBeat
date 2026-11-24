@@ -1294,12 +1294,6 @@
   function renderDuty(ov, key) {
     var sec = h("section", "ep-sec");
     sec.appendChild(h("h3", null, "点岗位换人"));
-    /* 标题先把结论说了，剩下的收进「?」：
-       以前这里两句说明、下面每行再标一遍「已换」，同一件事说了三遍。 */
-    var dutyNote = h("p", "ep-note");
-    dutyNote.appendChild(h("span", null, "只换今天，不动以后的排班"));
-    dutyNote.appendChild(helpNote("▲▼ 调的是同一时刻谁先做，大屏底下的值日条会跟着变。"));
-    sec.appendChild(dutyNote);
 
     var doc = roleDoc();
     var roles = (doc.roles || []).slice().sort(function (a, b) {
@@ -1310,21 +1304,30 @@
       var changed = ov.roles && ov.roles[r.id];
       var line = h("div", "ep-rowline");
       line.dataset.roleId = r.id;
-      var row = h("button", "ep-row" + (changed ? " changed" : ""));
+
+      /* 一行 = 岗位名 + 出人方式 + 人名（每个名字自己是一个按钮）+ ▲▼。
+         人名单独成按钮，老师点谁就直接改谁；点岗位名进整个面板。 */
+      var row = h("div", "ep-row" + (changed ? " changed" : ""));
+      row.dataset.roleId = r.id;
       row.appendChild(h("span", "p", r.name));
+      row.appendChild(modeBadge(r, key));
 
-      /* 谁：只有 rolePeopleNow 一个来源（引擎答案 + 今天的临时换人）。
-         轮换岗位额外标出「A/B 组」，让老师知道明天会换人——
-         只写人名的话，老师会以为这就是长期安排。 */
       var names = rolePeopleNow(r, key);
-      var who = nameText(names);
-      if (r.groups && who) who = "A/B 组 · " + who;
-      else if (!who && r.groups) {
-        who = roleRosterSize(r) ? "A/B 组（今天这组没人）" : "A/B 组（成员还没填）";
-      } else if (!who && r.peopleMap) who = "星期表里今天没人";
+      var who = h("div", "ep-who");
+      if (!names.length) {
+        who.appendChild(h("span", "ep-who-empty", emptyWho(r, key)));
+      }
+      names.forEach(function (n) {
+        var chip = h("button", "ep-namechip", n);
+        chip.addEventListener("click", function (e) {
+          if (e && e.stopPropagation) e.stopPropagation();
+          openPicker(r, key, { focus: n });
+        });
+        who.appendChild(chip);
+      });
+      row.appendChild(who);
+      if (changed) row.appendChild(h("span", "x", "今天"));
 
-      row.appendChild(h("span", "s", who || "未定"));
-      row.appendChild(h("span", "x", changed ? "已换" : "换"));
       row.addEventListener("click", function () { openPicker(r, key); });
       line.appendChild(row);
 
@@ -1343,6 +1346,31 @@
     sec.appendChild(list);
     renderDutyPresents(doc, key);
     bodyEl.appendChild(sec);
+  }
+
+  /* 出人方式的徽标：老师扫一眼就知道这个岗位明天会不会换人 */
+  var MODE_TEXT = { fixed: "固定", ab: "A/B 组", weekday: "按星期" };
+  function modeBadge(role, key) {
+    var mode = S.roleModeOf ? S.roleModeOf(role) : "fixed";
+    var text = MODE_TEXT[mode] || "固定";
+    if (mode === "ab") {
+      var d = RT && RT.day ? RT.day(key) : null;
+      if (d && d.group) text += " · 今天 " + d.group;
+    }
+    if (role.assign === "self-organize") text += " · 自主";
+    var b = h("span", "ep-modebadge" + (mode === "fixed" ? "" : " on"), text);
+    return b;
+  }
+
+  function emptyWho(role, key) {
+    var mode = S.roleModeOf ? S.roleModeOf(role) : "fixed";
+    if (mode === "weekday") {
+      var d = RT && RT.day ? RT.day(key) : null;
+      var w = d ? (WEEKDAYS.filter(function (x) { return x.n === d.weekday; })[0] || {}) : {};
+      return (w.label || "这一天") + "还没排人";
+    }
+    if (mode === "ab") return roleRosterSize(role) ? "今天这组还没人" : "还没分 A/B 组";
+    return "还没排人";
   }
 
   /* 时段常驻（0.3.23）：课间 / 晨间自主管理 / 午间各配哪些岗位整段挂在
@@ -1414,15 +1442,6 @@
 
   /* 一组「人员」可能是名字、学号、也可能是对象（手工改过的配置）。
      拼到界面上之前一律取名字、丢掉取不出来的，别让 [object Object] 露脸。 */
-  /* 一组人拼成屏上一行字。归一化交给 Store.peopleList —— 和写闸门、
-     引擎同一份实现；这里只负责拼接。以前这里自己「取名字」、写闸门
-     「按分隔符拆开」，同一份数据在两处被理解成不同的东西。 */
-  function nameText(list) {
-    if (S.peopleList) return S.peopleList(list).join("、");
-    return (Array.isArray(list) ? list : [])
-      .map(function (x) { return typeof x === "string" ? x : ""; })
-      .filter(function (n) { return !!n; }).join("、");
-  }
 
   /* 换人时候选的排序依据：这个岗位原本是谁，就先出谁。
      岗位的人可能在 people、peopleMap、groups、substitute 四处，
@@ -1529,107 +1548,131 @@
     return out;
   }
 
-  /* 一个岗位通常就一个人：点谁就是谁，点完直接落库、关窗。
-     只有「一班多人」的岗位（路队长、补给站、按组轮换的值日组等）才需要多选，
-     这时才保留「确定」按钮。 */
-  function roleIsMulti(role) {
-    if (!role) return false;
-    if (role.grp || role.groups) return true;
-    if ((role.people || []).length > 1) return true;
-    if (role.peopleMap && Object.keys(role.peopleMap).length > 1) return true;
-    return false;
-  }
+  /* 一个岗位通常就一个人：点谁就是谁。多人在一起干的（擦窗户、按组轮换的
+     值日组）才需要加减。这个判断现在收在面板里按「当前方式」算，
+     不再从配置里推——配置里留着旧的分组数据，会把固定岗位错认成多人。 */
 
-  function openPicker(role, key) {
-    /* 先收掉可能残留的旧卡：同一时刻只留一张 */
+  /* ---------- 换人面板 ----------
+     一屏里把四件事做完，不再一层层点：
+       1. 候选名单放在最上面，打姓或名的汉字/拼音都能出人（Store.rankStudents）；
+       2. 这个岗位现在是谁，紧贴候选列出来，点一下就去掉；
+       3. 「固定 / A/B 轮流 / 按星期」当场互切——以前固定岗位想改成轮流
+          根本没有入口，反向的「改为固定人员」却是有的；
+       4. 「保存」写进岗位配置（以后都这样），「只改今天」留成次按钮。
+     说明文字全删了，改由按钮的按下态、已选人数、槽位上的「缺 N」这些
+     看得见的东西表达。 */
+  function openPicker(role, key, opts) {
     closePicker();
+    opts = opts || {};
+
+    /* 岗位历史上是不是「一岗多人」。单选岗位（班牌）点人 = 换掉，
+       多选岗位点人 = 加/减一个人。从配置派生，不另存一个开关。 */
+    /* 这一个槽位是「一个人干」还是「几个人一起干」。
+       以前靠 roleIsMulti 从配置推，结果把「以前分过组」也当成多人：
+       一个岗位从 A/B 切回固定后，分组数据还在，点个人就变成了追加。
+       现在按当前方式判：固定看实际人数（并给老师一个显式开关），
+       轮流方式的每格都允许多人。 */
+    var related = relatedNames(role);
+    var draft = JSON.parse(JSON.stringify(role));
+    var mode = S.roleModeOf ? S.roleModeOf(draft) : "fixed";
+    var oneSeat = mode === "fixed" && S.peopleList(draft.people).length <= 1;
+    var SLOTS = { fixed: [null], ab: ["A", "B"], weekday: ["1", "2", "3", "4", "5"] };
+    /* 当前正在编辑哪一个槽位。固定方式只有一个槽，下面会按首个人人所在的槽纠正。 */
+    var slot = null;
+    var focusName = opts.focus || "";
+
+    function slotList() { return SLOTS[mode] || [null]; }
+
+    function slotNames(which) {
+      var s = which === undefined ? slot : which;
+      if (mode === "fixed") return S.peopleList(draft.people);
+      if (mode === "ab") return draft.groups ? S.peopleList(draft.groups[s]) : [];
+      return draft.peopleMap ? S.peopleList(draft.peopleMap[s]) : [];
+    }
+
+    function writeSlot(names, which) {
+      var s = which === undefined ? slot : which;
+      if (mode === "fixed") { draft.people = names.slice(); return; }
+      if (mode === "ab") {
+        draft.groups = draft.groups || {};
+        draft.groups[s] = names.slice();
+        return;
+      }
+      draft.peopleMap = draft.peopleMap || {};
+      draft.peopleMap[s] = names.slice();
+    }
+
+    function firstFilledSlot() {
+      var ls = slotList();
+      for (var i = 0; i < ls.length; i++) if (slotNames(ls[i]).length) return ls[i];
+      return ls[0];
+    }
+
+    slot = mode === "fixed" ? null : firstFilledSlot();
+
+    function seatLabel(s) {
+      if (s == null) return "固定";
+      if (mode === "ab") return s + " 组";
+      var w = WEEKDAYS.filter(function (x) { return String(x.n) === String(s); })[0];
+      return w ? w.label : "周" + s;
+    }
 
     var wrap = h("div", "ep-dialog picker");
     var head = h("div", "ep-dialog-head");
-    head.appendChild(h("div", "ep-dialog-title", "换人 · " + role.name));
+    head.appendChild(h("div", "ep-dialog-title", role.name));
     var shut = h("button", "ep-dialog-close", "关闭");
     shut.title = "关闭，这次的选择不保存";
     shut.addEventListener("click", function () { closePicker(); });
     head.appendChild(shut);
     wrap.appendChild(head);
 
-    /* 遮罩挡住卡片后面的岗位：触摸时误点不会又开一张卡 */
     var mask = h("div", "ep-picker-mask");
     mask.addEventListener("click", function () { closePicker(); });
 
-    var multi = roleIsMulti(role);
-    var groupBox = null;
-    if (multi) {
-      groupBox = h("div", "ep-groups");
-      wrap.appendChild(groupBox);
-    }
-
+    /* 先搜索、先出候选：老师打开面板十次有九次是来找人的 */
     var q = document.createElement("input");
     q.className = "ep-input";
-    q.placeholder = "打一个字，或姓氏拼音首字母";
+    q.placeholder = "打姓或名：汉字或拼音（zhou / z / 周）";
     wrap.appendChild(q);
 
     var grid = h("div", "ep-people");
-    /* 一行状态：现在列的是哪批人、共几个。
-       没有它，「点没点组」只差在几个字的颜色上，老师看不出来。 */
-    var statusBar = h("div", "ep-pickstatus");
-    wrap.appendChild(statusBar);
     wrap.appendChild(grid);
 
-    /* 单人岗位（如「班牌」）点一下就是选定今天，不弹二次确认；但老师
-       常常是想「以后都换成这个人」，以前没有出口，第二天又变回原样。
-       这里给一个开关：勾上再点人，写的是岗位配置而不是今天。 */
-    var pinAlways = false;
-    if (!multi) {
-      var pinBtn = h("button", "ep-ghost ep-pin-always", "以后一直用这个人");
-      pinBtn.title = "先点一下这个按钮，再点人名：会写进岗位配置，以后每天都显示，不只是一天";
-      pinBtn.addEventListener("click", function () {
-        pinAlways = !pinAlways;
-        pinBtn.classList.toggle("on", pinAlways);
-        pinBtn.textContent = pinAlways ? "现在是「以后一直用」，点人名生效" : "以后一直用这个人";
-      });
-      wrap.appendChild(pinBtn);
-    }
+    /* 已选：这个岗位现在是谁，和候选人贴在一起，点一下就摘掉 */
+    var pickedBox = h("div", "ep-picked");
+    var pickedHead = h("div", "ep-picked-head");
+    var pickedTitle = h("span", "ep-picked-t", "");
+    pickedHead.appendChild(pickedTitle);
+    var clearBtn = h("button", "ep-picked-clear", "清空");
+    clearBtn.addEventListener("click", function () {
+      if (!slotNames().length) return;
+      writeSlot([]);
+      paintAll();
+    });
+    pickedHead.appendChild(clearBtn);
+    /* 一个人干 / 多人一起干：显式开关，不靠猜配置。
+       单人（班牌、路队长这种）点人就是换人；多人点人是加人。 */
+    var mixBox = h("span", "ep-seatmix");
+    pickedHead.appendChild(mixBox);
+    pickedBox.appendChild(pickedHead);
 
-    /* 换人的范围只有三种，用一行字说清楚就够。
-       以前这里叠着三段说明（"这个岗位现在按 A/B 组轮换。这里点的只改今天；
-       要固定成这些人，点下面的「改为固定人员」——以后每天都显示他们，
-       轮换表还留着，随时能恢复。"共 64 字），一眼扫过去只会被跳过，
-       然后老师照样以为改一次就一直有效。长解释收进「?」，谁想细看谁点。 */
-    var hintRow = h("div", "ep-pickhint");
-    hintRow.appendChild(h("span", "ep-pickhint-t", multi ? "选人后点「确定」" : "点谁就是谁"));
-    hintRow.appendChild(helpNote(
-      "换只改今天这一天，不影响以后的排班。"
-      + (role.groups || role.peopleMap || role.rotation
-        ? "这个岗位有轮换表：今天定的人只顶今天；要以后每天都是这些人，点下面「改为固定人员」，轮换表会留着，随时能改回来。"
-        : "要让以后每天都用这些人，点下面的「长期固定」。")
-    ));
-    wrap.appendChild(hintRow);
+    var seatsRow = h("div", "ep-seats");
+    pickedBox.appendChild(seatsRow);
+    var chips = h("div", "ep-pickchips");
+    pickedBox.appendChild(chips);
+    wrap.appendChild(pickedBox);
 
-    /* 打开时把「今天这一轮的人」列出来（就是它们，不用再去找），
-       但**一个都不预先勾上**。
-       以前 selected 一上来就是整组，老师点一个人想换掉，底下却写
-       「已选 15 人」，看着像点错了。现在：选了才叫选，没选就是不改。 */
-    var currentNames = rolePeopleNow(role, key);
-    var selected = [];
-    /* 面板现在在看什么。以前没有这个状态：
-         · paint() 一上来就把整份名单铺 24 个人出来，所以「已经分组」在界面上
-           完全看不出来；
-         · 点组直接把 15 人塞进 selected，但组按钮没有任何变化，
-           于是底下那句「已选 15 人」对老师来说像是凭空冒出来的。
-       current —— 只列这个岗位今天的人（打开时的样子）
-       group   —— 点了某一组，只列这组的人
-       search  —— 老师在打字，列匹配到的候选 */
-    var view = { kind: "current" };
-    var saveBtn = null;
-    var related = relatedNames(role);
-    var activeGroup = null;   /* 从已存组带出时记住它，「保存修改」写回原组 */
-    var nameInput = null;
-    var groupHint = null;
-    var modifyBtn = null;
+    /* 出人方式：一行三个按钮，当前的那种按下去 */
+    var modeRow = h("div", "ep-modeseg");
+    wrap.appendChild(modeRow);
 
-    /* 候选 = 名单 + 本岗位现有的人：名单没录入时，老师至少能把
-       值日的人换给同岗位的其他人（2026-11-19 真机反馈②）。 */
+    /* 常用组：点一下就整组带进当前槽位 */
+    var groupBox = h("div", "ep-groups");
+    wrap.appendChild(groupBox);
+
+    var foot = h("div", "ep-actrow");
+    wrap.appendChild(foot);
+
     function pickerPool() {
       var list = rosterStudents().slice();
       var have = {};
@@ -1637,357 +1680,291 @@
       related.forEach(function (n) {
         if (n && !have[n]) { list.push({ name: n }); have[n] = 1; }
       });
+      /* 草稿里已经排上、但名单里没有的人也要能看见（组里留着的旧姓名） */
+      slotList().forEach(function (s) {
+        slotNames(s).forEach(function (n) {
+          if (n && !have[n]) { list.push({ name: n }); have[n] = 1; }
+        });
+      });
       return list;
     }
 
-    /* 选定即写入：同一天同一岗位只写这一处，关掉弹窗就是确认。 */
-    function commit(names) {
-      var roles = (S.getDayOverride(key) || {}).roles || {};
-      roles[role.id] = { people: names.slice() };
-      S.patchDayOverride(key, { roles: roles });
-      wrap.remove();
-      flash(role.name + " 今天换给 "
-        + (names.length > 3 ? names.length + " 人" : names.join("、")));
-      renderBody(role.id);
-    }
-
-    /* 写进岗位配置（长期），不是今天的临时覆盖。
-       以前这段逻辑只挂在「长期固定」按钮上，且有轮换表的岗位根本看不到
-       那个按钮；现在抽出来，单选岗位的「以后一直用」也走同一条路。 */
-    function persistPeople(names) {
-      var docRoles = JSON.parse(JSON.stringify(roleDoc()));
-      var target = (docRoles.roles || []).filter(function (x) { return x.id === role.id; })[0];
-      if (!target) { flash("找不到岗位配置"); return false; }
-      target.people = names.slice();
-      S.patchConfig({ roles: docRoles });
-      return true;
-    }
-
-    /* 勾选的人名 → 名单 id；没有 id 的名单用 name: 兜底，组仍然存得住。
-       名单没录入时也用 name: 兜底（候选里有岗位现有人，见 pickerPool）。 */
-    function pickedIds() {
-      var roster = rosterStudents();
-      var ids = [];
-      selected.forEach(function (n) {
-        var hit = roster.filter(function (s) {
-          return s && s.name === n && s.active !== false;
-        })[0];
-        var id = hit ? (hit.id ? String(hit.id) : "name:" + hit.name)
-                     : "name:" + n;
-        if (ids.indexOf(id) < 0) ids.push(id);
-      });
-      return ids;
-    }
-
-    /* 说清楚这次是「改已有的组」还是「另存一个新组」 */
-    function paintGroupHint() {
-      if (!groupHint) return;
-      groupHint.textContent = activeGroup
-        ? "正在改「" + activeGroup.name + "」：增减人员后点「保存修改」写回这一组；想保留原组就改名点「另存为新组」。"
-        : "临时勾选不会写进配置。起个名字点「另存为新组」，或先点上面的组带出再改。";
-      if (modifyBtn) modifyBtn.style.display = activeGroup ? "" : "none";
-    }
-
-    function paintGroupChips() {
-      if (!groupBox) return;
-      groupBox.innerHTML = "";
-      var defs = groupDefs(role, key);
-      if (!defs.length) return;
-      groupBox.appendChild(h("span", "ep-groups-label", "点组带出"));
-      defs.forEach(function (g) {
-        var on = view.kind === "group" && view.id === g.id;
-        var box = h("span", "ep-group");
-        /* 「缺 N」写在按钮上，不写进 title：一体机没有悬停，title 在教室里等于不存在（红线 7）。 */
-        var label = g.name;
-        if (g.names.length) label += " · " + g.names.length + "人";
-        if (g.missing) label += " · 缺" + g.missing;
-        var b = h("button", "ep-group-chip" + (on ? " on" : ""), label);
-        b.title = on
-          ? "再点一下取消带入"
-          : "点一下只列这组 " + g.names.length + " 人，并全部勾上；还要点下面的「确定」才生效";
-        if (g.missing) b.classList.add("ep-group-warn");
-        b.addEventListener("click", function () {
-          if (on) {
-            /* 再点一下取消：回到「今天这一轮」，不留下半截选择 */
-            view = { kind: "current" };
-            selected = [];
-            activeGroup = null;
-          } else {
-            view = { kind: "group", id: g.id, name: g.name,
-                     names: g.names.slice(), missing: g.missing || 0 };
-            selected = g.names.slice();
-            activeGroup = (g.source === "manual") ? g : null;
-            if (activeGroup && nameInput) nameInput.value = activeGroup.name;
-          }
-          q.value = "";              /* 带入是整体动作，把搜索条件清掉免得两套条件打架 */
-          g.names.forEach(function (n) { S.markPicked(n); });
-          paintGroupChips();
-          paintGroupHint();
-          paint();
-        });
-        box.appendChild(b);
-        if (g.source === "manual") {
-          var x = h("button", "ep-group-del", "×");
-          x.title = "删除这个组";
-          x.addEventListener("click", function () {
-            S.deleteGroup(g.id);
-            if (activeGroup && activeGroup.id === g.id) activeGroup = null;
-            if (view.kind === "group" && view.id === g.id) {
-              view = { kind: "current" };
-              selected = [];
-            }
-            paintGroupChips();
-            paintGroupHint();
-            paint();
-            flash("已删除「" + g.name + "」");
-          });
-          box.appendChild(x);
-        }
-        groupBox.appendChild(box);
-      });
-    }
-
-    /* 状态行：现在列的是哪批人。没有这行，「点没点组」只差在几个字的
-       颜色上，老师看不出来。 */
-    function paintStatus(qs) {
-      statusBar.innerHTML = "";
-      if (qs) return;                /* 搜索时让位，别两句话打架 */
-      if (view.kind === "group") {
-        /* 带入之后老师可能又增减了几个人，这时再说「已带入」就不老实了 */
-        var picked = selected.length;
-        var lead = view.edited
-          ? (picked ? "从「" + view.name + "」里挑了 " + picked + " 人"
-                    : "从「" + view.name + "」里挑人")
-          : "已带入「" + view.name + "」" + (picked ? " · " + picked + " 人" : "");
-        statusBar.appendChild(h("span", "ep-pickstatus-t", lead));
-        if (view.missing) {
-          statusBar.appendChild(h("span", "ep-pickstatus-w",
-            "另有 " + view.missing + " 人不在名单里"));
-          statusBar.appendChild(helpNote(
-            "这几位多半是名单整份换过（新学年、新接一个班），组里还留着旧姓名。"
-            + "从下面把现有的人勾上，点「确定」就补回来了；原组还在岗位配置里。"));
-        }
-        var redo = h("button", "ep-pickstatus-x", "重新挑");
-        redo.title = "不要这一整组，自己从里面挑几个人";
-        redo.addEventListener("click", function () {
-          selected = [];
-          view.edited = true;
-          paint();
-        });
-        statusBar.appendChild(redo);
-        return;
+    function tap(name) {
+      var cur = slotNames().slice();
+      var at = cur.indexOf(name);
+      if (at >= 0) {
+        cur.splice(at, 1);
+      } else if (oneSeat && cur.length >= 1) {
+        cur = [name];                 /* 一个人干的岗位：点谁就是换谁 */
+      } else {
+        cur.push(name);
       }
-      /* 没有名单时把「为什么列表这么短、怎么办」并进这一行，
-         省掉一整段说明文字 */
-      var hasRoster = rosterStudents().length > 0;
-      statusBar.appendChild(h("span", "ep-pickstatus-t",
-        !hasRoster
-          ? "还没有名单 · 打字可以顺手加人"
-          : currentNames.length
-            ? "今天这一轮 " + currentNames.length + " 人"
-            : "今天还没排人"));
+      writeSlot(cur);
+      S.markPicked(name);
+      paintAll();
     }
 
-    function syncSaveBtn() {
-      if (!saveBtn) return;
-      saveBtn.textContent = selected.length
-        ? "确定 · 用这 " + selected.length + " 人"
-        : "确定";
-    }
-
-    function paint() {
+    function paintGrid() {
       grid.innerHTML = "";
       var qs = String(q.value || "").trim();
-      var rows;
-      if (qs) {
-        rows = S.rankStudents(pickerPool(), qs, related, 24);
-      } else if (view.kind === "group") {
-        rows = view.names.map(function (n) { return { name: n }; });
-      } else {
-        rows = currentNames.map(function (n) { return { name: n }; });
-      }
-
-      paintStatus(qs);
+      var rows = S.rankStudents(pickerPool(), qs, related, qs ? 24 : 16);
+      var cur = slotNames();
 
       if (!rows.length) {
         if (qs) {
-          /* 搜不到人时就地补，不能只写一句「名单里没有这个人」把老师晾着。
-             （以前这里指路「去 ⋯ 菜单 → 配置班级补录」，而那条路上
-             名册为空时连录入框都不渲染——指的方向根本走不通。） */
-          var typed = qs;
-          var add = h("button", "ep-addperson", "把「" + typed + "」加进名单");
+          var add = h("button", "ep-addperson", "把「" + qs + "」加进名单");
           add.addEventListener("click", function () {
-            var r = S.addStudent(typed);
+            var r = S.addStudent(qs);
             if (!r.ok) { flash(r.why); return; }
-            flash(r.existed ? "名单里本来就有「" + typed + "」" : "已加进名单：" + typed);
-            /* 搜索词留着：加完当场就能在候选里看到他，
-               不用再打一遍字（打了字却什么都没变，老师会以为没加上） */
-            paint();
+            flash(r.existed ? "名单里本来就有「" + qs + "」" : "已加进名单：" + qs);
+            paintAll();
           });
           grid.appendChild(add);
-        } else if (view.kind === "group") {
-          grid.appendChild(h("p", "ep-note", "这一组还没有人"));
         } else {
-          grid.appendChild(h("p", "ep-note", "今天还没排人：打字找人，或从上面点一组"));
+          grid.appendChild(h("span", "ep-person-none", "还没选人：上面点人，或点一组带出"));
         }
-        syncSaveBtn();
         return;
       }
 
       rows.forEach(function (s) {
-        var b = h("button", "ep-person" + (selected.indexOf(s.name) >= 0 ? " on" : ""), s.name);
-        b.addEventListener("click", function () {
-          S.markPicked(s.name);
-          if (!multi) {
-            if (pinAlways) {
-              if (persistPeople([s.name])) {
-                wrap.remove();
-                flash("「" + role.name + "」以后固定给 " + s.name);
-                renderBody(role.id);
-              }
-              return;
-            }
-            commit([s.name]);
-            return;
-          }
-          var i = selected.indexOf(s.name);
-          if (i >= 0) selected.splice(i, 1);
-          else selected.push(s.name);
-          if (view.kind === "group") view.edited = true;
-          paint();
-        });
+        var on = cur.indexOf(s.name) >= 0;
+        var b = h("button", "ep-person" + (on ? " on" : ""), s.name);
+        b.addEventListener("click", function () { tap(s.name); });
         grid.appendChild(b);
       });
-      syncSaveBtn();
     }
 
-    q.addEventListener("input", paint);
-    paintGroupChips();
-    paint();
-
-    /* 临时勾选只留在弹窗里；只有点「保存修改 / 另存为新组」才写配置。 */
-    if (multi) {
-      groupHint = h("p", "ep-note", "");
-      wrap.appendChild(groupHint);
-
-      var saveRow = h("div", "ep-group-save");
-      nameInput = document.createElement("input");
-      nameInput.className = "ep-input ep-group-name";
-      nameInput.placeholder = "给这组起个名字，下次一点就带出";
-      saveRow.appendChild(nameInput);
-
-      /* 已存组：在原 id 上更新成员和名字，不新增一条。 */
-      modifyBtn = h("button", "ep-mini ep-group-modify", "保存修改");
-      modifyBtn.addEventListener("click", function () {
-        if (!activeGroup) { flash("先点一个已存的组"); return; }
-        var ids = pickedIds();
-        if (!ids.length) { flash("先选人"); return; }
-        var name = (nameInput.value || "").trim() || activeGroup.name;
-        var r = S.saveGroup({
-          id: activeGroup.id,
-          name: name,
-          memberIds: ids,
-          order: activeGroup.order
-        });
-        if (!r.ok) { flash(r.why); return; }
-        activeGroup = null;
-        paintGroupChips();
-        paintGroupHint();
-        flash("已更新「" + name + "」，共 " + ids.length + " 人");
+    function paintSeats() {
+      seatsRow.innerHTML = "";
+      seatsRow.hidden = mode === "fixed";
+      if (mode === "fixed") return;
+      slotList().forEach(function (s) {
+        var n = slotNames(s).length;
+        var b = h("button", "ep-seat" + (s === slot ? " on" : ""), seatLabel(s) + (n ? " · " + n : ""));
+        b.addEventListener("click", function () { slot = s; paintAll(); });
+        seatsRow.appendChild(b);
       });
-      saveRow.appendChild(modifyBtn);
-
-      /* 永远从空白名字框新建，避免误以为在改旧组。 */
-      var saveGroupBtn = h("button", "ep-mini ep-group-save-btn", "另存为新组");
-      saveGroupBtn.addEventListener("click", function () {
-        if (!selected.length) { flash("先选人"); return; }
-        var name = (nameInput.value || "").trim();
-        if (!name) { flash("先给这组起个名字"); return; }
-        if (S.peopleGroups().some(function (g) { return g.name === name; })) {
-          flash("已有同名组「" + name + "」，要改它请用「保存修改」");
-          return;
-        }
-        var ids = pickedIds();
-        if (!ids.length) { flash("名单里找不到这些人"); return; }
-        var r = S.saveGroup({
-          id: "g" + Date.now(),
-          name: name,
-          memberIds: ids,
-          order: S.peopleGroups().length
-        });
-        if (!r.ok) { flash(r.why); return; }
-        nameInput.value = "";
-        activeGroup = null;
-        paintGroupChips();
-        paintGroupHint();
-        flash("已存成新组「" + name + "」");
-      });
-      saveRow.appendChild(saveGroupBtn);
-      wrap.appendChild(saveRow);
-      paintGroupHint();
     }
 
-    var row = h("div", "ep-actrow");
-    if (multi) {
-      saveBtn = h("button", "ep-primary", "确定");
-      saveBtn.addEventListener("click", function () {
-        if (!selected.length) {
-          /* 没选人 = 这次不改。关掉窗口，岗位保持原样——
-             别把「我什么都没点」写成「这个岗位今天没人」。 */
-          closePicker();
-          flash("没选人，这次不改");
-          return;
-        }
-        commit(selected);
-      });
-      row.appendChild(saveBtn);
-      /* 长期固定：把现在勾的人写进岗位配置（不是今天的临时换人）。
-         以前只给「直接按 people 出人」的岗位出现——A/B 组和按星期轮换的
-         岗位根本没有这个入口，老师只能在今天改，第二天又变回「待定」。
-         现在所有岗位都有：人员解析里「指定人员」优先于轮换表，
-         写进去就生效；轮换数据留在原处，「恢复轮换」能一键退回。 */
-      var drifting = !!(role.groups || role.peopleMap || role.rotation);
-      var persistBtn = h("button", "ep-ghost ep-persist", drifting ? "改为固定人员" : "长期固定");
-      persistBtn.title = drifting
-        ? "把这个岗位固定成现在勾选的人；A/B 轮换或按星期的表会保留，之后可以「恢复轮换」"
-        : "把现在勾选的人写进岗位配置，以后每天都显示他们";
-      persistBtn.addEventListener("click", function () {
-        if (!selected.length) { flash("先选人"); return; }
-        if (!persistPeople(selected)) return;
-        flash("「" + role.name + "」已固定给 " + selected.join("、"));
-        wrap.remove();
-        renderBody(role.id);
-      });
-      row.appendChild(persistBtn);
-
-      /* 固定过的人想退回轮换表：只删人工指定，groups/peopleMap/rotation 一直都在 */
-      if (drifting && role.people && role.people.length) {
-        var backBtn = h("button", "ep-ghost ep-unpersist", "恢复轮换");
-        backBtn.title = "删掉人工指定的人，回到按组/按星期自动轮换";
-        backBtn.addEventListener("click", function () {
-          var docRoles = JSON.parse(JSON.stringify(roleDoc()));
-          var target = (docRoles.roles || []).filter(function (x) { return x.id === role.id; })[0];
-          if (!target) { flash("找不到岗位配置"); return; }
-          delete target.people;
-          S.patchConfig({ roles: docRoles });
-          flash("「" + role.name + "」已恢复按轮换表出人");
-          wrap.remove();
-          renderBody(role.id);
+    function paintChips() {
+      chips.innerHTML = "";
+      mixBox.innerHTML = "";
+      if (mode === "fixed") {
+        [["one", "1 人"], ["many", "多人"]].forEach(function (x) {
+          var on = (x[0] === "one") === oneSeat;
+          var b = h("button", "ep-seatmix-btn" + (on ? " on" : ""), x[1]);
+          b.addEventListener("click", function () {
+            oneSeat = x[0] === "one";
+            paintAll();
+          });
+          mixBox.appendChild(b);
         });
-        row.appendChild(backBtn);
+      }
+      var names = slotNames();
+      if (!names.length) {
+        chips.appendChild(h("span", "ep-picked-empty", "还没人"));
+      }
+      names.forEach(function (n) {
+        var c = h("button", "ep-pickchip", n + "  ×");
+        c.title = "点一下从这一" + (mode === "fixed" ? "岗" : "槽") + "去掉";
+        if (n === focusName) c.classList.add("focus");
+        c.addEventListener("click", function () {
+          var cur = slotNames().slice();
+          var at = cur.indexOf(n);
+          if (at >= 0) cur.splice(at, 1);
+          writeSlot(cur);
+          paintAll();
+        });
+        chips.appendChild(c);
+      });
+      /* 组里留着、名单里已经没有的姓名：数量写在屏上（一体机没有悬停） */
+      var roster = rosterStudents();
+      if (roster.length) {
+        var have = {};
+        roster.forEach(function (s) { if (s && s.name) have[s.name] = 1; });
+        var miss = names.filter(function (n) { return !have[n]; });
+        if (miss.length) {
+          chips.appendChild(h("span", "ep-picked-warn", "另有 " + miss.length + " 人不在名单里"));
+        }
+      }
+      pickedTitle.textContent = (mode === "fixed" ? "已选" : seatLabel(slot)) + " · " + names.length + " 人";
+      if (mode !== "fixed" && !names.length) {
+        pickedTitle.textContent = seatLabel(slot) + " · 还没排人";
       }
     }
-    var clear = h("button", "ep-ghost", "恢复原样");
-    clear.addEventListener("click", function () {
-      var roles = (S.getDayOverride(key) || {}).roles || {};
-      delete roles[role.id];
-      S.patchDayOverride(key, { roles: roles });
-      wrap.remove();
-      renderBody(role.id);
-    });
-    row.appendChild(clear);
-    wrap.appendChild(row);
 
+    function paintModes() {
+      modeRow.innerHTML = "";
+      [["fixed", "固定"], ["ab", "A/B 轮流"], ["weekday", "按星期"]].forEach(function (m) {
+        var b = h("button", "ep-modebtn" + (m[0] === mode ? " on" : ""), m[1]);
+        b.addEventListener("click", function () { switchMode(m[0]); });
+        modeRow.appendChild(b);
+      });
+    }
+
+    var saveGroupOpen = false;
+
+    function paintGroups() {
+      groupBox.innerHTML = "";
+      var defs = groupDefs(role, key);
+      if (defs.length) {
+        groupBox.appendChild(h("span", "ep-groups-label", "常用组"));
+        defs.forEach(function (g) {
+          var box = h("span", "ep-group");
+          var label = g.name + (g.names.length ? " · " + g.names.length : "");
+          if (g.missing) label += " · 缺" + g.missing;
+          var b = h("button", "ep-group-chip" + (g.missing ? " ep-group-warn" : ""), label);
+          b.addEventListener("click", function () {
+            writeSlot(g.names.slice());
+            g.names.forEach(function (n) { S.markPicked(n); });
+            paintAll();
+            flash("已带入「" + g.name + "」");
+          });
+          box.appendChild(b);
+          if (g.source === "manual") {
+            var x = h("button", "ep-group-del", "×");
+            x.title = "删除这个组";
+            x.addEventListener("click", function () {
+              S.deleteGroup(g.id);
+              paintGroups();
+              flash("已删除「" + g.name + "」");
+            });
+            box.appendChild(x);
+          }
+          groupBox.appendChild(box);
+        });
+      }
+
+      if (!saveGroupOpen) {
+        var save = h("button", "ep-group-chip ep-group-new", "＋ 存为组");
+        save.addEventListener("click", function () {
+          if (!slotNames().length) { flash("先选人"); return; }
+          saveGroupOpen = true;
+          paintGroups();
+        });
+        groupBox.appendChild(save);
+        return;
+      }
+
+      var nameInput = document.createElement("input");
+      nameInput.className = "ep-input ep-group-name";
+      nameInput.placeholder = "这组叫什么";
+      var ok = h("button", "ep-mini", "存");
+      ok.addEventListener("click", function () {
+        var names = slotNames();
+        if (!names.length) { flash("先选人"); return; }
+        var name = String(nameInput.value || "").trim();
+        if (!name) { flash("先给这组起个名字"); return; }
+        if (S.peopleGroups().some(function (g) { return g.name === name; })) {
+          flash("已有同名组「" + name + "」");
+          return;
+        }
+        var roster = rosterStudents();
+        var ids = names.map(function (n) {
+          var hit = roster.filter(function (s) { return s && s.name === n; })[0];
+          return hit ? (hit.id ? String(hit.id) : "name:" + n) : "name:" + n;
+        });
+        var r = S.saveGroup({ id: "g" + Date.now(), name: name, memberIds: ids, order: S.peopleGroups().length });
+        if (!r.ok) { flash(r.why); return; }
+        saveGroupOpen = false;
+        paintGroups();
+        flash("已存成「" + name + "」");
+      });
+      var no = h("button", "ep-mini", "取消");
+      no.addEventListener("click", function () { saveGroupOpen = false; paintGroups(); });
+      groupBox.appendChild(nameInput);
+      groupBox.appendChild(ok);
+      groupBox.appendChild(no);
+    }
+
+    function paintFoot() {
+      foot.innerHTML = "";
+      var saveBtn = h("button", "ep-primary", "保存");
+      saveBtn.title = "写进岗位配置，以后每天都按这个来";
+      saveBtn.addEventListener("click", saveLong);
+      foot.appendChild(saveBtn);
+
+      var todayBtn = h("button", "ep-ghost ep-todayonly", "只改今天");
+      todayBtn.title = "只动今天这一天的值日条，不改岗位配置";
+      todayBtn.addEventListener("click", saveToday);
+      foot.appendChild(todayBtn);
+    }
+
+    function paintAll() {
+      paintModes();
+      paintSeats();
+      paintChips();
+      paintGrid();
+      paintGroups();
+      paintFoot();
+    }
+
+    function switchMode(k) {
+      if (k === mode) return;
+      var seed = slotNames().slice();
+      var r = S.setRoleMode ? S.setRoleMode(draft, k, { seed: seed }) : null;
+      if (r && r.role) draft = r.role;
+      else { draft.mode = k; }
+      mode = k;
+      slot = mode === "fixed" ? null : firstFilledSlot();
+      focusName = "";
+      paintAll();
+      /* 人已经坐在「已选」里了，这句话只是确认「切成功了」，
+         不再解释搬到哪儿——解释交给眼睛。 */
+      if (seed.length) {
+        flash("已切到" + (k === "fixed" ? "固定" : k === "ab" ? "A/B 轮流" : "按星期")
+          + " · " + slotNames().length + " 人");
+      }
+    }
+
+    /* 保存 = 写进岗位配置（长期）。写之前先把今天的临时覆盖清掉，
+       否则屏上还是旧人，老师会以为没保存上。 */
+    function saveLong() {
+      var doc = JSON.parse(JSON.stringify(roleDoc()));
+      var list = doc.roles || [];
+      var at = -1;
+      list.forEach(function (x, i) { if (x && x.id === role.id) at = i; });
+      if (at < 0) { flash("找不到岗位配置"); return; }
+      list[at] = draft;
+      S.patchConfig({ roles: doc });
+      var ovr = (S.getDayOverride(key) || {}).roles || {};
+      if (ovr[role.id]) {
+        delete ovr[role.id];
+        S.patchDayOverride(key, { roles: ovr });
+      }
+      closePicker();
+      var saved = slotNames();
+      flash(role.name + " 已保存"
+        + (saved.length ? "：" + (saved.length > 3 ? saved.length + " 人" : saved.join("、")) : ""));
+      renderBody(role.id);
+    }
+
+    /* 只改今天：写当天的临时覆盖，岗位配置一个字都不动 */
+    function saveToday() {
+      var names = slotNames().slice();
+      var ovr = (S.getDayOverride(key) || {}).roles || {};
+      if (names.length) ovr[role.id] = { people: names };
+      else delete ovr[role.id];
+      S.patchDayOverride(key, { roles: ovr });
+      closePicker();
+      flash(names.length
+        ? role.name + " 今天换成 " + (names.length > 3 ? names.length + " 人" : names.join("、"))
+        : role.name + " 今天恢复原样");
+      renderBody(role.id);
+    }
+
+    q.addEventListener("input", paintGrid);
+
+    /* 从值日行点某个人名进来：直接落到他所在的那个槽位 */
+    if (focusName) {
+      var found = null;
+      slotList().forEach(function (s) {
+        if (found === null && slotNames(s).indexOf(focusName) >= 0) found = s;
+      });
+      if (found !== null) slot = found;
+    }
+
+    paintAll();
     panelEl.appendChild(mask);
     panelEl.appendChild(wrap);
     q.focus();

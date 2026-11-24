@@ -377,9 +377,9 @@
     s: "桑沙山单商尚邵佘申沈慎盛施石时史舒束双水司松宋苏宿孙索",
     t: "谈谭汤唐陶滕田通童涂屠",
     w: "万汪王危韦卫魏温文闻翁邬巫乌吴伍武",
-    x: "奚习席夏咸相向项萧谢辛邢幸熊徐许宣薛荀",
-    y: "严言颜晏燕杨羊阳姚叶易殷尹应尤游于余俞虞禹郁喻元袁岳云恽",
-    z: "臧曾翟詹湛张章赵甄郑支钟周朱诸祝庄卓宗邹祖左"
+    x: "奚习席夏咸相向项萧谢辛邢幸熊徐许宣薛荀解",
+    y: "严言颜晏燕杨羊阳姚叶易殷尹应尤游于余俞虞禹郁喻元袁岳云恽乐",
+    z: "臧曾翟詹湛张章赵甄郑支钟周朱诸祝庄卓宗邹祖左查"
   };
 
   var SURNAME_PY = (function () {
@@ -396,13 +396,77 @@
     return SURNAME_PY[String(name).charAt(0)] || "";
   }
 
-  /* 排序：本场景相关的人 → 最近点过 → 名单顺序。
-     这是 2.17 定的规则，越靠前的越容易被点到。
-     输入先归一化：老师打的第一个字就是「姓」，`indexOf` 已经能命中；
-     打字母时按姓氏拼音首字母找（打 z 出张/赵/周），只取第一个字母——
-     打「zhang」不会比「z」更精确，但也不会突然一个都不出。 */
+  /* ---------- 拼音匹配 ----------
+     以前只认「姓氏首字母」：打 zhou 也按 z 找，赵、郑、朱一起出来；
+     打 yu 想找「予宁」，出来的却是姓杨的。因为 SURNAME_GROUPS 里只有首字母。
+     app/pinyin.js 是构建期生成的完整拼音表（姓用姓氏读音，常用字收全读音），
+     这里分四档拿人，越靠前越准：
+       0 姓的拼音以输入开头          zhou → 周
+       1 名的拼音以输入开头          yu   → 予宁、予安
+       2 姓的首字母等于输入（单字母） z    → 张、赵、周
+       3 名的首字母等于输入（单字母）
+     表没加载时退回老的首字母规则，不会反而变差。 */
+  var Py = (function () {
+    function table() { return root.Pinyin || null; }
+    function syls(s) { return String(s || "").split("|").filter(Boolean); }
+    function surname(name) {
+      if (!name) return [];
+      var p = table();
+      if (!p) { var one = surnameInitial(name); return one ? [one] : []; }
+      var first = String(name).charAt(0);
+      return syls(p.surname(String(name)) || p.char(first));
+    }
+    /* 名（第二字起）每个字的读音，摊平成一串音节 */
+    function given(name) {
+      var p = table();
+      var s = String(name || "");
+      if (!p || s.length < 2) return [];
+      var out = [];
+      for (var i = 1; i < s.length; i++) out = out.concat(syls(p.char(s.charAt(i))));
+      return out;
+    }
+    return { surname: surname, given: given };
+  })();
+
+  /* 音节以 q 开头；lv 与 lu 互认（打 lu 也要能找到吕）。
+     姓氏表没加载（兜底）时音节只有一个字母，多打的字母按首字母算命中——
+     那是老规则，不能因为换了实现就让人找不到人。 */
+  function sylHit(syl, q) {
+    if (!syl || !q) return false;
+    if (syl.indexOf(q) === 0) return true;
+    if (syl.length === 1) return q.charAt(0) === syl;
+    if (syl.indexOf("v") >= 0) return syl.replace(/v/g, "u").indexOf(q) === 0;
+    return false;
+  }
+
+  /* 拼音命中档位，越小越准；一个都不中返回 -1 */
+  function pyRank(name, q) {
+    var sur = Py.surname(name);
+    var giv = Py.given(name);
+    var i;
+    if (!sur.length && !giv.length) return -1;
+    for (i = 0; i < sur.length; i++) if (sylHit(sur[i], q)) return 0;
+    for (i = 0; i < giv.length; i++) if (sylHit(giv[i], q)) return 1;
+    if (q.length === 1) {
+      for (i = 0; i < sur.length; i++) if (sur[i].charAt(0) === q) return 2;
+      for (i = 0; i < giv.length; i++) if (giv[i].charAt(0) === q) return 3;
+    }
+    return -1;
+  }
+
+  /* 汉字的档位：姓最准，名开头次之，名中间最次 */
+  function hanRank(name, q) {
+    var at = String(name).indexOf(q);
+    if (at < 0) return -1;
+    if (at === 0) return 0;
+    return at === 1 ? 1 : 2;
+  }
+
+  /* 排序：命中档位 → 本场景相关的人 → 最近点过 → 名单顺序。
+     档位放最前，这就是「按姓快速呈现」：打 zhou，姓周的全在最上面，
+     接着才是名字里带 zhou 音的人。 */
   function rankStudents(list, q, related, limit) {
-    q = String(q == null ? "" : q).trim();
+    q = String(q == null ? "" : q).trim().toLowerCase();
     limit = limit || 8;
     if (!limit || limit < 1) return [];
 
@@ -416,29 +480,44 @@
       if (v && v !== "[object Object]") rel.push(v);
     });
 
-    var py = /^[a-z]/i.test(q) ? q.toLowerCase().charAt(0) : "";
-    var pool = all.filter(function (s) {
-      if (s.active === false) return false;
-      if (!q) return true;
-      if (s.name.indexOf(q) >= 0 || (s.alias && s.alias.indexOf(q) >= 0)) return true;
-      if (py && surnameInitial(s.name) === py) return true;
-      return false;
+    var byPy = /^[a-z]+$/.test(q);
+    var scored = [];
+    all.forEach(function (s, i) {
+      if (s.active === false) return;
+      var tier = 0;
+      if (q) {
+        if (byPy) {
+          tier = pyRank(s.name, q);
+          if (tier < 0 && s.alias) {
+            /* 备注名（小名、曾用名）也认，排在正名后面 */
+            var an = personNameOf(s.alias) || s.alias;
+            var a = an ? pyRank(String(an), q) : -1;
+            if (a >= 0) tier = a + 4;
+          }
+        } else {
+          tier = hanRank(s.name, q);
+          if (tier < 0 && s.alias) {
+            var ah = hanRank(String(personNameOf(s.alias) || s.alias), q);
+            if (ah >= 0) tier = ah + 3;
+          }
+        }
+        if (tier < 0) return;
+      }
+      scored.push({ s: s, i: i, tier: tier });
     });
 
     var picked = read(KEY.picked, {});
-    var idx = {};
-    all.forEach(function (s, i) { idx[s.name] = i; });
-
-    pool.sort(function (a, b) {
-      var ra = rel.indexOf(a.name) >= 0 ? 0 : 1;
-      var rb = rel.indexOf(b.name) >= 0 ? 0 : 1;
+    scored.sort(function (a, b) {
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      var ra = rel.indexOf(a.s.name) >= 0 ? 0 : 1;
+      var rb = rel.indexOf(b.s.name) >= 0 ? 0 : 1;
       if (ra !== rb) return ra - rb;
-      var ta = picked[a.name] || 0, tb = picked[b.name] || 0;
+      var ta = picked[a.s.name] || 0, tb = picked[b.s.name] || 0;
       if (ta !== tb) return tb - ta;
-      return (idx[a.name] || 0) - (idx[b.name] || 0);
+      return a.i - b.i;
     });
 
-    return pool.slice(0, limit);
+    return scored.slice(0, limit).map(function (x) { return x.s; });
   }
 
   function markPicked(name) {
@@ -717,6 +796,82 @@
   /* 值日条按 order 从小到大排（PLAN 2.14），这个先后由班主任定（2.4）。
      老数据里多条岗位并列同一个 order（比如三个 0），只交换两个数字看不出变化；
      所以按当前位置换完人，再统一重排成 5、10、15…，相对顺序唯一且可预期。 */
+  /* ---------- 岗位的出人方式 ----------
+     以前没有这个概念：引擎按 people → groups → peopleMap 的固定优先级取人，
+     「固定人员」只是 people 有值。于是老师把固定岗位改成轮流时没有入口，
+     反向的「改为固定人员」却是有的——单向通道。
+     现在给岗位一个显式 mode：
+       fixed    每天同样的人
+       ab       按 A/B 组轮流
+       weekday  按星期轮流
+     老数据没有 mode 时按解析优先级推断（people 有人就是 fixed），行为不变。 */
+  var ROLE_MODES = ["fixed", "ab", "weekday"];
+
+  function roleModeOf(role) {
+    if (!role) return "fixed";
+    if (ROLE_MODES.indexOf(role.mode) >= 0) return role.mode;
+    if (peopleList(role.people).length) return "fixed";
+    if (role.groups) return "ab";
+    if (role.peopleMap || (role.rotation && role.rotation.kind === "weekday-map")) return "weekday";
+    return "fixed";
+  }
+
+  /* 某一种方式下的全部人（去重保序），切到固定时取并集用 */
+  function namesOfMode(role, mode) {
+    var out = [], seen = {};
+    function add(v) {
+      peopleList(v).forEach(function (n) {
+        if (n && !seen[n]) { seen[n] = 1; out.push(n); }
+      });
+    }
+    if (mode === "ab") {
+      if (role.groups) Object.keys(role.groups).forEach(function (k) { add(role.groups[k]); });
+    } else if (mode === "weekday") {
+      if (role.peopleMap) Object.keys(role.peopleMap).forEach(function (k) { add(role.peopleMap[k]); });
+    } else {
+      add(role.people);
+    }
+    return out;
+  }
+
+  /* 切出人方式：返回新 role（不改入参）。changed=false 表示本来就是这种。
+     搬运规则（老师确认过的口径）：
+       · 切到轮流 → 原来那批人放进第一个槽（A 组 / 周一），其余槽留空；
+       · 切到固定 → 各槽的人合成一份（去重保序）；
+     轮换数据一律不删，切回去还在。opts.seed 可指定「以今天生效的人为种子」。 */
+  function setRoleMode(role, mode, opts) {
+    if (!role) return { role: role, changed: false, why: "没有这个岗位" };
+    if (ROLE_MODES.indexOf(mode) < 0) return { role: role, changed: false, why: "未知的出人方式" };
+    var cur = roleModeOf(role);
+    if (cur === mode) return { role: role, changed: false };
+
+    var next = clone(role);
+    var seed = (opts && Array.isArray(opts.seed)) ? peopleList(opts.seed) : namesOfMode(role, cur);
+    next.mode = mode;
+
+    if (mode === "ab") {
+      next.groups = next.groups || {};
+      /* A 组已经排过人就尊重原样，不覆盖老师的布置 */
+      if (!peopleList(next.groups.A).length && seed.length) next.groups.A = seed.slice();
+      next.cycle = Object.assign(
+        { kind: "date-range", current: null, status: "unconfirmed" },
+        next.cycle || {});
+    } else if (mode === "weekday") {
+      next.peopleMap = next.peopleMap || {};
+      var hasAny = Object.keys(next.peopleMap).some(function (k) {
+        return peopleList(next.peopleMap[k]).length > 0;
+      });
+      if (!hasAny && seed.length) next.peopleMap["1"] = seed.slice();
+      next.rotation = Object.assign({ kind: "weekday-map", status: "confirmed" }, next.rotation || {});
+    } else {
+      var union = namesOfMode(role, "ab").concat(namesOfMode(role, "weekday"));
+      var seen = {}, out = [];
+      union.forEach(function (n) { if (!seen[n]) { seen[n] = 1; out.push(n); } });
+      next.people = out.length ? out : seed.slice();
+    }
+    return { role: next, changed: true, moved: seed.slice() };
+  }
+
   function reorderRoles(roles, roleId, delta) {
     var list = (roles || []).map(function (r, i) {
       return { role: r, at: i, order: (typeof r.order === "number" ? r.order : i) };
@@ -992,12 +1147,17 @@
   function cleanRoleOne(r) {
     if (!isPlain(r)) return null;
     var o = clone(r);
+    /* 出人方式只认这三种；写坏了就当没写，让引擎按老优先级推 */
+    if ("mode" in o && ["fixed", "ab", "weekday"].indexOf(o.mode) < 0) delete o.mode;
     if ("people" in o) o.people = peopleList(o.people);
     if (o.peopleMap !== undefined) {
       if (!isPlain(o.peopleMap)) delete o.peopleMap;
       else Object.keys(o.peopleMap).forEach(function (k) {
         var names = peopleList(o.peopleMap[k]);
-        if (names.length) o.peopleMap[k] = names[0];
+        /* 一天一个人时存字符串（老格式），一天多人时存数组：编辑面板允许
+           「周二两个人一起干」，这里不能把它截成一个人。 */
+        if (names.length === 1) o.peopleMap[k] = names[0];
+        else if (names.length > 1) o.peopleMap[k] = names;
         else delete o.peopleMap[k];
       });
     }
@@ -1282,6 +1442,8 @@
     textsLocal: textsLocal, setTextsLocal: setTextsLocal, setupSnapshot: setupSnapshot,
     config: config, patchConfig: patchConfig, resetConfig: resetConfig,
     reorderRoles: reorderRoles,
+    roleModeOf: roleModeOf, setRoleMode: setRoleMode, namesOfMode: namesOfMode,
+    ROLE_MODES: ROLE_MODES,
     peopleGroups: peopleGroups, saveGroup: saveGroup, deleteGroup: deleteGroup,
     upsertGroup: upsertGroup, removeGroup: removeGroup,
     fixGroupKeys: fixGroupKeys, auditPeople: auditPeople,

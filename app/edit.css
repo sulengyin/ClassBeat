@@ -174,11 +174,87 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ep-row .x{color:#7C6A56;font-size:2.1vmin;flex:none}
 
+/* 值日行：人名自己是一个按钮，点谁就直接改谁（0.5.6）。
+   以前一行只有一个人名串 + 一个「换」，想改第二个人要先开面板再找。 */
+.ep-modebadge{flex:none;font-size:1.9vmin;font-weight:800;letter-spacing:.02em;
+              padding:.5vmin 1vmin;border-radius:.9vmin;
+              border:.2vmin solid #6B5641;background:#3D2D20;color:#C1B09A}
+.ep-modebadge.on{border-color:#B0803C;color:#F2C879}
+.ep-who{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:.5vmin;align-items:center}
+.ep-namechip{font:inherit;font-size:2.3vmin;font-weight:700;
+             padding:.7vmin 1.3vmin;border-radius:1vmin;
+             border:.22vmin solid #6B5641;background:#3D2D20;color:#E2D4BC;cursor:pointer}
+.ep-namechip:hover{background:#4A3728;border-color:#FFD64F;color:#FBF3DF}
+.ep-who-empty{font-size:2.2vmin;color:#8E7B66}
+
+/* 出人方式：三个按钮，当前的那种按下去 */
+.ep-modeseg{display:flex;gap:.7vmin;margin:1.6vmin 0 .8vmin}
+.ep-modebtn{font:inherit;font-size:2.2vmin;font-weight:800;flex:1;
+            padding:1.1vmin .6vmin;border-radius:1.1vmin;
+            border:.24vmin solid #6B5641;background:#3D2D20;color:#C1B09A;cursor:pointer}
+.ep-modebtn:hover{background:#4A3728;border-color:#A08A6E}
+.ep-modebtn.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10}
+
+/* 已选区：和候选贴在一起，点一下摘掉一个人 */
+.ep-picked{margin-top:1.4vmin;padding:1.2vmin 1.4vmin;border-radius:1.4vmin;
+           background:#2A1F16;border:.22vmin solid #6B5641}
+.ep-picked-head{display:flex;align-items:center;justify-content:space-between;gap:1vmin}
+.ep-picked-t{font-size:2.2vmin;font-weight:800;color:#FBF3DF}
+.ep-picked-clear{font:inherit;font-size:1.9vmin;padding:.6vmin 1.2vmin;border-radius:.9vmin;
+                 border:.2vmin solid #6B5641;background:transparent;color:#C1B09A;cursor:pointer}
+.ep-picked-clear:hover{border-color:#F08A7E;color:#F08A7E}
+.ep-seats{display:flex;flex-wrap:wrap;gap:.6vmin;margin-top:.9vmin}
+.ep-seats[hidden]{display:none}
+.ep-seat{font:inherit;font-size:2.1vmin;font-weight:800;padding:.8vmin 1.3vmin;
+         border-radius:1vmin;border:.22vmin solid #6B5641;background:#3D2D20;
+         color:#C1B09A;cursor:pointer}
+.ep-seat.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10}
+.ep-pickchips{display:flex;flex-wrap:wrap;gap:.6vmin;margin-top:1vmin}
+.ep-picked-empty{font-size:2.1vmin;color:#8E7B66}
+.ep-pickchip{font:inherit;font-size:2.2vmin;font-weight:700;padding:.8vmin 1.3vmin;
+             border-radius:1vmin;border:.22vmin solid #B0803C;background:#43301F;
+             color:#F2C879;cursor:pointer}
+.ep-pickchip:hover{border-color:#F08A7E;color:#F08A7E}
+.ep-pickchip.focus{border-color:#FFD64F;color:#FFD64F}
+.ep-person-none{grid-column:1/-1;font-size:2.1vmin;color:#8E7B66}
+.ep-picked-warn{font-size:2vmin;font-weight:700;color:#E8B45A;padding-left:.6vmin}
+.ep-seatmix{display:inline-flex;gap:.3vmin;margin-left:.8vmin}
+.ep-seatmix-btn{font:inherit;font-size:1.9vmin;font-weight:800;padding:.5vmin .9vmin;
+                 border-radius:.8vmin;border:.2vmin solid #6B5641;background:transparent;
+                 color:#8E7B66;cursor:pointer}
+.ep-seatmix-btn.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10}
+
 .ep-dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
            width:62vmin;max-height:82vmin;overflow:auto;background:#33251B;
            border:.32vmin solid #F1E3C6;border-radius:2.8vmin;padding:2.8vmin;
            box-shadow:1.4vmin 1.4vmin 0 rgba(0,0,0,.4);z-index:120}
-.ep-dialog.picker{width:78vmin}
+.ep-dialog.picker{width:78vmin;height:82vmin;max-height:none;display:flex;flex-direction:column;
+                  overflow:hidden}
+/* 换人卡片自己绝不滚动：一体机没有滚轮，「要滚才能看见」等于看不见。
+   整卡定高之后，高度富余/不足全由候选区吸收（它内部自己滚），
+   已选、方式、常用组、保存按钮都按内容定高，永远露在外面。 */
+.ep-dialog.picker > .ep-dialog-head,
+.ep-dialog.picker > .ep-input,
+.ep-dialog.picker > .ep-picked,
+.ep-dialog.picker > .ep-modeseg,
+.ep-dialog.picker > .ep-groups,
+.ep-dialog.picker > .ep-actrow{flex:0 0 auto}
+.ep-dialog.picker > .ep-people{flex:1 1 auto;min-height:11vmin;max-height:none;
+                               align-content:start}
+/* 已选和常用组也可能长：各自封顶后内部滚，别把下面的东西挤出去 */
+.ep-dialog.picker > .ep-picked{max-height:26vmin;overflow:auto}
+.ep-dialog.picker > .ep-groups{max-height:9vmin;overflow:auto}
+/* 候选区和已选区会各自内部滚。默认滚动条在 WebView2 里只有几个像素，
+   触摸屏上等于没有——画粗一点，老师才知道下面还有名字。 */
+.ep-dialog.picker > .ep-people::-webkit-scrollbar,
+.ep-dialog.picker > .ep-picked::-webkit-scrollbar,
+.ep-dialog.picker > .ep-groups::-webkit-scrollbar{width:1.1vmin}
+.ep-dialog.picker > .ep-people::-webkit-scrollbar-thumb,
+.ep-dialog.picker > .ep-picked::-webkit-scrollbar-thumb,
+.ep-dialog.picker > .ep-groups::-webkit-scrollbar-thumb{background:#6B5641;border-radius:.6vmin}
+.ep-dialog.picker > .ep-people::-webkit-scrollbar-track,
+.ep-dialog.picker > .ep-picked::-webkit-scrollbar-track,
+.ep-dialog.picker > .ep-groups::-webkit-scrollbar-track{background:transparent}
 .ep-dialog-title{font-size:2.9vmin;font-weight:900;margin-bottom:1.8vmin}
 .ep-dialog .ep-input{margin-bottom:1.3vmin}
 
@@ -195,7 +271,7 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-dialog-close:hover{background:#4A3728;border-color:#A08A6E}
 
 .ep-people{display:grid;grid-template-columns:repeat(4,1fr);gap:.9vmin;margin-top:1.3vmin;
-           max-height:42vmin;overflow:auto}
+           max-height:30vmin;overflow:auto}
 .ep-person{font:inherit;font-size:2.6vmin;padding:1.4vmin .8vmin;border-radius:1.2vmin;
            border:.24vmin solid #6B5641;background:#3D2D20;color:#E2D4BC;cursor:pointer}
 .ep-person.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10;font-weight:900}

@@ -28,6 +28,7 @@ const APP_JS: &[&str] = &[
     "config.js",
     "subjects.js",
     "rhythm.js",
+    "pinyin.js",
     "store.js",
     "runtime.js",
     "screen.js",

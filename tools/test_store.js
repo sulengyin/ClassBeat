@@ -12,7 +12,7 @@ function loadBrowserScript(f) {
   const code = fs.readFileSync(path.join(ROOT, f), "utf8");
   new Function("module", "exports", "require", "self", code)(undefined, undefined, undefined, global);
 }
-["app/data.js", "app/engine/schedule.js", "app/rhythm.js", "app/store.js", "app/runtime.js"].forEach(loadBrowserScript);
+["app/data.js", "app/engine/schedule.js", "app/rhythm.js", "app/pinyin.js", "app/store.js", "app/runtime.js"].forEach(loadBrowserScript);
 
 const D = global.window.RHYTHM_DATA;
 const RT = global.window.Runtime;
@@ -489,6 +489,51 @@ const rrPeople = SCH.resolvePeople({ id: "x2", people: ["丁"], groups: { A: ["�
 check(rrPeople[0].join("、") === "丁" && rrPeople[2] === "people",
   "老师指定的人优先于轮换组与星期表", JSON.stringify(rrPeople));
 
+/* ---------- 出人方式：固定 ⇄ A/B 组 ⇄ 按星期，双向可切（0.5.6） ---------- */
+check(S.roleModeOf({ people: ["甲"] }) === "fixed", "只有人名 = 固定");
+check(S.roleModeOf({ groups: { A: ["甲"] } }) === "ab", "只有分组 = A/B 轮流");
+check(S.roleModeOf({ peopleMap: { "1": "甲" } }) === "weekday", "只有星期表 = 按星期");
+check(S.roleModeOf({ people: ["甲"], groups: { A: ["乙"] } }) === "fixed",
+  "两套数据都在时按引擎的优先级判：有人名就是固定");
+
+const fixToAb = S.setRoleMode({ id: "m1", name: "班牌", people: ["甲", "乙"] }, "ab");
+check(fixToAb.changed && fixToAb.role.mode === "ab"
+      && fixToAb.role.groups.A.join("、") === "甲、乙"
+      && (fixToAb.role.groups.B || []).length === 0,
+  "固定 → A/B：原班人马整批放进 A 组，B 组留空",
+  JSON.stringify(fixToAb.role.groups));
+
+const fixToWd = S.setRoleMode({ id: "m2", name: "班牌", people: ["甲"] }, "weekday");
+check(fixToWd.changed && fixToWd.role.peopleMap["1"].join("、") === "甲",
+  "固定 → 按星期：原班人马放进周一",
+  JSON.stringify(fixToWd.role.peopleMap));
+
+const abToFix = S.setRoleMode({ id: "m3", name: "扫地", groups: { A: ["甲", "乙"], B: ["乙", "丙"] } }, "fixed");
+check(abToFix.changed && abToFix.role.people.join("、") === "甲、乙、丙",
+  "A/B → 固定：两组并集去重",
+  JSON.stringify(abToFix.role.people));
+check(abToFix.role.groups.A.length === 2,
+  "切到固定不删原来的分组，随时能切回去");
+
+const wdToFix = S.setRoleMode({ id: "m4", name: "黑板", peopleMap: { "1": "甲", "3": "乙" } }, "fixed");
+check(wdToFix.role.people.join("、") === "甲、乙",
+  "按星期 → 固定：周一到周五并集",
+  JSON.stringify(wdToFix.role.people));
+
+check(S.setRoleMode({ id: "m5", people: ["甲"] }, "fixed").changed === false,
+  "本来就是固定，再切固定不产生改动");
+check(S.setRoleMode({ id: "m6", people: ["甲"] }, "乱写").changed === false,
+  "不认识的方式直接拒绝，不把岗位写坏");
+
+/* 引擎听 mode：切到 A/B 后，旧 people 留着也不该再生效 */
+const modeEngine = SCH.resolvePeople(
+  { id: "m7", mode: "ab", people: ["旧人"], groups: { A: ["甲"], B: ["乙"] } }, "B", null, 1);
+check(modeEngine[0].join("、") === "乙",
+  "写了 mode 就只按这一种出人，残留的 people 不抢戏", JSON.stringify(modeEngine));
+const modeFixed = SCH.resolvePeople({ id: "m8", mode: "fixed", people: ["甲"], groups: { A: ["乙"] } }, "A", null, 1);
+check(modeFixed[0].join("、") === "甲",
+  "固定方式的岗位，分组数据留着也仍按固定名单出人", JSON.stringify(modeFixed));
+
 /* 临时换人的 people 被写成单个字符串（"乙"）而不是数组：
    以前 applyOverrides 用 r.people.slice()，对字符串来说返回的还是字符串，
    后面 peopleText 调 .map 直接抛错，整条值日条白掉。 */
@@ -558,17 +603,43 @@ check(zzOk.length > 0
   "常驻岗位今天指定了人，每一段都变成有名字（不再是待定）",
   JSON.stringify(zzOk.map(d => d.people)));
 
-/* 打字母按姓氏拼音首字母找人（老师打字慢，能少打就少打） */
+/* 姓名检索：姓和名的拼音都要认，而且姓排在前面（0.5.6） */
 const pyList = [{ name: "张三" }, { name: "李四" }, { name: "赵五" }, { name: "王六" }, { name: "周七" }];
 check(S.rankStudents(pyList, "z").map(s => s.name).join("、") === "张三、赵五、周七",
   "打 z 出所有姓张/赵/周的", S.rankStudents(pyList, "z").map(s => s.name).join("、"));
-check(S.rankStudents(pyList, "L").map(s => s.name).join("、") === "李四",
-  "大写字母也认", S.rankStudents(pyList, "L").map(s => s.name).join("、"));
+check(S.rankStudents(pyList, "L").map(s => s.name).join("、") === "李四、王六",
+  "大写字母也认，名的拼音也算（王六的「六」= liu）",
+  S.rankStudents(pyList, "L").map(s => s.name).join("、"));
 check(S.rankStudents(pyList, "wang").map(s => s.name).join("、") === "王六",
-  "多打几个字母仍按姓氏首字母找，不会突然一个都不出",
-  S.rankStudents(pyList, "wang").map(s => s.name).join("、"));
+  "打完整拼音只出这个姓的人", S.rankStudents(pyList, "wang").map(s => s.name).join("、"));
+check(S.rankStudents(pyList, "zhang").map(s => s.name).join("、") === "张三",
+  "打 zhang 不会把姓赵、姓周的也带出来", S.rankStudents(pyList, "zhang").map(s => s.name).join("、"));
 check(S.rankStudents(pyList, "张").length === 1, "打汉字还是按名字包含匹配");
 check(S.rankStudents([{ name: "欧阳光" }], "o").length === 1, "表里有这个姓就能按首字母找到");
+
+/* 真名单上最容易出错的两个查询：姓的完整拼音、名的拼音 */
+const PY = global.window.Pinyin;
+const PinyinOf = n => (PY ? PY.name(n).join("|") : "");
+const realRoster = D.students.map(s => ({ name: s.name }));
+const zhou = S.rankStudents(realRoster, "zhou", [], 24).map(s => s.name);
+check(zhou.length > 0 && zhou.every(n => n.charAt(0) === "周"),
+  "打 zhou 只出姓周的，不再混进赵、郑、朱", zhou.join("、"));
+const yu = S.rankStudents(realRoster, "yu", [], 24).map(s => s.name);
+check(yu.indexOf("周予宁") >= 0
+      && yu.every(n => PinyinOf(n).split("|").some(s => s.indexOf("yu") === 0)),
+  "打 yu 只出名字里有 yu 音的人（姓杨、姓尤的不再混进来）", yu.join("、"));
+const ning = S.rankStudents(realRoster, "ning", [], 24).map(s => s.name);
+check(ning.indexOf("周予宁") >= 0 && ning.length === 3,
+  "打 ning 能按名的拼音找到三个「宁」", ning.join("、"));
+check(S.rankStudents(realRoster, "lv", [], 24).map(s => s.name).indexOf("吕雨桐") >= 0,
+  "ü 写成 v：打 lv 能找到吕");
+check(S.rankStudents(realRoster, "lu", [], 24).map(s => s.name).indexOf("吕雨桐") >= 0,
+  "打 lu 也能找到吕（老师不一定知道 ü 要打 v）");
+/* 姓排在名前面：打 yu 时，姓于的要排在「予」前面 */
+const yuOrder = [{ name: "于小鱼" }, { name: "周予宁" }, { name: "杨望舒" }];
+check(S.rankStudents(yuOrder, "yu").map(s => s.name).join("、") === "于小鱼、周予宁",
+  "姓 yu 的排在名里有 yu 的前面，姓杨的不掺进来",
+  S.rankStudents(yuOrder, "yu").map(s => s.name).join("、"));
 
 /* 换人面板里「把 X 加进名单」。为了补一个人不该要求老师走完整个向导：
    那条路要点六层，而且入口叫「从岗位表导入」，老师根本找不到。 */

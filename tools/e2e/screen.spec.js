@@ -128,21 +128,26 @@ test("值日岗位指定了人，大屏就显示这个人（不再整组「待�
   await expect(row).toBeVisible();
   await row.click();
 
-  /* 面板现在打开只列「今天这一轮」。这个岗位按 A/B 轮换，今天这一轮是空的，
-     所以老师要先点同组的「值日组」把人带出来——这正是真实动作。 */
+  /* 这个岗位按 A/B 轮换，今天这一轮可能是空的：先点「常用组」把整组带出来，
+     再切成「固定」——这就是老师想「以后就这些人」的走法，一屏里做完。
+     以前固定方向有入口、反过来没有，这里两个方向都要走一遍。 */
   const chip = page.locator(".ep-group-chip").first();
-  await expect(chip, "排班组要出现在「点组带出」里").toBeVisible();
+  await expect(chip, "常用组里要能点出整组人").toBeVisible();
   await chip.click();
-  await expect(page.locator(".ep-pickstatus")).toContainText("已带入");
-  /* 带入的是整组；这里只想固定其中一个人，先「重新挑」清空再点 */
-  await page.locator(".ep-pickstatus-x").click();
-  await expect(page.locator(".ep-person.on")).toHaveCount(0);
+  await expect(page.locator(".ep-pickchip").first()).toBeVisible();
+  await page.locator(".ep-modebtn", { hasText: "固定" }).click();
+  await expect(page.locator(".ep-seats")).toBeHidden();
+
+  /* 只想固定其中一个人：清空后点他 */
+  await page.locator(".ep-picked-clear").click();
+  await expect(page.locator(".ep-pickchip")).toHaveCount(0);
 
   const person = page.locator(".ep-person").first();
   const name = (await person.innerText()).trim();
   expect(name, "候选里要有人名").not.toBe("");
   await person.click();
-  await page.locator(".ep-persist").click();
+  await expect(page.locator(".ep-pickchip")).toHaveCount(1);
+  await page.locator(".ep-primary").click();
   await expect(page.locator("#epFlash")).toContainText(name);
   await page.locator(".ep-close").click();
 
@@ -610,18 +615,16 @@ test("名单在向导里单独一步能录能存，换人时打一个字就找�
   await search.fill("子航");
   await expect(page.locator(".ep-person", { hasText: "周子航" })).toBeVisible();
 
-  /* 打开时不预选：没选就不该显示「已选 N 人」 */
+  /* 点组：整组人直接进已选区，候选人里在岗的有按下态 */
   await search.fill("");
-  await expect(page.locator(".ep-person.on")).toHaveCount(0);
-  await expect(page.locator(".ep-pickstatus")).toContainText(/今天这一轮|今天还没排人/);
-
-  /* 点组：chip 变成按下的样子，状态行写明带入哪一组 */
   const chip = page.locator(".ep-group-chip").first();
   await chip.click();
-  await expect(page.locator(".ep-group-chip").first()).toHaveClass(/\bon\b/);
-  await expect(page.locator(".ep-pickstatus")).toContainText("已带入");
-  expect(await page.locator(".ep-person.on").count(), "带入后整组被选上").toBeGreaterThan(0);
-  await expect(page.locator(".ep-pickstatus-x")).toBeVisible();
+  expect(await page.locator(".ep-pickchip").count(), "点组把整组带进已选区").toBeGreaterThan(0);
+  expect(await page.locator(".ep-person.on").count(), "在岗的人在候选里按下去").toBeGreaterThan(0);
+  /* 点已选区的人名就能摘掉一个人，不用关窗重来 */
+  const before = await page.locator(".ep-pickchip").count();
+  await page.locator(".ep-pickchip").first().click();
+  await expect(page.locator(".ep-pickchip")).toHaveCount(before - 1);
 
   expect(errors, "控制台不应有报错").toEqual([]);
 });
