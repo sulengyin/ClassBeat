@@ -96,24 +96,86 @@ pub fn run(opt: &Options) -> Result<(), String> {
 ///   两者现在不是一回事；
 /// - 超过 `max_chars` 就在最近的「；」处截断并补省略号，不硬切半个句子。
 pub fn notes_from_changelog(text: &str, version: &str, max_chars: usize) -> String {
-    let mut items: Vec<String> = Vec::new();
-    let mut in_section = false;
-    let mut seen_heading = false;
+    let sections = split_sections(text);
 
+    // 先按版本号找。CHANGELOG 顶部常留一个空的「## 未发布」段，
+    // 老实现只取第一个 `## ` 小节，抓到它就成了 "0.5.4："（0.5.3、0.5.4 连续两版都这样）。
+    let mut items: Option<Vec<String>> = None;
+    if !version.is_empty() {
+        if let Some((_, body)) = sections.iter().find(|(h, _)| heading_matches_version(h, version)) {
+            let got = collect_items(body);
+            if got.is_empty() {
+                eprintln!("警告：CHANGELOG 的 {version} 小节没有条目，退用最近一个有内容的小节");
+            }
+            items = Some(got);
+        }
+    }
+
+    // 版本号找不到（或该小节空）：退到第一个有内容的小节，别让老师看到空说明。
+    let items = items
+        .filter(|v| !v.is_empty())
+        .or_else(|| {
+            sections
+                .iter()
+                .map(|(_, body)| collect_items(body))
+                .find(|v| !v.is_empty())
+        })
+        .unwrap_or_default();
+
+    // 每条末尾的句号/分号去掉，否则拼起来会出现「。；」
+    let cleaned: Vec<String> = items
+        .iter()
+        .map(|s| {
+            strip_inline_markup(s)
+                .trim_end_matches(['。', '；', '，', '、', ' '])
+                .to_string()
+        })
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut body = cleaned.join("；");
+    if body.ends_with('。') || body.ends_with('；') {
+        body.pop();
+    }
+
+    let prefix = if version.is_empty() {
+        String::new()
+    } else {
+        format!("{version}：")
+    };
+    truncate_sentence(&format!("{prefix}{body}"), max_chars)
+}
+
+/// 按 `## ` 切小节。第一个小标题之前的内容（一级标题、引言）丢掉。
+fn split_sections(text: &str) -> Vec<(String, Vec<String>)> {
+    let mut out: Vec<(String, Vec<String>)> = Vec::new();
     for raw in text.lines() {
         let line = raw.trim_end();
-        if line.starts_with("## ") {
-            if seen_heading {
-                break; // 第二节开始，停
-            }
-            seen_heading = true;
-            in_section = true;
+        if let Some(heading) = line.strip_prefix("## ") {
+            out.push((heading.to_string(), Vec::new()));
             continue;
         }
-        if !in_section {
-            continue;
+        if let Some(last) = out.last_mut() {
+            last.1.push(line.to_string());
         }
-        let t = line.trim();
+    }
+    out
+}
+
+/// `## 0.5.4 — 2026-11-24` 匹配 "0.5.4"；`## 0.5.40` 不匹配 "0.5.4"；
+/// `## 未发布` 不匹配任何版本号。
+fn heading_matches_version(heading: &str, version: &str) -> bool {
+    let Some(first) = heading.split_whitespace().next() else {
+        return false;
+    };
+    first.trim_end_matches(['：', ':', '—', '-']) == version
+}
+
+/// 把一个小节的正文压成条目：`- ` 开头算一条，折行的续行并回上一条。
+fn collect_items(lines: &[String]) -> Vec<String> {
+    let mut items: Vec<String> = Vec::new();
+    for raw in lines {
+        let t = raw.trim();
         if t.is_empty() || t == "---" {
             continue;
         }
@@ -141,29 +203,7 @@ pub fn notes_from_changelog(text: &str, version: &str, max_chars: usize) -> Stri
             items.push(t.to_string());
         }
     }
-
-    // 每条末尾的句号/分号去掉，否则拼起来会出现「。；」
-    let cleaned: Vec<String> = items
-        .iter()
-        .map(|s| {
-            strip_inline_markup(s)
-                .trim_end_matches(['。', '；', '，', '、', ' '])
-                .to_string()
-        })
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    let mut body = cleaned.join("；");
-    if body.ends_with('。') || body.ends_with('；') {
-        body.pop();
-    }
-
-    let prefix = if version.is_empty() {
-        String::new()
-    } else {
-        format!("{version}：")
-    };
-    truncate_sentence(&format!("{prefix}{body}"), max_chars)
+    items
 }
 
 /// `**粗体**` / `` `代码` `` / `[文字](url)` → 纯文字，连续空白压成一个。
@@ -285,4 +325,60 @@ fn pick_artifact(dir: &Path, version: &str) -> Result<PathBuf, String> {
         return Ok(hit[0].clone());
     }
     Ok(cands[0].clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 复刻真实 CHANGELOG 的形状：顶部留了一个空的「## 未发布」段。
+    const DOC: &str = "\
+# 更新记录
+
+老师能直接感知到的变化写在这里；内部重构不列。
+
+## 未发布
+
+## 0.5.4 — 2026-11-24
+
+- **图标不再显示旧的**：读独立 ico。
+- **查清了丢数据这件事**：存在 LocalAppData。
+  更新不会碰它。
+
+## 0.5.3 — 2026-11-23
+
+- **名单能就地增删**：点一下选中。
+";
+
+    #[test]
+    fn picks_section_by_version_not_first_heading() {
+        // 老实现会抓到空的「## 未发布」，产出 "0.5.4：" 就没了。
+        let n = notes_from_changelog(DOC, "0.5.4", 300);
+        assert!(n.starts_with("0.5.4："), "实际：{n}");
+        assert!(n.contains("图标"), "实际：{n}");
+        assert!(n.contains("LocalAppData。更新不会碰它"), "折行要接上：{n}");
+        assert!(!n.contains("名单能就地增删"), "不能串到下一版：{n}");
+    }
+
+    #[test]
+    fn falls_back_to_first_non_empty_section() {
+        let n = notes_from_changelog(DOC, "9.9.9", 300);
+        assert!(n.starts_with("9.9.9："));
+        assert!(n.contains("图标"), "找不到版本时退到最近有内容的：{n}");
+    }
+
+    #[test]
+    fn empty_version_drops_prefix() {
+        let n = notes_from_changelog(DOC, "", 300);
+        assert!(!n.starts_with('：'));
+        assert!(n.starts_with("图标不再显示旧的"));
+    }
+
+    #[test]
+    fn heading_version_matches_exactly() {
+        assert!(heading_matches_version("0.5.4 — 2026-11-24", "0.5.4"));
+        assert!(heading_matches_version("0.5.4", "0.5.4"));
+        assert!(!heading_matches_version("0.5.40 — 2026-11-24", "0.5.4"));
+        assert!(!heading_matches_version("未发布", "0.5.4"));
+    }
 }

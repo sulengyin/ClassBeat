@@ -277,6 +277,17 @@ body[data-setup="1"] .warn{display:none}
   border-width:.22vmin;border-color:#C9B79E;background:#FFFDF6;
   box-shadow:none;font-size:2vmin;padding:1.1vmin 1.9vmin;
 }
+/* 设置页的「本机备份与恢复」：一行一天，右边一个恢复按钮。
+   行本身不可点——触摸屏上一划就误恢复，代价太大；只有按钮能恢复。 */
+.setup-backup{margin:2.6vmin 0 0}
+.setup-backup-list{display:flex;flex-direction:column;gap:1vmin;margin:1vmin 0 0}
+.setup-backup-row{
+  display:flex;align-items:center;justify-content:space-between;gap:1.4vmin;
+  flex-wrap:wrap;padding:1.1vmin 1.5vmin;border-radius:1.1vmin;
+  border:.22vmin solid #D8C8AE;background:#FFFDF6;
+}
+.setup-backup-row .setup-p{margin:0;font-size:1.9vmin;color:#4A3524}
+.setup-backup-row .setup-btn{font-size:1.9vmin;padding:1vmin 1.6vmin}
 .setup-roster-list{
   display:flex;flex-wrap:wrap;gap:.9vmin;align-content:flex-start;
   max-height:30vmin;overflow:auto;

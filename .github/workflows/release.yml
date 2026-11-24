@@ -108,7 +108,8 @@ jobs:
             --version "$version" \
             --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME" \
             --out desktop/dist/desktop/latest.json \
-            --notes-file CHANGELOG.md
+            --notes-file CHANGELOG.md \
+            --notes-max 300
           cat desktop/dist/desktop/latest.json
 
       # 单文件演示版：整个大屏内联成一个 html，双击就开，不用安装。

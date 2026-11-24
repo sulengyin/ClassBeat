@@ -1,7 +1,7 @@
 {
   "name": "classbeat-desktop",
   "private": true,
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "ClassBeat 班级节律屏 · 桌面壳（Tauri 2）",
   "scripts": {
     "stage": "cargo run --quiet --release --manifest-path tools-rs/Cargo.toml -- stage --data sample",

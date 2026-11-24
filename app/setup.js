@@ -3175,19 +3175,37 @@
       render();
     });
     acts.appendChild(discard);
-
-    var out = el("button", "setup-btn", "导出设置 JSON");
-    out.type = "button";
-    out.addEventListener("click", exportAll);
-    acts.appendChild(out);
-
-    var inp = el("button", "setup-btn", "导入设置 JSON");
-    inp.type = "button";
-    inp.addEventListener("click", pickImport);
-    acts.appendChild(inp);
     p.appendChild(acts);
 
-    p.appendChild(el("p", "setup-p", "导出整份设置。换电脑后点「导入设置 JSON」搬过去。"));
+    /* 本机备份与恢复：老师真正要的是「改坏了能退回去」，不是「导个文件」。
+       大屏开着时 backup.js 每天自动落一份快照，这里只负责列出来、点一下恢复。 */
+    var bsec = el("div", "setup-backup");
+    bsec.appendChild(el("h3", "setup-h", "本机备份与恢复"));
+    bsec.appendChild(el("p", "setup-p",
+      "班级、名单、课表都存在这台电脑上，大屏开着时每天自动存一份。"
+      + "更新版本不用做任何事，数据会自己留着。"));
+    var bHost = el("div", "setup-backup-list");
+    bsec.appendChild(bHost);
+    p.appendChild(bsec);
+    mountBackupList(bHost);
+
+    /* 换电脑才用：同一台电脑上升级不需要导文件。 */
+    var msec = el("div", "setup-backup");
+    msec.appendChild(el("h3", "setup-h", "换电脑时用"));
+    msec.appendChild(el("p", "setup-p",
+      "要把配置带到另一台电脑（或换一体机），才用导出 / 导入。"));
+    var macts = el("div", "setup-actions");
+    var out = el("button", "setup-btn", "导出成文件");
+    out.type = "button";
+    out.addEventListener("click", exportAll);
+    macts.appendChild(out);
+
+    var inp = el("button", "setup-btn", "从文件导入");
+    inp.type = "button";
+    inp.addEventListener("click", pickImport);
+    macts.appendChild(inp);
+    msec.appendChild(macts);
+    p.appendChild(msec);
 
     /* 版本与更新：入口放在设置最后一页，和「导出/导入」同属维护动作。 */
     var upBox = el("div", "setup-update");
@@ -3442,6 +3460,54 @@
     state.flash = "已恢复到这轮修改前（只动了岗位和文案）。";
     saveDraft();
     render();
+  }
+
+  /* ---------- 本机备份 ----------
+     能力都在 backup.js 里（list / restore），这里只负责画。
+     不弹窗、不阻断：读不到备份就说读不到，老师照样能用向导。 */
+  function mountBackupList(host) {
+    var B = root.Backup;
+    if (!B || !B.list) {
+      host.appendChild(el("p", "setup-p", "当前打开方式读不到本机备份。"));
+      return;
+    }
+    if (B.mode && B.mode() !== "http") {
+      host.appendChild(el("p", "setup-p",
+        "现在是双击文件打开的，写不进磁盘——用桌面版（桌面上的 ClassBeat 图标）"
+        + "打开才有每日备份。"));
+      return;
+    }
+    host.appendChild(el("p", "setup-p", "正在读本机备份…"));
+    B.list(function (items) {
+      host.textContent = "";
+      if (!items || !items.length) {
+        host.appendChild(el("p", "setup-p",
+          "还没有备份。大屏开着就会每天自动存一份，留最近 14 天。"));
+        return;
+      }
+      items.forEach(function (it) {
+        var row = el("div", "setup-backup-row");
+        row.appendChild(el("span", "setup-p",
+          it.day + " · " + (it.klass || "未命名班")
+          + " · " + Math.max(1, Math.round((it.size || 0) / 1024)) + " KB"));
+        var b = el("button", "setup-btn", "恢复到这天");
+        b.type = "button";
+        b.addEventListener("click", function () {
+          b.disabled = true;
+          B.restore(it.day, function (r) {
+            if (r && r.ok) {
+              if (root.location && root.location.reload) root.location.reload();
+              else render();
+            } else {
+              b.disabled = false;
+              alertBox((r && r.why) || "这份备份打不开。");
+            }
+          });
+        });
+        row.appendChild(b);
+        host.appendChild(row);
+      });
+    });
   }
 
   function exportAll() {

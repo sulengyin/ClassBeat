@@ -84,15 +84,21 @@ pub fn run() {
             logging::info(&format!("程序目录 {}", paths.install_root.display()));
             logging::info(&format!("数据目录 {}", paths.data.display()));
 
-            // WebView2 的 localStorage / IndexedDB 默认落在 exe 同级目录，
-            // NSIS 覆盖安装时被清——这是更新后班级、名单、课表全部丢失的根因。
-            // 把它指到 %APPDATA%\ClassBeat\webview，与 hooks.nsh 保护范围一致。
-            // 环境变量是进程级的，必须在 WebView 创建之前设（server::boot 还没
-            // 起，窗口还没开，此刻最安全）。
-            let webview_data = paths.data.join("webview");
-            let _ = std::fs::create_dir_all(&webview_data);
-            std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &webview_data);
-            logging::info(&format!("WebView2 数据目录 {}", webview_data.display()));
+            // WebView2 的 localStorage / IndexedDB 由 Tauri 2 固定在
+            // app_local_data_dir()（%LOCALAPPDATA%\cn.classbeat.app）。
+            // 它在安装目录之外，NSIS 覆盖安装和更新都不碰，所以老师的班级、
+            // 名单、课表不会因为升级消失。
+            //
+            // 别再用 WEBVIEW2_USER_DATA_FOLDER 试图换目录：Tauri 会显式把
+            // data_directory 传给 WebView2，环境变量被忽略
+            // （tauri-2.12.7/src/manager/webview.rs:559）。真要换目录，只能给
+            // 每个 WebviewWindowBuilder 调 .data_directory()，三个窗口必须是同一个。
+            //
+            // 日志里打 Tauri 解析出的同一个路径：真机排查时一眼能对上是哪份数据。
+            match app.path().app_local_data_dir() {
+                Ok(dir) => logging::info(&format!("WebView2 数据目录 {}", dir.display())),
+                Err(e) => logging::warn(&format!("WebView2 数据目录解析失败：{e}")),
+            }
 
             app.manage(AppState {
                 paths,

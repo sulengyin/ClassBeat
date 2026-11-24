@@ -2073,15 +2073,23 @@
      得先把它导出来——不然对面拿到的永远是出厂文案。 */
   function renderBackup() {
     var sec = h("section", "ep-sec wide");
-    sec.appendChild(h("h3", null, "带走这些修改"));
+    sec.appendChild(h("h3", null, "本机备份与恢复"));
     sec.appendChild(h("p", "ep-note",
-      "这里改的内容只存在这台机器上，重新打包、换一体机都会没有。"
-      + "导出后把文件（或下面这段文字）发给我，就能烤进新包里。"));
+      "班级、名单、课表都存在这台电脑上，大屏开着时每天自动存一份快照。"
+      + "改坏了、误删了，点下面的「恢复」回到那一天就行——更新版本也不需要做任何事。"));
+
+    /* 先给「恢复」：大多数时候老师要的是把配置找回来，不是搬去别处。 */
+    renderAutoBackup(sec);
+
+    sec.appendChild(h("h3", null, "换电脑时用"));
+    sec.appendChild(h("p", "ep-note",
+      "要把配置带到另一台电脑（或换一体机），才用下面这两种方式。"
+      + "同一台电脑上升级，数据会自己留着，不用导文件。"));
 
     var text = JSON.stringify(S.exportAll(), null, 2);
 
     var row = h("div", "ep-backup");
-    var out = h("button", "ep-mini", "导出设置");
+    var out = h("button", "ep-mini", "导出成文件");
     out.addEventListener("click", function () { doExport(text); });
     row.appendChild(out);
 
@@ -2090,7 +2098,7 @@
     file.accept = ".json,application/json";
     file.style.display = "none";
     file.addEventListener("change", function () { doImport(file); });
-    var inp = h("button", "ep-mini", "导入设置");
+    var inp = h("button", "ep-mini", "从文件导入");
     inp.addEventListener("click", function () { file.click(); });
     row.appendChild(inp);
     row.appendChild(file);
@@ -2113,8 +2121,6 @@
     ta.readOnly = true;
     ta.value = text;
     sec.appendChild(ta);
-
-    renderAutoBackup(sec);
 
     bodyEl.appendChild(sec);
     renderAudit(sec);
@@ -2169,8 +2175,8 @@
         box.appendChild(warn);
       }
       box.appendChild(h("p", "ep-note",
-        "当前是双击文件打开，写不进磁盘。自动备份只能在「打开大屏.bat」的"
-        + "8765 地址下落到本机；这里最多留一格浏览器副本。"));
+        "当前是双击文件打开的，写不进磁盘。用桌面版（桌面上的 ClassBeat 图标）"
+        + "打开才有每日备份；这里最多留一格浏览器副本。"));
       return;
     }
 

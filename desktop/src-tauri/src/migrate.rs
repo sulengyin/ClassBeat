@@ -5,7 +5,7 @@
 //! 这里是第二道保险：万一安装器被跳过（绿色版、手动覆盖装），
 //! 首次运行也能把老师的班级数据接过来——只复制，绝不覆盖、绝不删除。
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tauri::{AppHandle, Manager};
 
@@ -36,12 +36,14 @@ pub fn run_at_startup(app: &AppHandle) {
             ));
         }
     }
-    // WebView2 数据迁移：旧版没设 WEBVIEW2_USER_DATA_FOLDER，localStorage /
-    // IndexedDB 落在 exe 同级的默认目录，NSIS 覆盖安装时被清。新版已把它
-    // 指到 %APPDATA%\ClassBeat\webview，这里把旧数据搬过来。
-    // 必须在 WebView 创建之前做（server::boot 还没起窗口），否则文件被锁。
-    migrate_webview_data(&paths);
 }
+
+// WebView2 的 localStorage 不需要这里搬。它由 Tauri 2 固定在
+// app_local_data_dir()（%LOCALAPPDATA%\cn.classbeat.app），在安装目录之外，
+// NSIS 覆盖安装从不碰它。0.5.4 曾试图用 WEBVIEW2_USER_DATA_FOLDER 把数据
+// 挪到 %APPDATA%\ClassBeat\webview，那是无效的：Tauri 会显式把 data_directory
+// 传给 WebView2，环境变量被忽略（tauri-2.12.7/src/manager/webview.rs:559）。
+// 要换目录只能用 WebviewWindowBuilder::data_directory()。
 
 pub fn migrate(paths: &Paths) -> Report {
     let mut copied = 0;
@@ -82,68 +84,6 @@ fn copy_tree(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-/// 把旧版 WebView2 的数据搬到新目录（%APPDATA%\ClassBeat\webview）。
-/// 旧版没设 WEBVIEW2_USER_DATA_FOLDER，WebView2 把数据建在 exe 同级的
-/// `{exe_name}.exeWebview` 目录里。新版换目录后那个位置就废弃了——
-/// 不搬的话，从 0.5.x 升级上来老师会发现自己的班级、名单全没了。
-fn migrate_webview_data(paths: &Paths) {
-    let new_dir = paths.data.join("webview");
-    // 新目录已有 EBWebView 子目录：已迁移过或有数据，不动。
-    if new_dir.join("EBWebView").is_dir() {
-        return;
-    }
-    for src in legacy_webview_candidates(paths) {
-        let eb = src.join("EBWebView");
-        if !eb.is_dir() {
-            continue;
-        }
-        match copy_tree(&eb, &new_dir.join("EBWebView")) {
-            Ok(()) => {
-                logging::info(&format!(
-                    "迁移 WebView2 数据：{} → {}",
-                    src.display(),
-                    new_dir.display()
-                ));
-                return;
-            }
-            Err(e) => logging::warn(&format!(
-                "迁移 WebView2 数据失败（{} → {}）：{e}",
-                src.display(),
-                new_dir.display()
-            )),
-        }
-    }
-    // 找不到旧目录：全新安装，或旧数据已被 NSIS 清掉。
-    // 不报错——WebView2 会在新目录建空数据，老师进向导重新配。
-}
-
-/// 旧版没设 WEBVIEW2_USER_DATA_FOLDER 时，WebView2 把数据建在几个可能的
-/// 位置。不确定具体在哪（取决于安装模式和 Tauri 版本），所以列候选，
-/// 找到第一个含 EBWebView 子目录的就用。
-fn legacy_webview_candidates(paths: &Paths) -> Vec<PathBuf> {
-    let mut out: Vec<PathBuf> = Vec::new();
-    // WebView2 原生默认：{exe_dir}/{exe_name}.exeWebview
-    if let Ok(exe) = std::env::current_exe() {
-        if let (Some(dir), Some(stem)) =
-            (exe.parent(), exe.file_stem().and_then(|s| s.to_str()))
-        {
-            out.push(dir.join(format!("{stem}.exeWebview")));
-        }
-    }
-    // Tauri 可能用 identifier（cn.classbeat.app）作目录名，落在 %APPDATA%
-    if let Some(appdata) = std::env::var_os("APPDATA") {
-        out.push(PathBuf::from(&appdata).join("cn.classbeat.app"));
-    }
-    // 0.3.x 旧版在 %LOCALAPPDATA%\ClassBeat
-    out.push(paths.legacy.join("classbeat.exeWebview"));
-    if let Some(localappdata) = std::env::var_os("LOCALAPPDATA") {
-        let la = PathBuf::from(localappdata);
-        out.push(la.join("Programs").join("ClassBeat").join("classbeat.exeWebview"));
-        out.push(la.join("ClassBeat").join("classbeat.exeWebview"));
-    }
-    out
 }
 
 fn is_program_dir(p: &Path) -> bool {

@@ -1646,10 +1646,14 @@ global.Remote.info.phone = "";
 
   next()._h.click();
   const doneBtns = box.querySelectorAll(".setup-btn").map(b => b.textContent);
-  check(doneBtns.indexOf("导出设置 JSON") >= 0, "完成页能导出设置",
+  check(doneBtns.indexOf("导出成文件") >= 0, "完成页能把设置导出成文件",
     doneBtns.join(" / "));
-  check(doneBtns.indexOf("导入设置 JSON") >= 0, "完成页能导入另一台机器的设置",
+  check(doneBtns.indexOf("从文件导入") >= 0, "完成页能从另一台机器导入设置",
     doneBtns.join(" / "));
+  /* 主路径是「本机备份与恢复」，导出/导入只是换电脑时的次要手段：
+     面板必须自己出现，不能藏在 JSON 文本框后面。 */
+  check(box.querySelector(".setup-backup") !== null, "完成页有本机备份与恢复面板",
+    String(!!box.querySelector(".setup-backup")));
 
   /* B4a：最后一步列出岗位卡片和可折叠的文案分组，一共五步 */
   const roleCards = box.querySelectorAll(".setup-role");
