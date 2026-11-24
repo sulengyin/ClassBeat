@@ -271,10 +271,20 @@ test("向导作息的时间框不裁字、不溢出格子、表头和列对齐�
         }
       }
 
-      /* 表头和数据行是两份独立的网格（各有自己的 grid-template-columns），
-         只把其中一份的列宽改宽，上下立刻错位——这次修 bug 时真踩到了。 */
+      /* 表头和数据行是两份独立的网格（各有自己的 grid-template-columns）。
+         列宽若按内容解析（auto / max-content），两份会解析出不同结果——数据行里
+         有输入框、表头里只有「开始」两个字，字体一换就差出几十像素，1fr 那一列
+         跟着让位，表头整体错位。所以这里直接比两行的实际列宽，而不是只看对齐：
+         这张截图式的判据不依赖字体，Windows 本地和 Linux CI 能给出同样结论。 */
       const head = box.querySelector(".setup-row.head");
       const data = rows.find((r) => !r.classList.contains("head"));
+      const tracks = (el) => getComputedStyle(el).gridTemplateColumns.split(" ").map((v) => Math.round(parseFloat(v) * 10) / 10);
+      const headTracks = head ? tracks(head) : [];
+      const dataTracks = data ? tracks(data) : [];
+      const trackDrift = headTracks.length === dataTracks.length
+        ? headTracks.map((v, i) => Math.round(Math.abs(v - dataTracks[i]) * 10) / 10)
+        : [999];
+
       const misalign = head && data
         ? [...head.children].slice(2).map((c, i) => {
             const a = c.getBoundingClientRect().left;
@@ -283,12 +293,14 @@ test("向导作息的时间框不裁字、不溢出格子、表头和列对齐�
           })
         : [];
 
-      return { inputs, issues, misalign, overflowX: box.scrollWidth - box.clientWidth };
+      return { inputs, issues, misalign, trackDrift, overflowX: box.scrollWidth - box.clientWidth };
     });
 
     const where = vp.width + "×" + vp.height;
     expect(report.inputs, where + "：作息表里应该有开始 / 结束两组时间框").toBeGreaterThan(1);
     expect(report.issues, where + " 的时间框没落在自己的格子里").toEqual([]);
+    expect(Math.max(0, ...report.trackDrift),
+      where + " 表头和数据行的列宽不一致（两行是独立网格，列宽按内容解析就会各算各的）").toBeLessThanOrEqual(1);
     expect(Math.max(0, ...report.misalign),
       where + " 表头「开始 / 结束」和数据列没对齐").toBeLessThanOrEqual(2);
     expect(report.overflowX,

@@ -102,16 +102,21 @@ body[data-setup="1"] .warn{display:none}
 .setup-tpl span{display:block;font-size:1.9vmin;line-height:1.55;color:#6B5545}
 
 /* ---------- 作息表 ---------- */
-.setup-blocks{border:.26vmin solid #D8C8AE;border-radius:1.4vmin;overflow:hidden}
+.setup-blocks{
+  border:.26vmin solid #D8C8AE;border-radius:1.4vmin;overflow:hidden;
+  /* 开始 / 结束两列的宽度只在这里定义一次，表头和数据行都引用它。
+     为什么不能各算各的：.setup-row 是一条一条独立的网格（每行自带边框和斑马纹），
+     列宽若写成 auto，两份网格会按各自内容各自解析——数据行里有输入框、表头里只有
+     「开始」两个字，字体一换（Linux / 一体机的 WebView2 / 不同字号）就解析出不同
+     宽度，1fr 那一列跟着让位，表头于是整体错位（CI 上实测偏 36.3px，Windows 上恰好为 0，
+     所以本地怎么点都是对的）。
+     也不能写死成小格子：以前是 9vmin 的列塞 11vmin 的输入框，输入框必然比列宽，
+     往右溢出 15~21px，最右一列被下面的 overflow:hidden 切掉（真机反馈 2026-11-24）。
+     定成一个够用的固定值，两行同一套列宽，输入框 width:100% 填满它，两头都不会出错。 */
+  --tt-col:14vmin;
+}
 .setup-row{
-  /* 开始 / 结束两列按「至少 13.5vmin，内容大就跟着变大」来定，不写死成小格子。
-     以前是 9vmin 的固定列，里面塞的是 11vmin 宽的 input——输入框必然比列宽，
-     往右溢出 15~21px，结束时间被表格右边框切掉（真机反馈 2026-11-24）。
-     13.5vmin 是按实测来的：type=time 的原生宽度约 11.5vmin（随字号等比放大），
-     留 2vmin 余量；编辑面板的 .tt-time 用的也是这个数，已在真机上验过。
-     下限写成 minmax(...auto) 而不是固定值，表头和数据行才是同一套列宽——
-     两行各自是独立网格，只要有一行被内容撑开，上下就对不齐了。 */
-  display:grid;grid-template-columns:7vmin minmax(0,1fr) minmax(13.5vmin,auto) minmax(13.5vmin,auto);
+  display:grid;grid-template-columns:7vmin minmax(0,1fr) var(--tt-col) var(--tt-col);
   align-items:center;gap:1vmin;
   padding:.7vmin 1.2vmin;border-bottom:.16vmin solid #E8DCC6;
   font-size:2vmin;
@@ -124,8 +129,8 @@ body[data-setup="1"] .warn{display:none}
 .setup-row .k{font-weight:800;color:#6B5545}
 .setup-row .t{display:flex;align-items:center;gap:.4vmin}
 .setup-row input{
-  /* 铺满所在的列，不再自带宽度：列宽已经是「不小于 13.5vmin」，
-     输入框再自己定一个宽度，两套尺寸迟早对不上（就是上面说的 9vmin/11vmin）。 */
+  /* 铺满所在的列，不再自带宽度。列宽已经由 --tt-col 定好，输入框再自带一个宽度，
+     就会出现「框比列宽」的老问题；min-width:0 让它在任何字体下都跟着列走，不会撑破。 */
   width:100%;min-width:0;font-family:inherit;font-size:2vmin;
   font-variant-numeric:tabular-nums;
   background:#FFFDF6;border:.22vmin solid #C9B79E;border-radius:.8vmin;
