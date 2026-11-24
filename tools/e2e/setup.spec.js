@@ -220,3 +220,80 @@ test("岗位表核对时漏了人，打一个字或姓氏拼音首字母就能�
 
   expect(errors, "控制台不应有报错").toEqual([]);
 });
+
+test("向导作息的时间框不裁字、不溢出格子、表头和列对齐（真机 2026-11-24）", async ({ page }) => {
+  /* 真机反馈：「结束」那一列的时间被表格右边框切掉，屏幕越小越明显。
+     根因是 .setup-row 的列宽写死 9vmin，而里面 input 写死 11vmin——输入框天生
+     比列宽 15~21px，必然往右溢出，最右一列再被 .setup-blocks 的 overflow:hidden
+     切掉。编辑面板早就有一条同类用例（screen.spec.js「作息时间框不裁字」），
+     但它量的是 .tt-time，向导用的是 .setup-row —— 所以这个 bug 一路绿着上线了。
+
+     这条按「输入框必须完整落在自己的格子里」来验，不钉具体的 vmin 数值：
+     字号是 vmin 算的，换个分辨率、换个字号，写死的期望值立刻失效。 */
+  await page.route("**/app/data.js", (route) =>
+    route.fulfill({ status: 200, contentType: "application/javascript", body: "window.RHYTHM_DATA={};" }));
+
+  const errors = await openScreen(page, AT);
+  await page.locator(".setup-field input").nth(1).fill("作息检查班");
+  await next(page); // 名单
+  await next(page); // 作息
+  await expect(page.locator(".setup-blocks .setup-row").first()).toBeVisible();
+
+  // 两种屏幕都量：1920 是一体机主流，1366 是老机型，vmin 更小、最容易挤
+  for (const vp of [{ width: 1920, height: 1080 }, { width: 1366, height: 768 }]) {
+    await page.setViewportSize(vp);
+
+    const report = await page.evaluate(() => {
+      const box = document.querySelector(".setup-blocks");
+      const bb = box.getBoundingClientRect();
+      const rows = [...box.querySelectorAll(".setup-row")];
+      const issues = [];
+      let inputs = 0;
+
+      for (const row of rows) {
+        for (const inp of row.querySelectorAll("input")) {
+          inputs += 1;
+          const r = inp.getBoundingClientRect();
+          const cell = inp.parentElement.getBoundingClientRect();
+          const fs = parseFloat(getComputedStyle(inp).fontSize);
+          const tag = "第 " + [...rows].indexOf(row) + " 行";
+          if (r.right > cell.right + 1) {
+            issues.push(tag + " 溢出所在列 " + (r.right - cell.right).toFixed(1) + "px");
+          }
+          if (r.right > bb.right + 1) {
+            issues.push(tag + " 超出表格右边框 " + (r.right - bb.right).toFixed(1) + "px（会被切掉）");
+          }
+          // 08:10 是 5 个字符；等宽数字 + 时钟图标，留一点余量
+          if (r.width < fs * 4.6) {
+            issues.push(tag + " 框宽 " + r.width.toFixed(1) + " 装不下 08:10（字号 " + fs + "）");
+          }
+          if (inp.scrollWidth > inp.clientWidth + 1) issues.push(tag + " 框内文字被裁");
+        }
+      }
+
+      /* 表头和数据行是两份独立的网格（各有自己的 grid-template-columns），
+         只把其中一份的列宽改宽，上下立刻错位——这次修 bug 时真踩到了。 */
+      const head = box.querySelector(".setup-row.head");
+      const data = rows.find((r) => !r.classList.contains("head"));
+      const misalign = head && data
+        ? [...head.children].slice(2).map((c, i) => {
+            const a = c.getBoundingClientRect().left;
+            const b = data.children[i + 2].getBoundingClientRect().left;
+            return Math.round(Math.abs(a - b) * 10) / 10;
+          })
+        : [];
+
+      return { inputs, issues, misalign, overflowX: box.scrollWidth - box.clientWidth };
+    });
+
+    const where = vp.width + "×" + vp.height;
+    expect(report.inputs, where + "：作息表里应该有开始 / 结束两组时间框").toBeGreaterThan(1);
+    expect(report.issues, where + " 的时间框没落在自己的格子里").toEqual([]);
+    expect(Math.max(0, ...report.misalign),
+      where + " 表头「开始 / 结束」和数据列没对齐").toBeLessThanOrEqual(2);
+    expect(report.overflowX,
+      where + " 作息表横向溢出（表格是 overflow:hidden，溢出就等于被切掉）").toBeLessThanOrEqual(1);
+  }
+
+  expect(errors, "控制台不应有报错").toEqual([]);
+});
