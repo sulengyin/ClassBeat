@@ -9,7 +9,13 @@
  */
 
 const { test, expect } = require("@playwright/test");
-const { openScreen, openTools } = require("./helpers");
+const { openScreen, openTools, clearHub } = require("./helpers");
+
+/* 上一个用例留在服务端的班级配置会被这一组拉进空上下文，
+   屏上的内容跟着变（比如原本该是「还没有配置」）。先清干净再开。 */
+test.beforeEach(async ({ request }) => {
+  await clearHub(request);
+});
 
 const DOWNLOAD = "https://github.com/sulengyin/ClassBeat/releases/latest";
 

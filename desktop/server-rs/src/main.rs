@@ -8,6 +8,7 @@
 //! 两版响应逐字节比对。
 
 mod backup;
+mod live;
 mod messages;
 mod pyjson;
 mod resp;

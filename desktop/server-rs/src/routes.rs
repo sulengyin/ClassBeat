@@ -238,6 +238,17 @@ async fn handle_get(
             .clamp(1, 50) as usize;
         return resp::json(&json!({"ok": true, "messages": messages::recent(st, n)}), 200);
     }
+    if path == "/api/config/live" {
+        /* 配置的唯一权威副本：大屏、浏览器、手机读到的都是这一份。
+           没有文件时 rev=0、config=null，客户端据此决定是「推本地」还是「拉服务端」。
+           `?rev=1` 只回版本号：大屏 24 小时开着，轮询不该每 5 秒搬 15KB。 */
+        let (rev, cfg) = crate::live::read(st);
+        let rev_only = query.split('&').any(|kv| kv == "rev" || kv.starts_with("rev="));
+        if rev_only {
+            return resp::json(&json!({"ok": true, "rev": rev}), 200);
+        }
+        return resp::json(&json!({"ok": true, "rev": rev, "config": cfg}), 200);
+    }
     if path == "/api/config/backup" {
         if !loopback {
             return resp::err("forbidden", 403);
@@ -338,6 +349,32 @@ async fn handle_post(
             &json!({"ok": true, "cleared": ev.is_some(), "event": ev.unwrap_or(Value::Null)}),
             200,
         );
+    }
+
+    if route == "/api/config/live" {
+        if let Some(r) = too_big(content_length, BACKUP_MAX_BODY) {
+            return r;
+        }
+        let payload = match parse_json_object(body) {
+            Ok(v) => v,
+            Err(msg) => return resp::err(&msg, 400),
+        };
+        let cfg = payload.get("config").cloned().unwrap_or(Value::Null);
+        if !cfg.is_object() {
+            return resp::err("缺少 config 对象", 400);
+        }
+        let base = payload.get("baseRev").and_then(|v| v.as_i64()).unwrap_or(0);
+        return match crate::live::write(st, &cfg, base) {
+            Ok(rev) => resp::json(&json!({"ok": true, "rev": rev}), 200),
+            /* 别人先改过：把服务端那份回传，让客户端直接采用，而不是硬盖 */
+            Err(crate::live::WriteError::Stale(rev, cur)) => resp::json(
+                &json!({"ok": false, "stale": true, "rev": rev, "config": cur}),
+                200,
+            ),
+            Err(crate::live::WriteError::Io(e)) => {
+                resp::err(&format!("写不进配置：{e}"), 500)
+            }
+        };
     }
 
     if route == "/api/config/snapshot" {

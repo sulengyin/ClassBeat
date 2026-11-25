@@ -770,25 +770,210 @@
 
   function patchConfig(patch) {
     var cur = config();
+    /* 记下这次动了哪几块：撞车时只让这几块以本机为准（见 mergeBlocks） */
+    var touched = [];
     Object.keys(patch || {}).forEach(function (k) {
       if (CONFIG_BLOCKS.indexOf(k) < 0) return;
-      if (patch[k] === null) { delete cur[k]; return; }
+      if (patch[k] === null) { delete cur[k]; touched.push(k); return; }
       if (patch[k] === undefined) return;
       var v = cleanBlock(k, patch[k]);
       if (v === null || v === undefined) delete cur[k];
       else cur[k] = v;
+      touched.push(k);
     });
     write(KEY.config, cur);
     /* 大屏每秒重绘，但改完设置最好立刻看到，所以这里主动通知一次 */
     if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
     if (root.Screen && root.Screen.render) root.Screen.render();
+    /* 同时推给本机服务：换成别的浏览器 / 手机打开同一地址时读的是那一份 */
+    noteDirty(touched);
+    schedulePush();
     return cur;
+  }
+
+  /* ---------- 配置的唯一权威副本（本机服务） ----------
+
+     以前配置只写当前浏览器的 localStorage，而 localStorage 按「协议 + 主机 +
+     端口」隔离：大屏是 Tauri 的 WebView2，老师用 Edge / Chrome / 手机打开同一个
+     地址时是另外几份存储，在浏览器里配完，向导看着全对，大屏却一直读自己那份
+     （2026-11-25 真机反馈②）。现在服务端存一份 config.json，用 rev 判断谁新：
+       · 启动 / 每 5 秒问一次版本号，服务端更新就拉下来；
+       · 本地改动写完后推上去，带着自己读到的 rev；
+       · 撞车（别人先写过）时按块合并，本机改过的那几块为准，其余听服务端的。
+     没有服务（单文件演示版 file://）时整块自动停用，退回纯 localStorage。 */
+  var LIVE_REV = "rhythm.live.rev.v1";
+  var liveBusy = false, livePending = false, liveTimer = null, livePoll = null;
+  /* liveReady：已经和服务端对过一次版本号，知道「我这份是第几版」。
+     没对过就往后写会被服务端当成过期修改挡回来
+     （页面刚打开、手机刚从休眠里醒、WiFi 断了半秒，都会走到这条路）。 */
+  var liveReady = false;
+  /* liveDirty / liveDirtyBlocks：还没推上去的本地改动，以及改的是哪几块。
+     有这笔债在，服务端那份就不能整份盖过来——刚在屏上改完又跳回旧样子，
+     正是这次要修的毛病。["*"] 表示整份（重置、导入、升级迁移）。 */
+  var liveDirty = false, liveDirtyBlocks = null;
+  /* 两端互相顶着时最多连续合并两次，之后以服务端为准，避免来回拉锯。 */
+  var liveMergeLeft = 2;
+
+  function liveOn() {
+    var loc = root.location || {};
+    return (loc.protocol === "http:" || loc.protocol === "https:") && !!root.fetch;
+  }
+
+  function liveRev() { return read(LIVE_REV, 0) || 0; }
+  function setLiveRev(n) { write(LIVE_REV, (n | 0)); }
+
+  function liveNotify() {
+    if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
+    if (root.Screen && root.Screen.render) root.Screen.render();
+  }
+
+  function noteDirty(keys) {
+    if (!liveOn()) return;
+    if (keys === "*") { liveDirty = true; liveDirtyBlocks = ["*"]; return; }
+    if (!keys || !keys.length) return;
+    liveDirty = true;
+    if (liveDirtyBlocks && liveDirtyBlocks[0] === "*") return;
+    var cur = liveDirtyBlocks || [];
+    keys.forEach(function (k) { if (cur.indexOf(k) < 0) cur.push(k); });
+    liveDirtyBlocks = cur;
+  }
+
+  function clearDirty() { liveDirty = false; liveDirtyBlocks = null; liveMergeLeft = 2; }
+
+  /* 以服务端那份作底，把本机还没推上去的块盖上去。
+     只有本机真改过的那几块算「老师的意图」；其余块用服务端的，
+     免得把别的设备刚改的课表又推回旧版本。 */
+  function mergeBlocks(srvCfg) {
+    var mine = config();
+    if (!liveDirtyBlocks || liveDirtyBlocks[0] === "*") return mine;
+    var out = {};
+    Object.keys(srvCfg || {}).forEach(function (k) { out[k] = srvCfg[k]; });
+    liveDirtyBlocks.forEach(function (k) {
+      if (mine[k] === undefined) delete out[k];
+      else out[k] = mine[k];
+    });
+    return out;
+  }
+
+  function adoptLive(rev, cfg) {
+    var local = liveRev();
+    if (!cfg) {
+      /* 服务端还没有：把这台机器上已有的配置推上去，别让它空着 */
+      if (Object.keys(config()).length) schedulePush();
+      else setLiveRev(rev || 0);
+      return;
+    }
+    if (rev > local) {
+      write(KEY.config, liveDirty ? mergeBlocks(cfg) : cfg);
+      setLiveRev(rev);
+      liveNotify();
+      return;
+    }
+    if (rev < local) { schedulePush(); return; }
+    /* rev 相等：服务端和本地同版本，什么都不用做 */
+  }
+
+  function pullLive(cb) {
+    if (!liveOn()) return;
+    try {
+      root.fetch("/api/config/live", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok === true) {
+            liveReady = true;
+            adoptLive(d.rev | 0, d.config || null);
+            if (liveDirty) pushLive();       /* 基线拿到了，把欠的那笔补上 */
+          }
+          if (cb) cb();
+        })
+        .catch(function () { /* 服务没起、或离线：保持本地那份，下次再对 */ });
+    } catch (e) { /* 同上 */ }
+  }
+
+  function schedulePush() {
+    if (!liveOn()) return;
+    if (liveTimer) clearTimeout(liveTimer);
+    liveTimer = setTimeout(pushLive, 400);
+  }
+
+  /* 撞车：别人在这几百毫秒里写过。服务端那份作底 + 本机改过的块，
+     用新的版本号再写一次。老师刚点完保存就悄悄回滚，比什么都糟。 */
+  function mergeStale(rev, srvCfg) {
+    if (liveMergeLeft <= 0) {
+      /* 两端在互相顶：这一轮认服务端的，别把屏刷成抖动 */
+      clearDirty();
+      if (srvCfg) { write(KEY.config, srvCfg); liveNotify(); }
+      setLiveRev(rev);
+      return;
+    }
+    liveMergeLeft--;
+    write(KEY.config, mergeBlocks(srvCfg));
+    setLiveRev(rev);
+    liveNotify();
+    liveDirty = true;
+    pushLive();
+  }
+
+  function pushLive() {
+    if (!liveOn()) return;
+    if (!liveReady) {
+      /* 还不知道服务端是第几版：先拉基线，拉到了再推。
+         直接带着 rev=0 去写，会被判过期、改动当场丢掉。 */
+      liveDirty = true;
+      pullLive();
+      return;
+    }
+    if (liveBusy) { livePending = true; return; }
+    liveBusy = true;
+    var body = JSON.stringify({ config: config(), baseRev: liveRev() });
+    try {
+      root.fetch("/api/config/live", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: body
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          liveBusy = false;
+          if (d && d.ok === true) {
+            setLiveRev(d.rev | 0);
+            /* 还有一笔排在后面：等它也写完再算「都推完了」，
+               否则 liveDirtyBlocks 一清，撞车时就不知道本机改过哪几块了。 */
+            if (livePending) { livePending = false; schedulePush(); }
+            else clearDirty();
+            return;
+          }
+          if (d && d.stale) { mergeStale(d.rev | 0, d.config || null); return; }
+          /* 服务端不认（比如格式被改坏）：留在本机，等下一轮再说 */
+          liveDirty = true;
+        })
+        .catch(function () { liveBusy = false; liveDirty = true; });
+    } catch (e) { liveBusy = false; liveDirty = true; }
+  }
+
+  function startPoll() {
+    if (!liveOn() || livePoll) return;
+    livePoll = setInterval(function () {
+      try {
+        root.fetch("/api/config/live?rev=1", { cache: "no-store" })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            /* 没对上基线、或还欠着一笔没推的，版本号没变也得拉一次 */
+            if (d && d.ok === true &&
+                (!liveReady || liveDirty || (d.rev | 0) > liveRev())) pullLive();
+          })
+          .catch(function () { });
+      } catch (e) { /* 忽略 */ }
+    }, 5000);
   }
 
   function resetConfig() {
     write(KEY.config, {});
     if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
     if (root.Screen && root.Screen.render) root.Screen.render();
+    /* 重置也要告诉服务端：不然别的设备还拿着旧那份，
+       下次它一推（rev 变大），这台机器刚清空的配置又会被拉回来。 */
+    noteDirty("*");
+    schedulePush();
     return {};
   }
 
@@ -1394,6 +1579,9 @@
 
     if (root.Runtime && root.Runtime.reload) root.Runtime.reload();
     if (root.Screen && root.Screen.render) root.Screen.render();
+    /* 导进来的是一整份班级配置，也要成为服务端那份 */
+    noteDirty("*");
+    schedulePush();
 
     var meta = (obj.config && obj.config.meta) || {};
     var sch = (obj.config && obj.config.schedule) || {};
@@ -1441,6 +1629,8 @@
     texts: texts, patchTexts: patchTexts, resetTexts: resetTexts,
     textsLocal: textsLocal, setTextsLocal: setTextsLocal, setupSnapshot: setupSnapshot,
     config: config, patchConfig: patchConfig, resetConfig: resetConfig,
+    /* 配置的服务端副本：启动时拉一次、改完推上去、每 5 秒问一次版本号 */
+    livePull: pullLive, livePush: pushLive, liveStart: startPoll, liveRev: liveRev,
     reorderRoles: reorderRoles,
     roleModeOf: roleModeOf, setRoleMode: setRoleMode, namesOfMode: namesOfMode,
     ROLE_MODES: ROLE_MODES,
@@ -1456,4 +1646,13 @@
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.Store = api;
+
+  /* 等其它脚本（Runtime / Screen）挂好再拉：这一步决定「这台设备看到的是不是
+     服务端那份」。file:// 或没有 fetch 时 liveOn() 直接 false，什么都不做。 */
+  if (typeof setTimeout === "function") {
+    setTimeout(function () {
+      pullLive();
+      startPoll();
+    }, 300);
+  }
 })(typeof window !== "undefined" ? window : globalThis);

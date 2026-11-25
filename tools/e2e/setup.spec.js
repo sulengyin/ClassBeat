@@ -6,7 +6,13 @@
  */
 
 const { test, expect } = require("@playwright/test");
-const { openScreen, openTools } = require("./helpers");
+const { openScreen, openTools, clearHub } = require("./helpers");
+
+/* 配置从 0.5.9 起存在服务端，会被下一个用例拉到自己的空上下文里。
+   这一组全都是「从什么都没有配起」，所以每个用例先把服务端那份清干净。 */
+test.beforeEach(async ({ request }) => {
+  await clearHub(request);
+});
 
 /* 不能取决于「今天恰好是几号」：钉在周四上午，当天一定有时间线。 */
 const AT = "2026-11-05T08:30:00+08:00";

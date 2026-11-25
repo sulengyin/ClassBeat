@@ -25,6 +25,8 @@ pub struct Paths {
     pub phone_file: PathBuf,
     pub backup_dir: PathBuf,
     pub exit_flag: PathBuf,
+    /// 配置的唯一权威副本：大屏、浏览器、手机读写的都是这一份
+    pub config_file: PathBuf,
 }
 
 impl Paths {
@@ -59,6 +61,7 @@ impl Paths {
             log_file: pick("server.log"),
             phone_file: base.join("phone.html"),
             exit_flag: pick("exit-request.flag"),
+            config_file: pick("config.json"),
             backup_dir,
             base,
             install_root,

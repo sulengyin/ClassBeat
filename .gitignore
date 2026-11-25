@@ -22,6 +22,9 @@ e2e-results.json
 # 运行时产生的消息，可能含老师写的话
 server/messages.json
 server/messages.json.bad
+# 配置的唯一权威副本：班级名、老师姓名、学生名单，等同 data/，只在老师本机
+server/config.json
+server/config.json.tmp
 # 上次启动的局域网地址，只对这台机器有意义
 server/net.json
 # 无窗运行时的日志与 pid（排错看它，不进仓库）

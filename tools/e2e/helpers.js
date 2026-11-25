@@ -9,11 +9,26 @@ const SCREEN_PATH = `/app/index.html?hub=127.0.0.1:${PORT}&nosync=1`;
 
 /** 把服务端攒下的旧消息全部撤回，免得上一轮的通知串到这一轮。 */
 async function clearHub(request) {
+  await clearConfig(request);
   for (let i = 0; i < 20; i += 1) {
     const res = await request.post("/api/retract");
     const body = await res.json();
     if (!body.cleared) return;
   }
+}
+
+/**
+ * 清掉服务端那份班级配置。
+ * 0.5.9 起配置存服务端（换浏览器 / 手机打开都是同一份），而每个用例都是
+ * 全新的浏览器上下文：不重置的话，上一个用例配好的班级会被下一个用例
+ * 拉回来——「什么都没有」的用例开局就有班，断言全乱。
+ * 只把内容清空，不动 rev 计数：那只是给客户端对版本号用的。
+ */
+async function clearConfig(request) {
+  const res = await request.get("/api/config/live");
+  const cur = await res.json();
+  if (!cur || !cur.config) return;
+  await request.post("/api/config/live", { data: { config: {}, baseRev: cur.rev } });
 }
 
 /**
@@ -75,4 +90,4 @@ async function hubNow(request) {
   return body.now;
 }
 
-module.exports = { SCREEN_PATH, clearHub, openScreen, openTools, overflow, hubNow };
+module.exports = { SCREEN_PATH, clearHub, clearConfig, openScreen, openTools, overflow, hubNow };
