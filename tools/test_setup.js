@@ -319,12 +319,29 @@ const mR01 = mergedCsv.roles.roles.filter(r => r.id === "r01")[0];
 const mNew = mergedCsv.roles.roles.filter(r => r.name === "图书角管理员")[0];
 check(mergedCsv.updated === 1 && mergedCsv.added === 1, "合并：更新一个、新增一个",
   mergedCsv.updated + " / " + mergedCsv.added);
-check(mR01.duty === "提醒静齐排队" && mR01.people.length === 2
-      && mR01.freq.kind === "event" && mR01.order === 90,
-  "命中现有岗位：只改职责，人员/频率/顺序原样保留");
+check(mR01.duty === "提醒静齐排队" && mR01.freq.kind === "event" && mR01.order === 90,
+  "命中现有岗位：改职责，显示时间与顺序沿用原来那份");
 check(mNew && mNew.freq.kind === "unset" && mNew.people.length === 1
       && mNew.people[0] === "周予宁" && mNew.assign === "fixed" && mNew.grp === null,
   "新增岗位：freq=unset，人员只写核对通过的", mNew && JSON.stringify(mNew));
+/* 2026-11-25 反馈③：岗位名称、数量、人，三样都得听老师上传的那张表。
+   旧行为是「命中现有岗位只改名称和职责、其余原样保留」，于是包里的来源班
+   岗位和别班学生名字会一直留在屏上。 */
+const pOwn = S3._parseImport("岗位,职责,负责人\n路队长,提醒静齐排队,李青禾", ROSTER, roleSet);
+const mOwn = S3._mergeRoleImport(roleSet, pOwn.rows);
+const ownR01 = mOwn.roles.roles.filter(r => r.id === "r01")[0];
+check(ownR01.people.join("/") === "李青禾",
+  "命中现有岗位时，人员以上传的表为准（不再留着来源班的人名）", ownR01.people.join("/"));
+check(mOwn.roles.roles.length === 1 && mOwn.removed === roleSet.roles.length - 1,
+  "表里没有的岗位不再留在本班：岗位名称和数量都听表",
+  mOwn.roles.roles.length + " 个 / 移除 " + mOwn.removed);
+
+/* 一行都没选（或全并过）时不能把清单清空——「没改动」不等于「全删了」 */
+const nonePicked = S3._mergeRoleImport(roleSet, []);
+check(nonePicked.roles.roles.length === roleSet.roles.length && nonePicked.removed === 0,
+  "一行都没选时原样退回，不会把岗位清空",
+  nonePicked.roles.roles.length + " / " + roleSet.roles.length);
+
 check(JSON.stringify(roleSet) === beforeRoleSet, "合并不会就地改掉原岗位对象");
 check(S3._addedRoleCount(mergedCsv.roles, roleSet) === 1, "新增岗位计数正确");
 

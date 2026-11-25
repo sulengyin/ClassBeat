@@ -111,9 +111,9 @@ test("空配置打开就进向导，不碰命令行也能配出当天的屏", as
   await expect(page.locator(".setup-grid-row:not(.head) input")).toHaveCount(35);
   await next(page);
 
-  // 完成页当场给出时间线，不用等第二天
-  await expect(page.locator(".setup-preview")).toBeVisible();
-  expect(await page.locator(".tl-row").count()).toBeGreaterThan(10);
+  // 完成页给出汇总；时间线预览已移出配置流程（2026-11-25 反馈）
+  await expect(page.locator(".setup-preview")).toHaveCount(0);
+  await expect(page.locator(".setup-sum")).toContainText("空包测试班");
 
   await apply(page);
 
@@ -160,8 +160,9 @@ test("改班名和课表后刷新仍在，屏上抬头跟着换", async ({ page 
   await page.locator(".setup-grid-row:not(.head) input").first().fill("数学");
   await next(page);
 
-  // 还没应用，预览也要显示刚改的 07:40
-  await expect(page.locator(".setup-timeline")).toContainText("07:40");
+  /* 还没应用，末页汇总也要显示刚改的 07:40——它读的是草稿，不是已保存配置。
+     时间线预览已移出配置流程（2026-11-25），这里用汇总行钉同一件事。 */
+  await expect(page.locator(".setup-sum")).toContainText("07:40");
 
   await apply(page);
 
@@ -187,42 +188,114 @@ test("改班名和课表后刷新仍在，屏上抬头跟着换", async ({ page 
   expect(errors, "控制台不应有报错").toEqual([]);
 });
 
-test("岗位表核对时漏了人，打一个字或姓氏拼音首字母就能补进来", async ({ page }) => {
-  /* 只给一个名单的最小包：前三步不依赖具体的作息与课表内容，
-     这条只关心「核对人员」那一步的补人。 */
+test("岗位清单只听老师上传的那张表：不摊人员、不摊置信度、不残留来源班的岗位", async ({ page }) => {
+  /* 2026-11-25 真机反馈：
+     ① 配置阶段把「每个岗位对应的人」和「置信度」摊给老师看，一页很长，
+        点一下就弹回顶部——这些属于编辑模式；
+     ③ 岗位名称和人员来自包里的来源班，老师上传自己的表也不管用。
+     这条把两件事一起钉住：表里有什么岗位，本班就有什么岗位；表里点了名，
+     人就换成表里的。 */
   const roster = ["赵子墨", "钱嘉禾", "孙星野", "李青禾", "周梓萱", "张望舒"]
     .map((n, i) => ({ id: "s" + (i + 1), name: n, active: true }));
+  const roles = {
+    class: "来源班",
+    dutyCycle: {},
+    roles: [
+      { id: "r01", name: "路队长", duty: "排队", people: ["孙星野"], freq: { kind: "event" }, order: 10 },
+      { id: "r02", name: "节能小队长", duty: "关灯", people: ["钱嘉禾"], freq: { kind: "daily" }, order: 20 },
+    ],
+  };
   await page.route("**/app/data.js", (route) => route.fulfill({
     status: 200, contentType: "application/javascript",
-    body: "window.RHYTHM_DATA=" + JSON.stringify({ students: roster, texts: {} }) + ";"
+    body: "window.RHYTHM_DATA=" + JSON.stringify({ students: roster, roles, texts: {} }) + ";"
   }));
 
   const errors = await openScreen(page, AT);
 
-  await page.locator(".setup-field input").nth(1).fill("补人测试班");
+  await page.locator(".setup-field input").nth(1).fill("清单测试班");
   await next(page);   // 名单：包里有，直接用
   await next(page);   // 作息：用默认那一套
   await next(page);   // 课表：一节课都不填也能往下走
   await next(page);   // 岗位 / 文案
 
   await page.locator(".setup-import-open").click();
-
-  await page.locator(".setup-import-text").fill("岗位\t职责\t负责人\n路队长\t提醒排队\t赵子墨");
+  await page.locator(".setup-import-text")
+    .fill("岗位\t职责\t负责人\n饮水机管理员\t每天换水\t李青禾\n图书角管理员\t整理图书\t张望舒");
   await page.locator(".setup-import-run").click();
 
-  await expect(page.locator(".setup-import-add").first()).toBeVisible();
-  await page.locator(".setup-import-add").first().click();
+  const rows = page.locator(".setup-import-preview .setup-import-row");
+  await expect(rows).toHaveCount(2);
+  await expect(page.locator(".setup-import-preview")).toContainText("饮水机管理员");
 
-  /* 打字母按姓氏拼音首字母找：z 应该出张/周，且已经在这一行里的人不再出现 */
-  await page.locator(".setup-quickadd-input").fill("z");
-  const items = page.locator(".setup-quickadd-item");
-  await expect(items.first()).toBeVisible();
-  const texts = await items.allTextContents();
-  expect(texts).toContain("张望舒");
-  expect(texts, "已经在表里的人不该再出现在候选里").not.toContain("赵子墨");
+  /* 人员、置信度、补人按钮都不该出现在配置阶段 */
+  expect(await page.locator(".setup-import-person, .setup-import-conf, .setup-import-add").count())
+    .toBe(0);
+  /* 岗位名是只读文本，不是输入框 */
+  await expect(page.locator(".setup-import-name-text").first()).toHaveText("饮水机管理员");
+  expect(await page.locator(".setup-import-name").count()).toBe(0);
 
-  await page.locator(".setup-quickadd-item", { hasText: "张望舒" }).click();
-  await expect(page.locator(".setup-import-person.exact", { hasText: "张望舒" })).toBeVisible();
+  await page.locator(".setup-import-apply").click();
+
+  /* 并入后：草稿里的岗位清单就是表里那两条，来源班的两个岗位不再留下 */
+  const draftRoles = await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem("rhythm.setup.draft.v1") || "{}");
+    return (((d.roles || {}).roles) || []).map((r) => ({ name: r.name, people: r.people || [] }));
+  });
+  expect(draftRoles.map((r) => r.name).sort()).toEqual(["图书角管理员", "饮水机管理员"]);
+  const water = draftRoles.filter((r) => r.name === "饮水机管理员")[0];
+  expect(water.people, "表里点名的负责人要真正写进去").toEqual(["李青禾"]);
+
+  expect(errors, "控制台不应有报错").toEqual([]);
+});
+
+test("岗位表里勾选不会把人弹回页面顶部（真机 2026-11-25）", async ({ page }) => {
+  /* 真机反馈：班级配置 → 岗位/文案这一页内容多，点一下（勾选、全选、全不选）
+     整页重画，.setup-body 的 scrollTop 归 0，老师得自己再往下滚一次，
+     触摸屏上等于没法连续操作。
+     这条按「滚到哪里、点完还在哪里」来验，不钉元素顺序或行数。 */
+  await page.setViewportSize({ width: 1100, height: 700 });
+
+  const roster = ["赵子墨", "钱嘉禾", "孙星野", "李青禾", "周梓萱", "张望舒"]
+    .map((n, i) => ({ id: "s" + (i + 1), name: n, active: true }));
+  await page.route("**/app/data.js", (route) => route.fulfill({
+    status: 200, contentType: "application/javascript",
+    body: "window.RHYTHM_DATA=" + JSON.stringify({ students: roster, texts: {} }) + ";",
+  }));
+
+  const errors = await openScreen(page, AT);
+
+  await page.locator(".setup-field input").nth(1).fill("滚动测试班");
+  await next(page);   // 名单
+  await next(page);   // 作息
+  await next(page);   // 课表
+  await next(page);   // 岗位 / 文案
+
+  await page.locator(".setup-import-open").click();
+  await page.locator(".setup-import-text").fill(
+    "岗位\t职责\t负责人\n"
+    + ["饮水机管理员\t每天换水\t李青禾",
+       "图书角管理员\t整理图书\t张望舒",
+       "窗台小管家\t擦窗台\t赵子墨",
+       "讲台清洁员\t擦讲台\t钱嘉禾",
+       "黑板管理员\t擦黑板\t孙星野",
+       "桌椅小卫士\t摆桌椅\t周梓萱"].join("\n"));
+  await page.locator(".setup-import-run").click();
+  await expect(page.locator(".setup-import-row")).toHaveCount(6);
+
+  /* 有得滚才谈得上「别跳回去」；没有就说明用例前提不成立，直接失败更好排查 */
+  const scrollable = await page.evaluate(() => {
+    const el = document.querySelector(".setup-body");
+    el.scrollTop = 260;
+    return { max: el.scrollHeight - el.clientHeight, top: el.scrollTop };
+  });
+  expect(scrollable.max, "这一页要能滚起来，用例才有意义").toBeGreaterThan(120);
+  expect(scrollable.top).toBeGreaterThan(120);
+
+  /* 用 DOM 点击，绕开 Playwright 的「滚到元素可见」——那一步本身会改 scrollTop */
+  await page.evaluate(() => document.querySelector(".setup-import-none").click());
+  const after = await page.evaluate(() => document.querySelector(".setup-body").scrollTop);
+  expect(after, "点了「全不选」之后还应该停在原处").toBeGreaterThan(120);
+  expect(Math.abs(after - scrollable.top), "位置浮动不该超过一屏的零头").toBeLessThan(40);
 
   expect(errors, "控制台不应有报错").toEqual([]);
 });

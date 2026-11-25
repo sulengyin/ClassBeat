@@ -365,9 +365,44 @@
     return s === "[object Object]" ? "" : s;
   }
 
-  /* 值日条上一次显示几个人：空名字（上面被兜成 ""）不能留成空档 */
+  /* 本班名单，只用来回答一件事：这个名字是不是本班的学生。
+     包里的岗位带着来源班的人名（孙星野、孔子墨…），老师换了自己的名单后，
+     那些名字就成了别班同学的名字，照原样上大屏是最不能接受的
+     （2026-11-25 反馈③：值日人不是上传名单里的人）。
+     名单还没配（students 为空）时不拦：那时候连本班是谁都不知道，
+     拦下去只会让屏上一条值日都没有。 */
+  var rosterSet = null, rosterSetKey = "";
+  function classRoster() {
+    var students = (S && S.config && S.config().students) || [];
+    var key = students.length + ":" + students.map(function (s) {
+      return s && (s.active === false ? "-" : "") + (s.name || "");
+    }).join(",");
+    if (rosterSet === null || rosterSetKey !== key) {
+      rosterSetKey = key;
+      var set = null;
+      students.forEach(function (s) {
+        if (!s || !s.name || s.active === false) return;
+        if (!set) set = {};
+        set[s.name] = 1;
+      });
+      rosterSet = set;
+    }
+    return rosterSet;
+  }
+
+  /* 值日条上一次显示几个人：空名字（上面被兜成 ""）不能留成空档。
+     不在本班名单里的名字不上屏——岗位里留着旧人名时，屏上显示「待定」，
+     老师去编辑模式点一下就能选人。 */
   function peopleText(list) {
-    return (list || []).map(personName).filter(function (x) { return !!x; }).join("、");
+    var roster = classRoster();
+    var out = [];
+    (list || []).forEach(function (x) {
+      var n = personName(x);
+      if (!n) return;
+      if (roster && !roster[n]) return;
+      if (out.indexOf(n) < 0) out.push(n);
+    });
+    return out.join("、");
   }
 
   function renderDuty(day, minutes) {
@@ -413,21 +448,24 @@
       who.className = "who";
       /* 先看有没有人：老师亲手指定的人必须能看见。
          以前「自己商量」排在人员前面，指定了人却只显示「自己商量」；
-         「待定」也一并挪到最后——只有一个人都没有时才说待定。 */
-      if (d.people && d.people.length) {
-        who.textContent = peopleText(d.people);
+         「待定」也一并挪到最后——只有一个人都没有时才说待定。
+         names 为空但岗位本来有人，说明那些人不在本班名单里，
+         同样按「待定」处理，不把别班的名字写上屏。 */
+      var names = peopleText(d.people);
+      if (names) {
+        who.textContent = names;
       } else if (d.assign === "self-organize") {
         who.textContent = "自己商量";
         who.classList.add("none");
-      } else if (d.unknown) {
+      } else if (d.unknown || (d.people && d.people.length)) {
         who.textContent = "待定";
         who.classList.add("none");
       }
       if (who.textContent) item.appendChild(who);
 
       /* 组员可以点开看，只读（PLAN 2.18）。学生能点，但点了只能看。 */
-      if (d.people && d.people.length) {
-        item.dataset.people = peopleText(d.people);
+      if (names) {
+        item.dataset.people = names;
         item.dataset.task = d.tasks && d.tasks.length ? d.tasks.join("、") : d.name;
         /* 组里还有没排人的项：屏面只显示已排的人（否则老师选的人看不见），
            点开才说还差哪几项。 */

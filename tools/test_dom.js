@@ -1672,11 +1672,13 @@ global.Remote.info.phone = "";
   check(box.querySelector(".setup-backup") !== null, "完成页有本机备份与恢复面板",
     String(!!box.querySelector(".setup-backup")));
 
-  /* B4a：最后一步列出岗位卡片和可折叠的文案分组，一共五步 */
-  const roleCards = box.querySelectorAll(".setup-role");
+  /* B4a：最后一步只说明岗位来源 + 可折叠的文案分组，不再逐个列岗位卡片。
+     2026-11-25 起：配置阶段不提供岗位字段的编辑，改岗位去编辑模式。 */
   const bakedRoles = (window.RHYTHM_DATA.roles || {}).roles || [];
-  check(roleCards.length === bakedRoles.length, "最后一步按岗位逐个列卡片",
-    roleCards.length + " / " + bakedRoles.length);
+  check(box.querySelectorAll(".setup-role").length === 0
+        && box.querySelectorAll(".setup-roles").length === 0,
+    "最后一步不再逐个摆岗位卡片（那是编辑模式）",
+    String(box.querySelectorAll(".setup-role").length));
   check(box.querySelectorAll(".setup-src").length === 1, "最后一步标明岗位来源班");
   check(box.querySelectorAll(".setup-text-sec").length >= 4, "最后一步有可折叠的文案分组",
     String(box.querySelectorAll(".setup-text-sec").length));
@@ -1688,14 +1690,13 @@ global.Remote.info.phone = "";
         && doneBtns.indexOf("应用到这台机器") < 0,
     "未改动时最后一步先给「完成」，应用是次要动作", doneBtns.join(" / "));
 
-  /* 完成页的时间线预览：不用等到明天，当场看到配完的样子 */
-  const tl = box.querySelectorAll(".tl-row");
-  check(tl.length >= 10, "完成页有当天时间线预览", tl.length + " 行");
-  check(tl.length && tl[0].textContent.indexOf(
-        (window.RHYTHM_DATA.timetable.blocks || [])[0].start) >= 0,
-    "预览从作息第一段开始", tl.length ? tl[0].textContent : "");
-  check(inputsIn(box).length > 35, "岗位和文案都能直接编辑",
-    String(inputsIn(box).length));
+  /* 「配好之后，屏上是这样」整块已移出配置流程：配置只负责把文件变成
+     能用的屏，看效果回大屏。这一条钉住它不会悄悄回来。 */
+  check(box.querySelectorAll(".setup-preview").length === 0
+        && box.querySelectorAll(".tl-row").length === 0,
+    "配置阶段不再摆「配好之后，屏上是这样」的时间线预览");
+  check(box.querySelectorAll(".setup-text-sec input").length > 0,
+    "文案仍然可以在配置阶段填（它没有文件来源）");
 
   /* B4b：从岗位表导入。粘贴 → 识别 → 核对四态 → 并入草稿。
      名单已经独立成一步，这里不再摆一份「①学生名单」——同一份名单
@@ -1727,42 +1728,57 @@ global.Remote.info.phone = "";
   box.querySelector(".setup-import-open")._h.click();
 
   const ta = box.querySelector(".setup-import-text");
-  ta.value = "岗位,职责,负责人\n路队长,提醒静齐排队,孙星野、孔子墨\n图书角管理员,整理图书角,周予宁";
+  ta.value = "岗位,职责,负责人\n路队长,提醒静齐排队,李青禾\n图书角管理员,整理图书角,周予宁";
   ta._h.input();
   box.querySelector(".setup-import-run")._h.click();
   check(box.querySelectorAll(".setup-import-row").length === 2,
     "CSV 识别出两行岗位", String(box.querySelectorAll(".setup-import-row").length));
-  check(box.querySelectorAll(".setup-import-person.exact").length === 3,
-    "三名人员精确命中名册", String(box.querySelectorAll(".setup-import-person.exact").length));
+  check(box.querySelectorAll(".setup-import-name-text").length === 2
+        && !box.querySelector(".setup-import-name"),
+    "识别结果只列岗位名，不提供行内输入框");
+  check(!box.querySelector(".setup-import-person") && !box.querySelector(".setup-import-conf")
+        && !box.querySelector(".setup-import-add"),
+    "配置阶段不显示「每个岗位对应的人」和置信度");
   const tags = box.querySelectorAll(".setup-import-tag").map(t => t.textContent);
   check(tags.indexOf("更新「路队长」") >= 0 && tags.indexOf("新增岗位") >= 0,
     "预览分清「更新现有」和「新增」", tags.join(" / "));
 
   box.querySelector(".setup-import-apply")._h.click();
-  check(box.querySelectorAll(".setup-role").length === bakedRoles.length + 1,
-    "并入草稿后岗位卡片多一个", box.querySelectorAll(".setup-role").length + " / " + bakedRoles.length);
-  check(inputsIn(box).some(i => i.value === "图书角管理员"),
-    "新增岗位出现在草稿里");
+  const draft = () => JSON.parse(localStorage.getItem("rhythm.setup.draft.v1") || "{}");
+  const draftRoles = () => (draft().roles || {}).roles || [];
+  const draftRole = n => draftRoles().filter(r => r.name === n)[0] || {};
+  /* 岗位清单以表为准：表里 2 行，草稿里就是 2 个岗位，出厂的其余岗位
+     （来源班的清单）不再留在本班。 */
+  check(draftRoles().length === 2
+        && draftRoles().map(r => r.name).sort().join("/") === "图书角管理员/路队长",
+    "并入草稿后岗位清单就是表里那 2 个", draftRoles().map(r => r.name).join("/"));
+  check(draftRole("图书角管理员").people.join("/") === "周予宁",
+    "新增岗位带上表里点名的人", (draftRole("图书角管理员").people || []).join("/"));
+  /* 2026-11-25 反馈③的根子在上一行这条断言的反面：命中已有岗位时只改
+     名称和职责、人员原样保留，于是屏上一直是来源班的「孙星野、孔子墨」。
+     现在表里点了名就以表为准。 */
+  check(draftRole("路队长").people.join("/") === "李青禾",
+    "已有岗位的人员以上传的表为准，不再留着来源班的人名",
+    (draftRole("路队长").people || []).join("/"));
   check(!(JSON.parse(localStorage.getItem("rhythm.config.v1") || "{}").roles),
     "只进草稿，没写大屏配置");
   check(box.querySelectorAll(".setup-import").length === 0
         && box.querySelectorAll(".setup-import-count").length === 1,
     "并入后收起面板，留下待确认计数");
 
-  /* 疑似错字 / 未找到：先列差异，老师点「采用」才写 */
+  /* 对不上的姓名不再逐个人摊在配置界面：只汇总一句，屏上先显示「待定」，
+     要指定谁去编辑模式换人。姓名核对本身照旧做（合并时只写对得上的人）。 */
   box.querySelector(".setup-import-open")._h.click();
   const ta2 = box.querySelector(".setup-import-text");
-  ta2.value = "窗户小管家：孙星野、孔子默、王小明";
+  ta2.value = "窗户小管家：李青禾、孔子默、王小明";
   ta2._h.input();
   box.querySelector(".setup-import-run")._h.click();
-  check(box.querySelectorAll(".setup-import-person.typo").length === 1
-        && box.querySelectorAll(".setup-import-person.missing").length === 1,
-    "疑似错字和未找到都列出来，不静默写入");
-  const useBtn = box.querySelector(".setup-import-use");
-  check(!!useBtn, "疑似错字旁边有「采用」按钮");
-  useBtn._h.click();
-  check(box.querySelector(".setup-import-person.typo").textContent.indexOf("已采用") >= 0,
-    "点「采用」后确认候选姓名");
+  check(box.querySelectorAll(".setup-import-row").length === 1, "一行岗位照旧识别出来");
+  check(!box.querySelector(".setup-import-use"),
+    "配置阶段不再逐个「采用」姓名（换人在编辑模式）");
+  const pvNote = box.querySelector(".setup-import-preview").textContent;
+  check(pvNote.indexOf("没在名单里对上负责人") >= 0 && pvNote.indexOf("孔子默") < 0,
+    "对不上的只报数量，不逐个人名摊开", pvNote);
   box.querySelector(".setup-import-cancel")._h.click();
   check(box.querySelectorAll(".setup-import").length === 0, "「取消」收起导入面板");
 
@@ -1784,10 +1800,8 @@ global.Remote.info.phone = "";
   check(box.querySelectorAll(".setup-import-row").length === 1,
     "Word 表格粘贴：接住剪贴板里的 HTML，而不是只读纯文本",
     String(box.querySelectorAll(".setup-import-row").length));
-  check(box.querySelector(".setup-import-name").value === "路队长",
-    "Word 表格：岗位名识别正确", box.querySelector(".setup-import-name").value);
-  check(box.querySelectorAll(".setup-import-person.exact").length === 2,
-    "Word 表格：姓名仍然拿名册核对");
+  check(box.querySelector(".setup-import-name-text").textContent === "路队长",
+    "Word 表格：岗位名识别正确", box.querySelector(".setup-import-name-text").textContent);
   box.querySelector(".setup-import-cancel")._h.click();
 
   /* 直接选 .xlsx 文件：文件直读是异步的，change 之后要等它 render */
@@ -1850,8 +1864,8 @@ global.Remote.info.phone = "";
   await new Promise(r => setImmediate(r));
   check(box.querySelectorAll(".setup-import-row").length === 1,
     "选 .xlsx 文件后直接出预览", String(box.querySelectorAll(".setup-import-row").length));
-  check(box.querySelector(".setup-import-name").value === "窗户小管家",
-    "xlsx 文件里的岗位名读对了", box.querySelector(".setup-import-name").value);
+  check(box.querySelector(".setup-import-name-text").textContent === "窗户小管家",
+    "xlsx 文件里的岗位名读对了", box.querySelector(".setup-import-name-text").textContent);
   const flash = box.querySelectorAll(".setup-msg").map(m => m.textContent);
   check(flash.some(t => t.indexOf("岗位表.xlsx") >= 0),
     "提示里说明读的是哪个文件", flash.join(" | "));
@@ -1879,10 +1893,12 @@ global.Remote.info.phone = "";
   startInput._h.change();
   next()._h.click();
   next()._h.click();
-  /* 还没点应用，预览也必须是刚改的 07:40——它读的是草稿，不是已保存配置 */
-  const pvEl = box.querySelector(".setup-timeline");
-  check(!!pvEl && pvEl.textContent.indexOf("07:40") >= 0,
-    "预览跟着还没应用的草稿走", pvEl ? pvEl.textContent.slice(0, 60) : "没有预览");
+  /* 还没点应用，末页的汇总也必须是刚改的 07:40——它读的是草稿，
+     不是已保存配置。时间线预览已经从配置流程里移走（2026-11-25），
+     这里改用汇总行钉住同一件事：页面看到的是草稿。 */
+  const sumEl = box.querySelector(".setup-sum");
+  check(!!sumEl && sumEl.textContent.indexOf("07:40") >= 0,
+    "末页汇总跟着还没应用的草稿走", sumEl ? sumEl.textContent.slice(0, 80) : "没有汇总");
   box.querySelectorAll(".setup-btn").filter(b => b.textContent === "应用到这台机器")[0]._h.click();
   box.querySelectorAll(".setup-btn").filter(b => b.textContent === "确认保存")[0]._h.click();
 
@@ -1940,8 +1956,12 @@ global.Remote.info.phone = "";
     String(box.querySelectorAll(".setup-row").length));
   next()._h.click();
   next()._h.click();
-  const blankTl = box.querySelectorAll(".tl-row");
-  check(blankTl.length > 20, "空包完成页也能预览时间线", String(blankTl.length));
+  /* 空包也要走到末页并且给得出「应用到这台机器」——以前这里靠时间线
+     预览兜住，预览移走后用应用按钮和汇总来钉同一件事。 */
+  const blankBtns = box.querySelectorAll(".setup-btn").map(b => b.textContent);
+  check(blankBtns.indexOf("应用到这台机器") >= 0
+        && !!box.querySelector(".setup-sum"),
+    "空包也走得到末页并给出应用按钮", blankBtns.join(" / "));
   box.querySelector(".setup-x")._h.click();
   check(document.body.dataset.setup === "", "关掉向导后主屏提示恢复");
 

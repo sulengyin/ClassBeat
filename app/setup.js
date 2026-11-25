@@ -10,11 +10,12 @@
  * 步骤表在 STEPS 里声明，加一步只改那张表：不要再写 state.step === 2 这样的序号，
  * 序号一散，加一步就会串页（名单当初就是因为没有位置，才被塞进导入面板的）。
  *
- * 最后一步只做最小编辑：岗位能改名称和职责，文案能改常用的那几组。
- * 人员名单、执行频率、轮换规则一律原样保留——那些不是改字能解决的，
- * 硬改只会让屏上出现一半新一半旧的岗位。
+ * 最后一步只做两件事：把岗位表读进来、把常用的文案填上。
+ * 岗位的名称、职责、执行频率、换人方式一律到编辑模式改——配置阶段不提供
+ * 这些字段的编辑，否则同一个字段两处能改，改坏了不知道以哪边为准，
+ * 一页也因此长得要滚很久（2026-11-25 反馈）。
  *
- * 岗位表可以粘贴进来做辅助识别：拆出岗位名 / 职责 / 人员，姓名拿本班名册
+ * 岗位表就是本班的岗位清单：拆出岗位名 / 职责 / 人员，姓名拿本班名册
  * 比一次（精确 / 疑似错字 / 未找到 / 同名）。识别记录只留在草稿里，
  * 绝不写进 roles.json；未识别的姓名不会写入，也不会自动新增学生。
  * 表上的数字编号一律不解释（"1 沈亦然" 只当带编号的姓名，不当周几）。
@@ -185,66 +186,6 @@
   function nameOf(x) {
     if (root.Store && root.Store.personNameOf) return root.Store.personNameOf(x);
     return typeof x === "string" ? tidy(x) : "";
-  }
-
-  /* 核对结果里补一个人：打一个字、或姓氏拼音首字母，就出候选。
-     匹配用的是 Store.rankStudents —— 和值日页换人同一个函数，
-     不在这里另写「按姓氏找」。找到的人按「核对通过」写进 row.people，
-     合并时和其它对得上的姓名走同一条路。 */
-  function quickAddPerson(row, host) {
-    var box = el("div", "setup-quickadd");
-    var inp = el("input");
-    inp.className = "setup-quickadd-input";
-    inp.type = "text";
-    inp.placeholder = "补一个人：打一个字，或姓氏拼音首字母";
-    var list = el("div", "setup-quickadd-list");
-    box.appendChild(inp);
-    box.appendChild(list);
-
-    function taken() {
-      var m = {};
-      (row.people || []).forEach(function (p) {
-        var n = p.state === "exact" ? (p.resolved || p.name)
-              : (p.accepted ? (p.suggestion || p.resolved) : "");
-        if (n) m[n] = 1;
-      });
-      return m;
-    }
-
-    function paint() {
-      list.innerHTML = "";
-      var pool = rosterNames().map(function (n) { return { name: n, active: true }; });
-      if (!pool.length) {
-        list.appendChild(el("span", "setup-quickadd-none", "还没确认学生名单，先在上面确认名单"));
-        return;
-      }
-      var have = taken();
-      var res = (root.Store && root.Store.rankStudents)
-        ? root.Store.rankStudents(pool, inp.value, [], 8) : [];
-      res = res.filter(function (s) { return !have[s.name]; });
-      if (!res.length) {
-        list.appendChild(el("span", "setup-quickadd-none", "名单里没有这个人"));
-        return;
-      }
-      res.forEach(function (s) {
-        var b = el("button", "setup-quickadd-item", s.name);
-        b.type = "button";
-        b.addEventListener("click", function () {
-          row.people = (row.people || []).concat([{
-            raw: s.name, name: s.name, note: "", numbered: false,
-            suggestion: "", resolved: s.name, accepted: false, state: "exact"
-          }]);
-          saveDraft();
-          render();
-        });
-        list.appendChild(b);
-      });
-    }
-
-    inp.addEventListener("input", paint);
-    paint();
-    host.appendChild(box);
-    if (inp.focus) inp.focus();
   }
 
   /* 本班名单的权威只有一份：Store 里的 config.students。
@@ -1639,52 +1580,104 @@
   /* 只把选中的行并进草稿：命中现有岗位只改名称/职责，
      其余字段（人员、频率、轮换、顺序）整对象保留；
      新岗位一律 freq=unset——表上没写频率，不猜（PLAN 2.10）。 */
+  /* 这一行点了名、并且能在本班名册里对上的那些人。
+     typo 必须老师点过「采用」才算——猜出来的名字不能直接写进屏。 */
+  function rowPeople(row) {
+    var out = [];
+    ((row && row.people) || []).forEach(function (p) {
+      var n = "";
+      if (p.state === "exact") n = p.resolved || p.name;
+      else if (p.state === "typo" && p.accepted) n = p.suggestion || p.resolved;
+      if (n && out.indexOf(n) < 0) out.push(n);
+    });
+    return out;
+  }
+
+  /* 把岗位表并成草稿里的岗位清单。
+     语义是「这份表就是本班的岗位」，不是「在原有清单上补几条」：
+     以前是后者，于是老师上传了自己的表，包里的来源班岗位（路队长、
+     节能小队长……）照样留在屏上，岗位名称和数量都不听老师的
+     （2026-11-25 反馈：岗位名称不能写死）。
+     对得上的旧岗位（同名或 id 命中）沿用它的显示时间、轮换方式、顺序，
+     只把名称、职责、人员换成表里的——这样屏上表现不会因为一次上传而变样。
+     对不上的作为新岗位加入；新岗位没有显示时间，先在草稿里存着，
+     由老师到编辑模式里定（PLAN 2.10：表上没写的时间，不猜）。 */
   function mergeRoleImport(roleSet, rows) {
-    var out = roleSet && Array.isArray(roleSet.roles) ? clone(roleSet) : { roles: [] };
-    if (!Array.isArray(out.roles)) out.roles = [];
+    var base = roleSet && Array.isArray(roleSet.roles) ? clone(roleSet) : { roles: [] };
+    if (!Array.isArray(base.roles)) base.roles = [];
+
+    var picked = (rows || []).filter(function (row) {
+      return row && row.selected !== false && row.applied !== true && tidy(row.name);
+    });
+
+    /* 一行都没选（或全并过了）：原样退回，绝不能把清单清空——
+       「没有改动」和「把岗位全删了」是两件事。 */
+    if (!picked.length) {
+      return { roles: base, updated: 0, added: 0, skipped: (rows || []).length,
+               peopleUpdated: 0, removed: 0, noFreq: 0 };
+    }
 
     var ids = {};
-    out.roles.forEach(function (r) { ids[r.id] = 1; });
-    var maxOrder = 0;
-    out.roles.forEach(function (r) { if (+r.order > maxOrder) maxOrder = +r.order; });
+    base.roles.forEach(function (r) { ids[r.id] = 1; });
+    var order = 0;
+    base.roles.forEach(function (r) { if (+r.order > order) order = +r.order; });
 
-    var stats = { updated: 0, added: 0, skipped: 0 };
-    (rows || []).forEach(function (row) {
-      if (!row || row.selected === false || row.applied === true) { stats.skipped++; return; }
+    var stats = { updated: 0, added: 0, skipped: (rows || []).length - picked.length,
+                  peopleUpdated: 0, removed: 0, noFreq: 0 };
+    var used = {};
+    var next = [];
+
+    picked.forEach(function (row) {
       var name = tidy(row.name);
-      if (!name) { stats.skipped++; return; }
-
       var hit = null;
       if (row.targetId) {
-        out.roles.forEach(function (r) { if (!hit && r.id === row.targetId) hit = r; });
+        base.roles.forEach(function (r) { if (!hit && r.id === row.targetId) hit = r; });
       }
+      if (!hit) {
+        base.roles.forEach(function (r) { if (!hit && !used[r.id] && tidy(r.name) === name) hit = r; });
+      }
+
+      var people = rowPeople(row);
+
       if (hit) {
+        used[hit.id] = 1;
         hit.name = name;
         if (tidy(row.duty)) hit.duty = tidy(row.duty);
+        /* 表里点了名，就以表为准。以前这里人员「原样保留」，而包里的
+           岗位带着来源班的人名，于是屏上值日的还是「孙星野、孔子墨」。
+           mode 一并钉成 fixed：原来是 A/B 组轮换的岗位，不钉就会继续
+           按 groups 出人，people 写了也看不见；groups / peopleMap 数据
+           都留着，老师切回轮流就能原样用。
+           表里没写负责人（或一个都没对上名册）时不动 people。 */
+        if (people.length) {
+          hit.people = people;
+          hit.mode = "fixed";
+          stats.peopleUpdated++;
+        }
+        next.push(hit);
         stats.updated++;
         return;
       }
 
-      var people = [];
-      (row.people || []).forEach(function (p) {
-        var n = "";
-        if (p.state === "exact") n = p.resolved || p.name;
-        else if (p.state === "typo" && p.accepted) n = p.suggestion || p.resolved;
-        if (n && people.indexOf(n) < 0) people.push(n);
-      });
-
       var k = 1, id = "";
       do { id = "imp" + k; k++; } while (ids[id]);
       ids[id] = 1;
-      maxOrder += 10;
-      out.roles.push({
+      order += 10;
+      next.push({
         id: id, name: name, duty: tidy(row.duty),
         freq: { kind: "unset" }, people: people,
-        order: maxOrder, assign: "fixed", grp: null
+        order: order, assign: "fixed", grp: null
       });
       stats.added++;
+      stats.noFreq++;
     });
-    return { roles: out, updated: stats.updated, added: stats.added, skipped: stats.skipped };
+
+    /* 表里没有的旧岗位不再保留：它们是来源班的清单，不是这个班的。 */
+    base.roles.forEach(function (r) { if (!used[r.id]) stats.removed++; });
+    base.roles = next;
+    return { roles: base, updated: stats.updated, added: stats.added,
+             skipped: stats.skipped, peopleUpdated: stats.peopleUpdated,
+             removed: stats.removed, noFreq: stats.noFreq };
   }
 
   /* ---------- 草稿：中途关掉不用重填 ---------- */
@@ -1845,8 +1838,23 @@
   }
 
   /* ---------- 渲染 ---------- */
+  /* 这一页是整块重建的（box.innerHTML = ""），重建后 .setup-body 的
+     scrollTop 天然归 0。岗位表那一步内容多，老师在中间点一下勾选、
+     点一下「全不选」，眼前就跳回最上面，得自己再滚回来——触摸屏上
+     等于没法连续操作（2026-11-25 真机反馈）。
+     名单页早就用「就地更新、不整页重画」躲过去了，这里改不了那么细：
+     重建时把滚动位置和展开的折叠区记下来，重建完原样放回去。 */
   function render() {
     if (!box) return;
+    var old = box.querySelector(".setup-body");
+    var keepTop = old ? old.scrollTop : 0;
+    var keepOpen = [];
+    if (old) {
+      Array.prototype.forEach.call(old.querySelectorAll("details.setup-text-sec"), function (d, i) {
+        if (d.open) keepOpen.push(i);
+      });
+    }
+
     box.innerHTML = "";
     var panel = el("div", "setup-panel");
 
@@ -1869,6 +1877,16 @@
 
     panel.appendChild(foot());
     box.appendChild(panel);
+
+    /* 位置必须在挂进文档之后再还原：没挂载的元素没有布局，
+       这时候写 scrollTop 等于没写（实测会老老实实停在 0）。
+       折叠区先恢复展开态，再放滚动位置——展开会让内容变长。 */
+    if (keepOpen.length) {
+      Array.prototype.forEach.call(body.querySelectorAll("details.setup-text-sec"), function (d, i) {
+        if (keepOpen.indexOf(i) >= 0) d.setAttribute("open", "");
+      });
+    }
+    if (keepTop) body.scrollTop = keepTop;
   }
 
   function steps() {
@@ -2531,18 +2549,6 @@
     return d;
   }
 
-  function importField(label, value, onInput, cls, placeholder) {
-    var row = el("div", "setup-import-field");
-    row.appendChild(el("label", null, label));
-    var input = el("input");
-    input.className = cls;
-    input.value = value || "";
-    input.placeholder = placeholder || "";
-    input.addEventListener("input", function () { onInput(input.value.trim()); saveDraft(); });
-    row.appendChild(input);
-    return row;
-  }
-
   function roleNameOf(id) {
     var hit = null;
     ((state.roles && state.roles.roles) || []).forEach(function (r) { if (!hit && r.id === id) hit = r; });
@@ -2687,10 +2693,11 @@
     if (state.importRows && state.importRows.length) box.appendChild(importPreview());
 
     box.appendChild(el("p", "setup-p",
-      "名单里没有的名字不会写入，也不会自动加学生。"));
+      "这份表就是本班的岗位清单：表里有几个，屏上就有几个；"
+      + "表里没有的岗位会从本班移除。名单里没有的名字不会写入，也不会自动加学生。"));
 
     var foot = el("div", "setup-actions");
-    var apply = el("button", "setup-btn primary setup-import-apply", "并入草稿（不保存大屏）");
+    var apply = el("button", "setup-btn primary setup-import-apply", "用这张表作岗位清单（先存草稿）");
     apply.type = "button";
     apply.addEventListener("click", applyImport);
     foot.appendChild(apply);
@@ -2698,14 +2705,20 @@
     return box;
   }
 
+  /* 识别结果只回答一件事：这几行是不是我要的岗位。
+     以前每一行还摊开「姓名精确 / 疑似错字 / 未找到」「置信度 高 / 中 / 低」，
+     岗位名和职责都是输入框，外加「+ 加人」——那是编辑模式，而且一屏放不下，
+     老师滚到一半点一下又弹回顶部（2026-11-25 反馈）。姓名核对仍然照做
+     （见 matchPeople / mergeRoleImport），只是不再摊在配置流程里：
+     对不上的岗位，屏上先显示「待定」，去编辑模式点一下就能选人。 */
   function importPreview() {
     var wrap = el("div", "setup-import-preview");
-    var st = countPeopleStates(state.importRows);
+    var rows = state.importRows || [];
+    var picked = rows.filter(function (r) { return r.selected !== false; }).length;
     wrap.appendChild(el("div", "setup-import-sum",
-      "识别 " + state.importRows.length + " 个岗位 · 姓名精确 " + st.exact
-      + " · 疑似错字 " + st.typo + " · 未找到 " + st.missing + " · 同名 " + st.same));
+      "识别到 " + rows.length + " 行，已选 " + picked + " 行"));
 
-    state.importRows.forEach(function (row) {
+    rows.forEach(function (row) {
       var card = el("div", "setup-import-row");
 
       var head = el("div", "setup-import-row-head");
@@ -2716,79 +2729,25 @@
       pick.addEventListener("change", function () { row.selected = pick.checked; saveDraft(); });
       head.appendChild(pick);
 
-      var name = el("input");
-      name.className = "setup-import-name";
-      name.value = row.name || "";
-      name.placeholder = "岗位名";
-      name.addEventListener("input", function () { row.name = name.value.trim(); saveDraft(); });
-      head.appendChild(name);
-
+      head.appendChild(el("span", "setup-import-name-text", row.name || "（未命名岗位）"));
       head.appendChild(el("span", "setup-import-tag " + (row.targetId ? "update" : "add"),
         row.targetId ? "更新「" + (roleNameOf(row.targetId) || row.name) + "」" : "新增岗位"));
-      head.appendChild(el("span", "setup-import-conf", "置信度 " + (row.confidence || "中")));
       if (row.applied) head.appendChild(el("span", "setup-import-tag applied", "已并入草稿"));
       card.appendChild(head);
 
-      card.appendChild(importField("职责", row.duty || "", function (v) { row.duty = v; },
-        "setup-import-duty", "可以留空"));
-
-      var people = el("div", "setup-import-people");
-      if (!row.people || !row.people.length) {
-        people.appendChild(el("span", "setup-import-person bad", "没有识别到人员"));
-      }
-      (row.people || []).forEach(function (p) {
-        var chip = el("span", "setup-import-person " + p.state);
-        if (p.state === "exact") {
-          chip.textContent = "✓ " + (p.resolved || p.name);
-        } else if (p.state === "typo") {
-          if (p.accepted) {
-            chip.textContent = "✓ " + p.suggestion + "（已采用）";
-          } else {
-            chip.appendChild(el("span", null, "疑似 " + p.name + " → " + p.suggestion));
-            var use = el("button", "setup-import-use", "采用");
-            use.type = "button";
-            use.addEventListener("click", function () {
-              p.accepted = true;
-              p.resolved = p.suggestion;
-              saveDraft();
-              render();
-            });
-            chip.appendChild(use);
-          }
-        } else if (p.state === "same") {
-          chip.textContent = "同名 " + p.name + "（不采用）";
-        } else {
-          chip.textContent = "未找到 " + p.name + "（不采用）";
-        }
-        people.appendChild(chip);
-      });
-
-      /* 名单里有、表上漏写的人：点一下补进来，不用重新上传表格 */
-      var addOne = el("button", "setup-import-add", "+ 加人");
-      addOne.type = "button";
-      addOne.title = "名单里有、但表上漏写的人；打一个字或姓氏首字母就能找";
-      addOne.addEventListener("click", function () {
-        var open = people.querySelector(".setup-quickadd");
-        if (open) {
-          var i = open.querySelector("input");
-          if (i) i.focus();
-          return;
-        }
-        quickAddPerson(row, people);
-      });
-      people.appendChild(addOne);
-
-      card.appendChild(people);
-
-      if (row.pending && row.pending.length) {
-        var pd = el("div", "setup-import-pending");
-        row.pending.forEach(function (t) { pd.appendChild(el("span", null, t)); });
-        card.appendChild(pd);
-      }
-
-      if (row.raw) card.appendChild(el("div", "setup-import-raw", "原文：" + row.raw));
+      if (row.duty) card.appendChild(el("div", "setup-import-duty-text", row.duty));
       wrap.appendChild(card);
     });
+
+    /* 只报数量，不报名字：老师要知道「有岗位没人」，但不需要在配置阶段
+       逐个人核对——那是编辑模式里换人那一步的事。 */
+    var st = countPeopleStates(rows);
+    var noPeople = st.missing + st.typo + st.same;
+    if (noPeople) {
+      wrap.appendChild(el("p", "setup-p",
+        "其中 " + noPeople + " 个岗位没在名单里对上负责人。屏上会先显示「待定」，"
+        + "之后在编辑模式里点一下就能选人。"));
+    }
     return wrap;
   }
 
@@ -2820,7 +2779,7 @@
             ? "第一个工作表" + (res.sheetName ? "「" + res.sheetName + "」" : "")
             : "文档里最大的表格";
           state.importFlash = "从「" + filename + "」读到 " + parsed.rows.length
-            + " 个岗位（" + where + "）。核对姓名后再并入草稿。";
+            + " 个岗位（" + where + "）。确认这几行是你要的岗位，再并入草稿。";
         } else {
           state.importFlash = "从「" + filename + "」没读到岗位行；可以试试把表格复制粘贴进来。";
         }
@@ -2855,7 +2814,7 @@
       state.importFlash = (res.warnings && res.warnings.length ? res.warnings[0] + "。" : "")
         + "试试直接把表格粘进来。";
     } else {
-      state.importFlash = "识别到 " + res.rows.length + " 个岗位，先核对姓名。";
+      state.importFlash = "识别到 " + res.rows.length + " 个岗位，确认后并入草稿。";
     }
     saveDraft();
     render();
@@ -2882,72 +2841,63 @@
     state.roles = m.roles;
     state.importOpen = false;
     state.importFlash = "";
-    state.flash = "已并入草稿：更新 " + m.updated + " 个，新增 " + m.added
-      + " 个岗位（执行频率未设置，不会上屏）。点「应用到这台机器」才写进大屏。";
+    /* 结果要说清三件事：现在有几个岗位、哪些还上不了屏、哪些被移除了。
+       「没显示时间」不能只写一句「不会上屏」——老师会以为上传失败了。 */
+    var bits = ["已按你的表设成 " + (m.updated + m.added) + " 个岗位"];
+    if (m.updated) bits.push(m.updated + " 个沿用了原来的显示时间");
+    if (m.added) bits.push(m.added + " 个是新的，还没有显示时间，屏上暂时不显示（到编辑模式设一下）");
+    if (m.removed) bits.push("表里没有的 " + m.removed + " 个已移除");
+    state.flash = bits.join("；") + "。点「应用到这台机器」才写进大屏。";
     saveDraft();
     render();
   }
 
+  /* 岗位这一块只做一件事：把老师手上的岗位表读进来。
+     以前这里把每个岗位摊成一叠卡片，名称 / 职责 / 时间都是输入框，
+     等于在「配置」里开了一份编辑模式的副本——同样的字段两处能改，
+     改坏了不知道以哪边为准，一页也因此长得要滚很久
+     （2026-11-25 反馈）。改岗位去编辑模式，那里字段更全、还有换人。 */
   function roleSection(p) {
     var rs = state.roles;
     if (!rs || !Array.isArray(rs.roles) || !rs.roles.length) {
       p.appendChild(el("p", "setup-p",
         "这个包没有岗位表，可以粘贴，也可以跳过。"));
       importStart(p);
+      p.appendChild(el("p", "setup-p",
+        "岗位的名称、职责和换人方式，在编辑模式里改。"));
       return;
     }
 
     var src = el("div", "setup-src");
     if (rs.class && rs.class !== state.klass) {
-      src.classList.add("warn");
+      /* 不能叫 .warn：主屏那条「还没配置」的全屏提示就是 .warn，
+         它带着 display:none，套上去等于把这块提醒藏掉（2026-11-25 发现）。 */
+      src.classList.add("setup-src-bad");
       src.appendChild(el("b", null, "这些岗位来自打包来源班「" + rs.class + "」"));
       src.appendChild(el("span", null, "现在配的是「" + (state.klass || "未填") + "」。"
-        + "可以只改名称、职责和执行频率里的时间；人员、轮换规则都原样保留。"
-        + "不想用就跳过这一步——屏上不会写入任何岗位。"));
+        + "上传本班的岗位表，岗位的名称和数量就以表为准；不想用就跳过这一步。"
+        + "屏上不会写入任何岗位。"));
     } else {
       src.appendChild(el("b", null, "岗位清单：共 " + rs.roles.length + " 个"
         + (rs.class ? "（来源班「" + rs.class + "」）" : "")));
-      src.appendChild(el("span", null, "只改名称、职责和执行频率里的时间；人员、轮换规则原样保留。"));
+      src.appendChild(el("span", null, "有本班的岗位表就上传——岗位的名称和数量会按表来。"));
     }
     p.appendChild(src);
     importStart(p);
 
-    var list = el("div", "setup-roles");
-    rs.roles.forEach(function (r) {
-      var card = el("div", "setup-role");
-
-      var head = el("div", "setup-role-head");
-      var f = r.freq || {};
-      head.appendChild(el("span", "setup-role-id", r.id));
-      var freqEl = el("span", "setup-role-freq" + (f.kind === "unset" ? " unset" : ""), freqText(f));
-      head.appendChild(freqEl);
-      card.appendChild(head);
-
-      card.appendChild(field("名称", r.name, function (v) {
-        state.roles = editRole(state.roles, r.id, "name", v);
-      }));
-      card.appendChild(field("职责", r.duty || "", function (v) {
-        state.roles = editRole(state.roles, r.id, "duty", v);
-      }, "text", "一句话写清要做什么"));
-
-      /* 执行频率里的时间：有时间的岗位逐条给输入框，改一处只动这一处。
-         kind 为 unset / each / task 的没有时间可填，保持只读说明。 */
-      if (Array.isArray(f.times) && f.times.length) {
-        f.times.forEach(function (t, i) {
-          card.appendChild(field("时间", t, function (v) {
-            var now = (state.roles.roles.filter(function (x) { return x.id === r.id; })[0] || {}).freq || {};
-            var times = (now.times || []).slice();
-            times[i] = v;
-            state.roles = editRoleFreqTimes(state.roles, r.id, times);
-            freqEl.textContent = freqText(now.kind ? { kind: now.kind, event: now.event,
-              task: now.task, times: times } : { kind: "unset" });
-          }, "time"));
-        });
-      }
-
-      list.appendChild(card);
-    });
-    p.appendChild(list);
+    /* 新岗位没有显示时间就不上屏。这不是失败，但老师必须知道——
+       否则「传完表、屏上没变」会被当成又坏了（2026-11-25）。
+       常驻显示，不只在并入后弹一句。 */
+    var noTime = rs.roles.filter(function (r) {
+      return !r.freq || r.freq.kind === "unset";
+    }).length;
+    if (noTime) {
+      p.appendChild(el("p", "setup-p",
+        "其中 " + noTime + " 个岗位还没有显示时间，屏上暂时不显示；"
+        + "到编辑模式里给它们定个时间就会上屏。"));
+    }
+    p.appendChild(el("p", "setup-p",
+      "岗位的名称、职责和换人方式，在编辑模式里改。"));
   }
 
   function textSectionList(p) {
@@ -3029,124 +2979,12 @@
     }
   }
 
-  /* ---------- 完成页：时间线预览 ----------
-     配完不用等到明天：用草稿里的作息和课表现算一天给老师看。
-     不走 Runtime.day()，那份缓存读的是已保存的配置，看不到还没应用的改动。 */
-  var TL_TYPE = {
-    class: "上课", break: "课间", meal: "午餐", noon: "午间",
-    ritual: "固定", after: "课后服务", closed: "放学"
-  };
-
-  function dayKeyShift(key, n) {
-    var p = String(key).split("-");
-    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
-    d.setUTCDate(d.getUTCDate() + n);
-    return d.getUTCFullYear() + "-" +
-      (d.getUTCMonth() < 9 ? "0" : "") + (d.getUTCMonth() + 1) + "-" +
-      (d.getUTCDate() < 10 ? "0" : "") + d.getUTCDate();
-  }
-
-  function draftConfig() {
-    var c = cfg();
-    var tt = clone(c.timetable || {});
-    tt.blocks = clone(state.blocks || []);
-    if (state.noonBand) tt.noonBand = clone(state.noonBand);
-    var sc = clone(c.schedule || {});
-    sc.entries = clone(state.entries || []);
-    sc.class = state.klass;
-    /* 空包没有午间规则；给一个最普通的，预览才不至于算不出来。
-       这和 runtime.js 的 EMPTY_NOON 是同一份兜底。 */
-    var noon = c.noon || {
-      defaultPreset: "rest", weekRule: {},
-      presets: {
-        rest: { label: "午间", title: "午间休息", items: [], tip: "闭眼趴一会儿，不说话，不追跑" }
-      }
-    };
-    return {
-      meta: { school: state.school, klass: state.klass, headTeacher: state.head },
-      timetable: tt,
-      schedule: sc,
-      content: c.content || [],
-      roles: c.roles || { roles: [], dutyCycle: {} },
-      noon: noon,
-      calendar: c.calendar || { days: {} }
-    };
-  }
-
-  /* 今天不上学（周末 / 节假日）就往后找，最多看两周：
-     预览要回答「配完到底长什么样」，不能只甩一张「今天不上学」。 */
-  function previewInfo() {
-    if (!root.Schedule || !root.Schedule.buildDay) return null;
-    var key = (root.Clock && root.Clock.dayKey) ? root.Clock.dayKey() : "";
-    if (!key) return null;
-    var conf = draftConfig(), day = null, moved = false;
-    try {
-      for (var i = 0; i < 15; i++) {
-        var d = root.Schedule.buildDay(conf, dayKeyShift(key, i));
-        if (d && d.inSchool) { day = d; moved = i > 0; break; }
-        if (!day) day = d;
-      }
-    } catch (e) { return null; }
-    if (!day || !day.inSchool) return { day: day, key: key, moved: false, empty: true };
-    return { day: day, key: key, moved: moved };
-  }
-
-  function tlDetail(it) {
-    if (it.type === "class") {
-      var bits = [];
-      if (it.periodNo) bits.push("第" + it.periodNo + "节");
-      bits.push(it.subject || "—");
-      if (it.teacher) bits.push(it.teacher);
-      return bits.join("　");
-    }
-    if (it.items && it.items.length) return it.items.join("、");
-    return it.tip || "";
-  }
-
-  function previewSection(live) {
-    var pv = previewInfo();
-    var box = el("div", "setup-preview");
-    box.appendChild(el("div", "setup-preview-title", "配好之后，屏上是这样"));
-
-    if (!pv) {
-      box.appendChild(el("p", "setup-p", "算不出时间线，先重启程序试试。"));
-      return box;
-    }
-    if (pv.empty || !pv.day || !pv.day.inSchool) {
-      box.appendChild(el("p", "setup-p", "接下来两周都是假期，先检查校历或开学日。"));
-      return box;
-    }
-
-    var d = pv.day;
-    var meta = [d.date, d.weekdayName];
-    if (isFinite(d.weekNo)) meta.push("第 " + d.weekNo + " 周");
-    if (d.calendar && d.calendar.label) meta.push(d.calendar.label);
-    var head = el("div", "setup-preview-meta", meta.join("　·　"));
-    box.appendChild(head);
-    if (pv.moved) {
-      box.appendChild(el("p", "setup-preview-note", "今天不上学，先看下一个上学日。"));
-    }
-
-    var list = el("div", "setup-timeline");
-    (d.timeline || []).forEach(function (it) {
-      var row = el("div", "tl-row tl-" + (it.type || "other"));
-      row.appendChild(el("span", "tl-time", it.start + "–" + it.end));
-      row.appendChild(el("span", "tl-name", blockName(it) || TL_TYPE[it.type] || ""));
-      row.appendChild(el("span", "tl-detail", tlDetail(it)));
-      list.appendChild(row);
-    });
-    box.appendChild(list);
-
-    var warn = (d.warnings || []).filter(function (w) {
-      return w.code === "LESSON_MISSING";
-    }).length;
-    box.appendChild(el("p", "setup-p", live
-      ? "屏上现在就是这样。"
-      : "只是预览；点「应用到这台机器」才上屏。"
-        + (warn ? "空着的 " + warn + " 节显示「—」。" : "")));
-    return box;
-  }
-
+  /* ---------- 完成页 ----------
+     这里只回答两件事：现在生效没有、配的是什么。
+     以前这一页顶上还挂着一块「配好之后，屏上是这样」的时间线预览，
+     配上岗位表那一段的人员对应和置信度，等于把编辑模式和调试信息
+     塞进了配置流程（2026-11-25 反馈）。配置只负责「把文件变成能用的屏」，
+     看效果、改细节都回大屏和编辑模式，那里本来就有。 */
   function pageDone() {
     var p = el("div", "setup-page on");
     var filled = state.entries.filter(function (e) { return e.subject; }).length;
@@ -3176,8 +3014,6 @@
     }
     sum.appendChild(el("div", null, "课表：已填 " + filled + " 格 / " + (periodCount() * 5) + " 格"));
     p.appendChild(sum);
-
-    p.appendChild(previewSection(live));
 
     roleSection(p);
     textSectionList(p);

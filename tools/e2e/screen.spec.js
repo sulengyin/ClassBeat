@@ -109,6 +109,37 @@ test("验证码挡住乱输，答对才进设置", async ({ page, request }) => 
   await expect(page.locator("#epTitle")).toContainText(ping.class);
 });
 
+test("屏上不出现本班名单之外的人名，对不上的岗位显示「待定」（真机 2026-11-25）", async ({ page }) => {
+  /* 真机反馈：老师上传了自己的名单和岗位表，屏上的值日人却是别班的学生。
+     根因有两层：并岗位表时人员「原样保留」，而包里带着来源班的人名；
+     屏面又把岗位里存的姓名原样打印出来。
+     这条从大屏这一端钉住：不在本班名单里的名字一律不上屏。 */
+  await openScreen(page, "2026-11-05T17:12:00+08:00");
+
+  const withPeople = (people) => ({
+    students: [{ name: "李青禾", active: true }, { name: "周梓萱", active: true }],
+    roles: {
+      dutyCycle: {},
+      roles: [{
+        id: "r01", name: "路队长", duty: "排队", people,
+        freq: { kind: "event", event: "列队出发", times: ["17:10"] }, order: 10,
+      }],
+    },
+  });
+
+  // 岗位里存的是来源班的学生：屏上不许出现这个名字
+  await page.evaluate((cfg) => Store.patchConfig(cfg), withPeople(["孙星野"]));
+  const duty = page.locator("#duty");
+  await expect(duty).toContainText("路队长");
+  await expect(duty, "别班学生姓名不能上屏").not.toContainText("孙星野");
+  await expect(duty.locator(".who", { hasText: "待定" })).toBeVisible();
+
+  // 换成本班名单里的人：立刻显示本人
+  await page.evaluate((cfg) => Store.patchConfig(cfg), withPeople(["李青禾"]));
+  await expect(duty).toContainText("李青禾");
+  await expect(duty, "有人时不该再说待定").not.toContainText("待定");
+});
+
 test("值日岗位指定了人，大屏就显示这个人（不再整组「待定」）", async ({ page, request }) => {
   /* 真机反馈：老师在值日岗位里选了某某学生，大屏下方那条却还是「待定」。
      根因是岗位人员解析把 people 排在轮换表之后，且组里任一条没排人
