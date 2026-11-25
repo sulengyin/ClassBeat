@@ -60,7 +60,8 @@ pub fn run() {
     #[cfg_attr(not(feature = "updater"), allow(unused_mut))]
     let mut builder = tauri::Builder::default()
         // 第二次双击：不开第二个实例，把已有大屏拉到前面
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            logging::info(&format!("第二个实例被拦下，改为把大屏拉到前面（argv={argv:?} cwd={cwd}）"));
             window::show_or_open(app);
         }));
 

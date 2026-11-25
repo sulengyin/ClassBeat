@@ -276,16 +276,43 @@
      换人时候选里就多出两个字的假人；序号也会变成学号。 */
   var ROSTER_HEADER = /^(姓名|学生姓名|学生|名字|名单|序号|学号|编号|班级|性别|男|女|备注|联系电话|name|no\.?)$/i;
 
+  /* 一张「班级信息表」里除了姓名，还常有「学校：…」「班级：…」「班主任：…」
+     这样的字段行。它们的值（「五（1）班」「张老师」）都短得像人名，
+     以前一律被当成学生加进名单——老师看到的就是「上传了文件，班主任没填上，
+     名单里却多了个老师」。这里先把字段行认出来：值回填到对应字段，
+     行本身不参与姓名提取。 */
+  var META_LINE = /^\s*(学校|校区|班级|年级|班主任|任课教师|教师|老师)\s*[：:]/;
+
+  function metaFromText(text) {
+    var out = {};
+    String(text == null ? "" : text).split(/[\r\n]+/).forEach(function (line) {
+      var m = String(line).match(/^\s*([^\s：:]{1,6})\s*[：:]\s*(.+?)\s*$/);
+      if (!m) return;
+      var k = m[1].replace(/\s+/g, "");
+      var v = m[2].trim();
+      if (!v || v.length > 20) return;
+      if (/^(学校|校区)$/.test(k)) out.school = v;
+      else if (/^班级$/.test(k)) out.klass = v;
+      else if (/^(班主任|任课教师|教师|老师)$/.test(k)) out.head = v;
+    });
+    return out;
+  }
+
   function looksLikeName(s) {
     if (!s || s.length > 12) return false;
     if (ROSTER_HEADER.test(s)) return false;
     if (/^[\d\s.\-]+$/.test(s)) return false;
+    /* 「张老师 / 李老师」这种是称呼不是学生。真有人名字最后一个字是「师」
+       也只会是「王师」这类两个字的名字，不会以「老师」结尾。 */
+    if (s.length <= 6 && /(老师|教师)$/.test(s)) return false;
     return true;
   }
 
   function extractNames(text) {
     var out = [];
     String(text == null ? "" : text).split(/[\r\n]+/).forEach(function (line) {
+      /* 字段行整行跳过，它的值已经交给 metaFromText 了 */
+      if (META_LINE.test(line)) return;
       /* 带 tab 就是表格行：一行里可能并排放着序号、姓名、性别，
          逐个单元格判，不像人名的直接丢。 */
       var cells = line.indexOf("\t") >= 0 ? line.split("\t") : [line];
@@ -2040,14 +2067,31 @@
     file.addEventListener("change", function () {
       readPickedFile(file).then(function (res) {
         if (!res) return;
+        /* 表头里的学校 / 班级 / 班主任顺手填上：老师传一份班级信息表，
+           本来图的就是不用再手打一遍。已经有值的不覆盖——手填的优先。 */
+        var meta = metaFromText(res.text);
+        var filled = [];
+        if (meta.school && !state.school) { state.school = meta.school; filled.push("学校"); }
+        if (meta.klass && !state.klass) { state.klass = meta.klass; filled.push("班级"); }
+        if (meta.head && !state.head) { state.head = meta.head; filled.push("班主任"); }
+        var filledHint = filled.length
+          ? "顺手填了：" + filled.join("、") + "（第一步可以再改）。"
+          : "";
+
         var m = mergeNames(extractNames(res.text));
         if (!m.names.length) {
-          state.rosterFlash = "「" + res.name + "」里没读到姓名，换个文件或直接粘贴。";
+          state.rosterFlash = "「" + res.name + "」里没读到姓名，换个文件或直接粘贴。"
+            + (filledHint ? filledHint : "");
           saveDraft();
           render();
           return;
         }
         importNames(m.names, res.name);
+        if (filledHint) {
+          state.rosterFlash = (state.rosterFlash || "") + filledHint;
+          saveDraft();
+          render();
+        }
       }).catch(function (err) {
         state.rosterFlash = "读不了这个文件：" + (err && err.message ? err.message : "格式不对");
         saveDraft();
@@ -3619,6 +3663,9 @@
     _addedRoleCount: addedRoleCount,
     _parseImport: parseImport,
     _readOfficeFile: readOfficeFile,
+    /* 名单文件：字段行（学校/班级/班主任）与姓名必须分得开 */
+    _extractNames: extractNames,
+    _metaFromText: metaFromText,
     _matchPeople: function (text, roster) { return matchPeople(text, roster || rosterNames()); },
     _mergeRoleImport: mergeRoleImport,
     _rosterNames: rosterNames,

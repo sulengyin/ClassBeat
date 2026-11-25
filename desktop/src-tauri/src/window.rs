@@ -40,6 +40,10 @@ fn create_screen(app: &AppHandle, port: u16) {
         .fullscreen(true)
         .always_on_top(true)
         .resizable(false)
+        /* 不进任务栏：大屏 24 小时开着，任务栏里再挂一个按钮只是碍事，
+           而且任务栏按 exe 路径缓存图标，覆盖安装后常显示上一个版本的图案。
+           统一只留右下角托盘图标（2026-11-25 真机反馈）。 */
+        .skip_taskbar(true)
         .visible(false)
         .focused(true)
         .build();
@@ -66,16 +70,91 @@ fn create_screen(app: &AppHandle, port: u16) {
     }
 }
 
-/// 把大屏露出来：先断言全屏，再显示、置顶、抢焦点。
-/// 托盘「打开大屏」、热键恢复、首次建窗都走这一条，保证每次回来的都是满屏。
+/// 把大屏露出来：先让 Win32 把窗口从最小化里拉回来，再补全屏 / 置顶 / 焦点。
+///
+/// **为什么不能只靠 Tauri 的方法**：页面上的「最小化」是服务用 Win32
+/// `SW_MINIMIZE` 做的（`server-rs/src/win.rs`），Tauri 侧完全不知情——
+/// 它记的状态还是「可见、全屏」，于是 `unminimize()` 直接空转。真机上
+/// 表现就是「点了最小化，再点图标 / 托盘『打开大屏』，什么都没发生」。
+/// 这里先用 `IsIconic` + `SW_RESTORE` 按窗口实际状态还原，再走 Tauri 的补全，
+/// 两条路都走一遍，谁的状态准就听谁的。
 fn reveal(w: &tauri::WebviewWindow) {
+    let visible_before = w.is_visible().unwrap_or(false);
+    let minimal_before = w.is_minimized().unwrap_or(false);
+
+    #[cfg(windows)]
+    native_restore(w);
+
+    let _ = w.show();
+
+    #[cfg(windows)]
+    {
+        /* Tauri 的 skip_taskbar 只在建窗时调一次 ITaskbarList::DeleteTab，
+           窗口重新 show 出来以后任务栏又可能把按钮加回来。所以放在 show 之后
+           每次都补一遍窗口样式，才是持久的「永远不进任务栏」。 */
+        hide_from_taskbar(w);
+    }
     if !w.is_fullscreen().unwrap_or(false) {
         let _ = w.set_fullscreen(true);
     }
-    let _ = w.show();
-    let _ = w.unminimize();
     let _ = w.set_always_on_top(true);
     let _ = w.set_focus();
+
+    /* 以前每一步都是 `let _ =`，恢复失败时日志里一个字都没有，
+       真机报「点图标没反应」只能靠猜。现在把前后状态记下来。 */
+    logging::info(&format!(
+        "恢复大屏：可见 {}→{}，最小化 {}→{}，全屏 {}",
+        visible_before,
+        w.is_visible().unwrap_or(false),
+        minimal_before,
+        w.is_minimized().unwrap_or(false),
+        w.is_fullscreen().unwrap_or(false)
+    ));
+}
+
+/// 把窗口标记成「工具窗」：任务栏不再给它按钮，Alt+Tab 也跳过它。
+/// 用窗口样式而不是只靠 `ITaskbarList::DeleteTab`——后者是一次性的，
+/// 窗口每次重新显示都可能被任务栏加回来。
+#[cfg(windows)]
+fn hide_from_taskbar(w: &tauri::WebviewWindow) {
+    use std::ffi::c_void;
+
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_TOOLWINDOW,
+    };
+
+    let Ok(h) = w.hwnd() else { return };
+    let hwnd = HWND(h.0 as *mut c_void);
+    unsafe {
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let want = ex | WS_EX_TOOLWINDOW.0 as isize;
+        if ex != want {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, want);
+        }
+    }
+}
+
+/// 按窗口的真实状态（而不是 Tauri 记的状态）把它从最小化 / 后台拉回来。
+#[cfg(windows)]
+fn native_restore(w: &tauri::WebviewWindow) {
+    use std::ffi::c_void;
+
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE,
+    };
+
+    let Ok(h) = w.hwnd() else { return };
+    /* 跨 windows crate 版本取裸句柄：tauri 依赖的版本号未必和这里一致，
+       直接传 HWND 会因类型不同编不过，取 .0 再转最稳。 */
+    let hwnd = HWND(h.0 as *mut c_void);
+    unsafe {
+        if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+        let _ = SetForegroundWindow(hwnd);
+    }
 }
 
 /// 关大屏 ≠ 关应用。
@@ -119,8 +198,24 @@ pub fn show_or_open(app: &AppHandle) {
     }
     let port = app.state::<AppState>().port();
     if port == 0 {
-        // 服务还在起（双击第二下、或开机自启后立刻点托盘）
-        logging::warn("服务尚未就绪，稍后再开大屏");
+        /* 服务还在起（双击第二下、或开机自启后立刻点图标）。
+           以前这里只打一行 warn 就 return，老师看到的就是「点了图标没反应」。
+           现在等它就绪再开，最多等 10 秒——反正此时也没有窗口可显示。 */
+        logging::warn("服务尚未就绪，等它就绪后再开大屏");
+        let handle = app.clone();
+        std::thread::spawn(move || {
+            for _ in 0..20 {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                let p = handle.state::<AppState>().port();
+                if p != 0 {
+                    if handle.get_webview_window("screen").is_none() {
+                        open_screen(&handle, p);
+                    }
+                    return;
+                }
+            }
+            logging::error("等了 10 秒服务仍没就绪，大屏没有打开（看 logs/app.log 与 server.log）");
+        });
         return;
     }
     open_screen(app, port);
