@@ -11,11 +11,17 @@
 ;   * 任何一步失败都不阻断安装（老师装不上比装不完美更糟），但一律写日志
 ; ============================================================================
 
+; LogicLib 提供 ${If}/${ElseIf}。模板虽然经 MUI2 间接引入过，但那属于
+; 模板实现细节，不能当契约——自己显式引入，NSIS 的 include guard 保证不会重复。
+!include LogicLib.nsh
+
 !define CB_RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
 !define CB_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClassBeat"
 !define CB_APP_PATHS "Software\Microsoft\Windows\CurrentVersion\App Paths\classbeat.exe"
 !define CB_LEGACY "$LOCALAPPDATA\ClassBeat"
 !define CB_DATA "$APPDATA\ClassBeat"
+; 安装需要的最小磁盘空间（MB）。整包约 30 MB，再给解压与安全软件扫描留一倍余量。
+!define CB_NEED_MB 120
 
 ; ---------------------------------------------------------------------------
 ; 清场脚本的定位（实测结论，对应 docs/08 §8.2 最后一行）：
@@ -54,6 +60,80 @@
   !insertmacro CB_LOG "=== ClassBeat 安装开始 ==="
   !insertmacro CB_LOG "INSTDIR=$INSTDIR"
 
+  ; ---- 0. 先照一张环境快照，再决定动不动手 ----
+  ; 起因（2026-11-25 真机反馈）：老师只看到「抽取：无法写入文件 classbeat.exe」，
+  ; 而这句错可能来自四种完全不同的原因（位数、空间、占用、安全软件）。
+  ; 现场只有老师本人，所以把判断依据一次性记进这一个文件：
+  ; 系统版本、位数、可用空间、已装版本、每一步的退出码。
+  ReadRegStr $3 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" "ProductName"
+  ReadRegStr $4 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" "DisplayVersion"
+  ReadRegStr $5 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" "CurrentBuild"
+  !insertmacro CB_LOG "系统：$3 $4（build $5）"
+  ReadRegStr $3 HKCU "${CB_UNINST_KEY}" "DisplayVersion"
+  !insertmacro CB_LOG "已装版本：$3"
+  ${If} ${RunningX64}
+    !insertmacro CB_LOG "系统位数：64 位"
+  ${ElseIf} ${IsNativeARM64}
+    !insertmacro CB_LOG "系统位数：ARM64"
+  ${Else}
+    !insertmacro CB_LOG "系统位数：32 位"
+  ${EndIf}
+
+  ; ---- 0.1 位数不对就别装了 ----
+  ; 主程序是 64 位（PE32+），32 位 Windows 一定打不开，Windows 只会弹
+  ; 「此应用无法在你的电脑上运行」。以前一路装到底，装完留一个点不动的图标，
+  ; 老师会以为「更新把软件装坏了」。宁可现在说明白。
+  ${IfNot} ${RunningX64}
+    ${IfNot} ${IsNativeARM64}
+      !insertmacro CB_LOG "!!! 32 位 Windows，主程序是 64 位的，停止安装"
+      FileClose $9
+      IfSilent cb_arch_done
+        MessageBox MB_ICONSTOP|MB_OK "这台电脑是 32 位 Windows。$\r$\n$\r$\nClassBeat 需要 64 位 Windows 10 / 11；现在装上也会打不开（Windows 会提示「此应用无法在你的电脑上运行」）。$\r$\n$\r$\n请换一台 64 位电脑安装。安装日志：$\r$\n$TEMP\classbeat-install.log"
+      cb_arch_done:
+      Quit
+    ${EndIf}
+  ${EndIf}
+
+  ; ---- 0.2 空间与写权限 ----
+  ; NSIS 是自己解压再写盘的，空间不足或目录不可写，报的都是同一句
+  ; 「无法写入文件」，跟「被占用」长得一模一样。先分清。
+  CreateDirectory "$INSTDIR"
+  ClearErrors
+  ${DriveSpace} "$INSTDIR" "/D=F /S=M" $3
+  IfErrors cb_space_unknown
+    !insertmacro CB_LOG "可用空间：$3 MB"
+    IntCmp $3 ${CB_NEED_MB} cb_space_ok cb_space_low cb_space_ok
+  cb_space_low:
+    !insertmacro CB_LOG "!!! 空间不足：只有 $3 MB"
+    FileClose $9
+    IfSilent cb_space_quit
+      MessageBox MB_ICONSTOP|MB_OK "磁盘空间不够，装不下。$\r$\n$\r$\n$INSTDIR 所在磁盘只剩 $3 MB，至少需要 ${CB_NEED_MB} MB。$\r$\n请清理磁盘后再安装。安装日志：$\r$\n$TEMP\classbeat-install.log"
+    cb_space_quit:
+    Quit
+  cb_space_ok:
+    Goto cb_space_checked
+  cb_space_unknown:
+    !insertmacro CB_LOG "可用空间：读不出来，跳过这项检查"
+  cb_space_checked:
+
+  ; 往安装目录真写一个空文件试试：目录权限、受控文件夹访问、安全软件
+  ; 都会在这一步现形，而不是等解压到一半才失败。
+  ClearErrors
+  FileOpen $2 "$INSTDIR\.cb-write-probe" w
+  IfErrors cb_nowrite
+  FileClose $2
+  Delete "$INSTDIR\.cb-write-probe"
+  !insertmacro CB_LOG "写权限：正常"
+  Goto cb_write_ok
+  cb_nowrite:
+    !insertmacro CB_LOG "!!! 安装目录写不进去"
+    FileClose $9
+    IfSilent cb_nowrite_quit
+      MessageBox MB_ICONSTOP|MB_OK "没法往这个目录写文件：$\r$\n$INSTDIR$\r$\n$\r$\n最常见的原因是安全软件（360、火绒、电脑管家）或学校的管控策略拦下了未签名的程序。$\r$\n$\r$\n请先退出安全软件，把这个目录加入白名单，再重新安装。安装日志：$\r$\n$TEMP\classbeat-install.log"
+    cb_nowrite_quit:
+    Quit
+  cb_write_ok:
+
   ; ---- 1. 停掉正在跑的旧版（0.3.x：隐藏的 powershell 看门狗 + pythonw + 浏览器 kiosk）----
   ; 用随包的小脚本按命令行精确匹配，绝不误杀别人的 python / powershell。
   ; nsExec 不创建窗口：安装全程用户看不到控制台。
@@ -67,9 +147,43 @@
   Pop $1
   Pop $2
   !insertmacro CB_LOG "停旧版：退出码=$1 $2"
+  ; PowerShell 可能根本起不来：学校组策略、安全软件、以及"禁止脚本宿主"这类
+  ; 加固都会让 nsExec 直接回 -1（2026-11-25 本机复现：进程创建就被拦）。
+  ; 这时用系统自带的 taskkill 按映像名兜底 —— classbeat.exe 这个名字是本产品
+  ; 独有，按名字收不会误伤别的程序；0.3.x 的 pythonw 拿不到命令行，只能靠上面
+  ; 那个 ps1，兜底覆盖不到，所以日志里要写清楚。
+  StrCmp $1 "0" cb_stop_done 0
+    !insertmacro CB_LOG "停旧版没用上 PowerShell，改用 taskkill 兜底"
+    nsExec::Exec 'taskkill /F /IM classbeat.exe /T'
+    Pop $0
+    !insertmacro CB_LOG "taskkill：退出码=$0（128=没有这个进程，属于正常）"
+  cb_stop_done:
   Sleep 1500
   Delete "$TEMP\cb-stop-legacy.ps1"
   SetOutPath $INSTDIR
+
+  ; ---- 1.1 停完了再看一眼：文件还被占着就到此为止 ----
+  ; 这一步是本轮真机反馈的正解。老师双击安装包时，ClassBeat 通常正在跑
+  ; （它随开机自启）。旧版必须是「应用内更新」才有机会先退出，手动装包
+  ; 只能靠上面那个 ps1 去结束进程；一旦它被组策略或安全软件挡住，
+  ; 解压就会在 classbeat.exe 上失败——而 NSIS 只回一句「无法写入文件」，
+  ; 更糟的是文件可能已经被截断，老师再点桌面图标就变成
+  ; 「此应用无法在你的电脑上运行」，两句话其实是一个原因。
+  IfFileExists "$INSTDIR\classbeat.exe" 0 cb_lock_ok
+    ClearErrors
+    FileOpen $2 "$INSTDIR\classbeat.exe" a
+    IfErrors cb_locked
+    FileClose $2
+    !insertmacro CB_LOG "占用检查：classbeat.exe 没有被占用"
+    Goto cb_lock_ok
+  cb_locked:
+    !insertmacro CB_LOG "!!! classbeat.exe 仍被占用，停止安装"
+    FileClose $9
+    IfSilent cb_lock_quit
+      MessageBox MB_ICONEXCLAMATION|MB_OK "ClassBeat 的程序文件正被占用，装不进去。$\r$\n$\r$\n最常见的原因是 ClassBeat 还在运行；也可能是安全软件正在扫描这个文件。$\r$\n$\r$\n请这样处理：$\r$\n1. 看屏幕右下角的托盘区，右键 ClassBeat 的小图标 → 退出；$\r$\n2. 如果找不到图标，就重启电脑；$\r$\n3. 然后重新双击安装包。$\r$\n$\r$\n现在就停下，是为了避免把主程序写成半截——那样双击图标只会得到「此应用无法在你的电脑上运行」。$\r$\n$\r$\n安装日志：$TEMP\classbeat-install.log"
+    cb_lock_quit:
+    Quit
+  cb_lock_ok:
 
   ; ---- 2. 旧版数据搬过来（只搬缺失的，绝不覆盖新装已有的）----
   ; 0.3.x 把 data/ backups/ update-source.txt 和程序放在一起。
@@ -166,6 +280,20 @@
     MessageBox MB_ICONSTOP|MB_OK "安装不完整：$\r$\n$INSTDIR\classbeat.exe$\r$\n不存在。$\r$\n$\r$\n请先卸载再重新安装，安装日志在：$\r$\n$TEMP\classbeat-install.log"
     Goto cb_main_done
   cb_main_ok:
+    ; 文件在 ~ 4 MB，明显小于这个数就是「写了一半」——多半是解压时被杀软
+    ; 或占用打断。这种 exe 双击只会得到「此应用无法在你的电脑上运行」，
+    ; 必须当场说清楚，不能让老师拿着一个残缺程序去猜。
+    FileOpen $2 "$INSTDIR\classbeat.exe" r
+    IfErrors cb_main_size_ok
+    FileSeek $2 0 END $3
+    FileClose $2
+    !insertmacro CB_LOG "主程序大小：$3 字节"
+    IntCmp $3 1000000 cb_main_small cb_main_small cb_main_size_ok
+  cb_main_small:
+    !insertmacro CB_LOG "!!! 主程序不完整（$3 字节），安装被中断"
+    MessageBox MB_ICONSTOP|MB_OK "主程序没写完整（只有 $3 字节），现在打开会提示「此应用无法在你的电脑上运行」。$\r$\n$\r$\n请先退出 ClassBeat，并按日志里的提示排除安全软件拦截，然后重新运行安装包。$\r$\n$\r$\n安装日志：$TEMP\classbeat-install.log"
+    Goto cb_main_done
+  cb_main_size_ok:
     !insertmacro CB_LOG "主程序已就位"
   cb_main_done:
 

@@ -267,7 +267,18 @@ fn check_hooks(src: &Path, errors: &mut Vec<String>) {
     need(text.contains("WriteRegStr HKCU"), "hooks.nsh 没有写注册表（App Paths / 自启 / 协议）", errors);
     need(text.contains("netsh advfirewall"), "hooks.nsh 没有防火墙规则", errors);
     need(text.contains("update-source.txt"), "hooks.nsh 没有接管旧版的 update-source.txt", errors);
-    need(!text.contains("${If}"), "hooks.nsh 用了 LogicLib 的 ${If}，但模板不保证引入 LogicLib", errors);
+    /* 原来是一刀切禁用 ${If}：当时 hooks.nsh 只用 IfFileExists/Goto，
+       而模板里的 LogicLib 是经 MUI2 间接引入的实现细节，不能当契约。
+       现在安装器要做位数、空间、占用这些分支判断，绕开 ${If} 只会写得更难懂，
+       所以改判「用了就必须自己 !include」，隐式依赖仍然不允许。 */
+    let uses_if = text.contains("${If}");
+    let includes_logiclib = text.contains("!include LogicLib.nsh")
+        || text.contains("!include \"LogicLib.nsh\"");
+    need(
+        !uses_if || includes_logiclib,
+        "hooks.nsh 用了 LogicLib 的 ${If}，但没有显式 !include LogicLib.nsh",
+        errors,
+    );
 
     let stop = std::fs::read_to_string(src.join("installer").join("stop-legacy.ps1")).unwrap_or_default();
     need(

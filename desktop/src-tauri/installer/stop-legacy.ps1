@@ -63,7 +63,26 @@ try {
     }
   }
 } catch {
-  Write-Out ("枚举进程失败：" + $_.Exception.Message)
+  # 学校电脑常见：组策略/安全软件把 Get-CimInstance（WMI）挡掉。
+  # 这条兜底只按映像名收 classbeat.exe —— 它是唯一的主程序，误杀风险为零；
+  # 旧版的 pythonw 靠命令行匹配，WMI 不可用时拿不到命令行，只能放过
+  # （那种机器上 0.3.x 本来就装不上，见 docs/跨代升级）。
+  Write-Out ("枚举进程失败：" + $_.Exception.Message + "，改用 Get-Process 按映像名兜底")
+  try {
+    foreach ($p in (Get-Process -Name 'classbeat' -ErrorAction SilentlyContinue)) {
+      try {
+        Stop-Process -Id $p.Id -Force -ErrorAction Stop
+        $killed++
+        Write-Out ("已结束 classbeat.exe pid=" + $p.Id)
+      } catch {
+        $blocked++
+        $blockedList += ("classbeat.exe pid=" + $p.Id)
+        Write-Out ("结束失败 pid=" + $p.Id + "：" + $_.Exception.Message)
+      }
+    }
+  } catch {
+    Write-Out ("Get-Process 兜底也失败：" + $_.Exception.Message)
+  }
 }
 
 # 旧版看门狗的优雅停标记（0.3.14+ 认这个），先写再杀更保险
