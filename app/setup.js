@@ -2985,9 +2985,31 @@
      配上岗位表那一段的人员对应和置信度，等于把编辑模式和调试信息
      塞进了配置流程（2026-11-25 反馈）。配置只负责「把文件变成能用的屏」，
      看效果、改细节都回大屏和编辑模式，那里本来就有。 */
+  /* 完成页「已填几格」按格子算，不按条目算：同一格允许单周/双周两条
+     （周五第 7 节心理/班队，单双周各一位老师），引擎合起来只显示一格。
+     以前直接数 entries 长度，36 条对 35 格，看着像错了（2026-11-25 反馈）。
+     这里按「周几 + 第几节」去重，且只数落在 5×节数 网格里的格子。 */
+  function countFilledCells(entries, periods) {
+    var seen = {}, n = 0, maxP = Math.max(+periods || 0, 7);
+    (entries || []).forEach(function (e) {
+      if (!e.subject) return;
+      var w = +e.weekday, pn = +e.periodNo;
+      if (w < 1 || w > 5 || pn < 1 || pn > maxP) return;
+      var key = w + "-" + pn;
+      if (seen[key]) return;
+      seen[key] = 1;
+      n += 1;
+    });
+    return n;
+  }
+
+  function filledCellCount() {
+    return countFilledCells(state.entries, periodCount());
+  }
+
   function pageDone() {
     var p = el("div", "setup-page on");
-    var filled = state.entries.filter(function (e) { return e.subject; }).length;
+    var filled = filledCellCount();
     var classes = state.blocks.filter(function (b) { return b.type === "class"; }).length;
 
     /* 这一页最要紧的不是汇总，而是「现在到底生效没有」。
@@ -3518,6 +3540,7 @@
     _noonBandOf: noonBandOf,
     _gridCellRows: gridCellRows,
     _gridFromRows: gridFromRows,
+    _countFilledCells: countFilledCells,
     _splitSubjectTeacher: splitSubjectTeacher,
     _knownSubjects: function (extra) {
       return root.Subjects ? root.Subjects.all(extra) : [];

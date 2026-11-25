@@ -16,6 +16,22 @@ test("打开就能写，班名对得上", async ({ page }) => {
   await expect(page.locator("#text")).toHaveAttribute("placeholder", /写一句话/);
 });
 
+/* 2026-11-25 反馈：手机扫码后顶部班名写死成出厂的「五（1）班」，
+   向导里改的班级不跟随。根因是 ping 只读服务启动时的 conf.klass，
+   不读权威配置。现在 ping 优先取 config.meta.klass，这里用真实服务钉住。 */
+test("顶部班名跟随权威配置，不是出厂固定值", async ({ page, request }) => {
+  const cur = await (await request.get("/api/config/live")).json();
+  await request.post("/api/config/live", {
+    data: { config: { meta: { klass: "四（3）班" } }, baseRev: cur.rev }
+  });
+
+  await page.goto("/");
+  await expect(page.locator("#cls")).toHaveText("四（3）班");
+
+  const ping = await (await request.get("/api/ping")).json();
+  expect(ping.class, "ping 也回配置里的班名").toBe("四（3）班");
+});
+
 test("按得准：按钮不小于 44px，输入框不小于 16px", async ({ page }) => {
   await page.goto("/");
 

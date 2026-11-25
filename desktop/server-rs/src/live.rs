@@ -63,6 +63,27 @@ pub fn read(store_state: &AppState) -> (i64, Option<Value>) {
     load(&store_state.paths.config_file)
 }
 
+/// 从权威配置里取班级名：向导把班级同时写进 meta.klass 与 schedule.class，
+/// 两个地方都认，优先 meta。取不到返回空串，调用方回退到启动时的默认值。
+///
+/// 为什么需要它：/api/ping 以前只回 conf.klass，那是服务启动时从安装目录
+/// 出厂 schedule.json 读的固定值，向导里改的班级不写这里，手机顶部就一直
+/// 显示旧班名。让 ping 读权威配置，手机和向导才看到同一个班（2026-11-25 反馈）。
+pub fn class_name(config: Option<&Value>) -> String {
+    let Some(c) = config else { return String::new(); };
+    let pick = |v: Option<&Value>| -> String {
+        v.and_then(|x| x.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default()
+    };
+    let from_meta = pick(c.get("meta").and_then(|m| m.get("klass")));
+    if !from_meta.is_empty() {
+        return from_meta;
+    }
+    pick(c.get("schedule").and_then(|s| s.get("class")))
+}
+
 pub enum WriteError {
     /// 客户端手里的版本已经过时：服务端有更新的版本，应先把这份拉下去
     Stale(i64, Option<Value>),
@@ -105,5 +126,22 @@ mod tests {
     fn parse_clamps_absurd_rev() {
         assert_eq!(parse(r#"{"rev":99999999999,"config":{}}"#).0, MAX_REV_SANE);
         assert_eq!(parse(r#"{"rev":-5,"config":{}}"#).0, 0);
+    }
+
+    #[test]
+    fn class_name_prefers_meta_then_schedule() {
+        let both = json!({"meta":{"klass":"三年级二班"},"schedule":{"class":"旧班名"}});
+        assert_eq!(class_name(Some(&both)), "三年级二班");
+        let only_schedule = json!({"schedule":{"class":"四年级一班"}});
+        assert_eq!(class_name(Some(&only_schedule)), "四年级一班");
+        let blank_meta = json!({"meta":{"klass":"  "},"schedule":{"class":"五年级三班"}});
+        assert_eq!(class_name(Some(&blank_meta)), "五年级三班");
+    }
+
+    #[test]
+    fn class_name_empty_when_missing() {
+        assert_eq!(class_name(None), "");
+        assert_eq!(class_name(Some(&json!({}))), "");
+        assert_eq!(class_name(Some(&json!({"meta":{"klass":null}}))), "");
     }
 }

@@ -176,13 +176,19 @@ async fn handle_get(
         };
         let (changed, last) = backup::note_address(st, &lan);
         let v = st.app_version();
+        /* 手机顶部、标题都读这个 class。它必须跟随向导里配的班级：
+           conf.klass 是启动时读安装目录出厂课表得到的固定值，改了配不会变，
+           所以优先取权威配置里的班级，取不到再退回启动时那一个。 */
+        let (_rev, live_cfg) = crate::live::read(st);
+        let klass = crate::live::class_name(live_cfg.as_ref());
+        let klass = if klass.is_empty() { conf.klass.clone() } else { klass };
         return resp::json(
             &json!({
                 "ok": true,
                 "app": "classbeat",
                 "shell": st.shell,
                 "home": st.home_id,
-                "class": conf.klass,
+                "class": klass,
                 "port": conf.port,
                 "lan": lan,
                 "version": v.version,

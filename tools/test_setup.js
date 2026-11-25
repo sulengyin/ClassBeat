@@ -688,6 +688,27 @@ async function readFail(buf, name) {
   check(S3._extractNames("张老师\n李老师\n王小明").join("、") === "王小明",
     "「XX老师」不算学生，真名照留");
 
+  /* 2026-11-25 反馈：完成页写「已填 36 格 / 35 格」。
+     根因不是数据坏，而是同一格允许单周 / 双周两条（周五第 7 节心理/班队），
+     按条目数数就成了 36。完成页改按格子去重，36 条应算 35 格。 */
+  const oddEven = [
+    { weekday: 1, periodNo: 1, subject: "语文" },
+    { weekday: 5, periodNo: 7, subject: "心理/班队", weekRule: "odd" },
+    { weekday: 5, periodNo: 7, subject: "心理/班队", weekRule: "even" }
+  ];
+  check(S3._countFilledCells(oddEven, 7) === 2,
+    "单双周同格只算一格", String(S3._countFilledCells(oddEven, 7)));
+  const fullWeek = [];
+  for (let w = 1; w <= 5; w++) for (let n = 1; n <= 7; n++) fullWeek.push({ weekday: w, periodNo: n, subject: "课" });
+  fullWeek.push({ weekday: 5, periodNo: 7, subject: "心理/班队", weekRule: "even" });
+  check(S3._countFilledCells(fullWeek, 7) === 35,
+    "满格 35 条 + 1 条单双周仍显示 35 格", String(S3._countFilledCells(fullWeek, 7)));
+  check(S3._countFilledCells([
+    { weekday: 6, periodNo: 1, subject: "周六课" },
+    { weekday: 1, periodNo: 9, subject: "第九节" },
+    { weekday: 2, periodNo: 2, subject: "" }
+  ], 7) === 0, "网格外和空科目不算进已填格");
+
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
 })();
