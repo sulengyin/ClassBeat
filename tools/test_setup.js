@@ -651,6 +651,26 @@ async function readFail(buf, name) {
   check((await readFail(makeZip([{ name: "docProps/app.xml", body: "<a/>" }]), "a.docx")) ===
     "这个 .docx 里没有正文", "docx 里缺正文时提示");
 
+  /* 2026-11-25 真机反馈：上传班级信息表后，班主任没填上、名单里却多了个老师。
+     根因是「学校：…」「班级：…」「班主任：…」这些行看着都像人名。
+     现在字段行整行跳过、值单独回填；「XX老师」也不再当成学生。 */
+  const infoSheet = [
+    "学校：春江中心小学",
+    "班级：五（1）班",
+    "班主任：张老师",
+    "序号\t姓名\t性别",
+    "1\t周予宁\t女",
+    "2\t吕雨桐\t女"
+  ].join("\n");
+  const mInfo = S3._metaFromText(infoSheet);
+  check(mInfo.school === "春江中心小学" && mInfo.klass === "五（1）班" && mInfo.head === "张老师",
+    "字段行能认出学校 / 班级 / 班主任", JSON.stringify(mInfo));
+  const nInfo = S3._extractNames(infoSheet);
+  check(nInfo.join("、") === "周予宁、吕雨桐",
+    "字段行和表头都不进学生名单", nInfo.join("、"));
+  check(S3._extractNames("张老师\n李老师\n王小明").join("、") === "王小明",
+    "「XX老师」不算学生，真名照留");
+
   console.log("\n" + pass + "/" + (pass + fail) + " 通过");
   process.exit(fail ? 1 : 0);
 })();
