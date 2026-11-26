@@ -152,7 +152,24 @@ pub fn run(repo: &Path, data_arg: &str, clean: bool, check_only: bool) -> Result
         .map_err(|e| format!("序列化 build-info 失败：{e}"))?;
     std::fs::write(resources.join("build-info.json"), text.as_bytes())
         .map_err(|e| format!("写 build-info.json 失败：{e}"))?;
+
+    // 更新源默认配置（随包发布、只读）。老师要换加速域名时，把这份文件
+    // 复制到 %APPDATA%\ClassBeat\update-source.txt 再改；那里优先。
+    // 0.5.3 曾把加速域名写死进程序、重构时丢失，导致教室连不上更新；
+    // 现在挪到这一份可替换的文件，换域名不用重发版。
+    let update_source = concat!(
+        "# ClassBeat 更新源：国内加速域名，按行依次尝试，第一个能用就用。\n",
+        "# 教室大屏不允许直连 GitHub，务必至少保留一个加速域名。\n",
+        "# 换域名：改下面网址即可（末尾 / 可省），重启 ClassBeat 生效。\n",
+        "# 末尾自动兜底 GitHub 原地址，无需在这里写。\n",
+        "https://ghfast.top/\n",
+        "https://gh-proxy.com/\n",
+        "https://ghproxy.net/\n",
+    );
+    std::fs::write(resources.join("update-source.txt"), update_source.as_bytes())
+        .map_err(|e| format!("写 update-source.txt 失败：{e}"))?;
     println!("{text}");
+    println!("  · 更新源默认配置就位（resources/update-source.txt）");
     println!("\n装配完成。下一步：npx tauri build");
     Ok(())
 }

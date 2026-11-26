@@ -103,10 +103,17 @@ jobs:
           set -e
           version="${GITHUB_REF_NAME#v}"
           mkdir -p desktop/dist/desktop
+          # 更新源 = 国内加速域名优先 + GitHub 原地址兜底（教室大屏不允许直连外网）。
+          # 清单里的安装包地址必须走加速域名，否则客户端就算从加速域名拿到清单，
+          # 下载安装包时仍会去连 GitHub 而失败。0.5.3 曾把这一层弄丢，务必保留。
+          # 换加速域名只需改 UPDATE_MIRROR 一行；客户端 endpoints 在更新器里
+          # 按 update-source.txt 依次尝试，二者用同一个前缀列表。
+          UPDATE_MIRROR="https://ghfast.top/"
+          ORIGIN_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
           desktop/tools-rs/target/release/classbeat-tools.exe make-latest \
             --bundle desktop/src-tauri/target/release/bundle/nsis \
             --version "$version" \
-            --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME" \
+            --base-url "${UPDATE_MIRROR}${ORIGIN_URL}" \
             --out desktop/dist/desktop/latest.json \
             --notes-file CHANGELOG.md \
             --notes-max 300

@@ -1,6 +1,6 @@
 [package]
 name = "classbeat-server"
-version = "0.5.13"
+version = "0.5.14"
 edition = "2021"
 rust-version = "1.77"
 description = "ClassBeat 班级节律屏 · 局域网服务（Rust 版，取代 rhythm_server.py）"

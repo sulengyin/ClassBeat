@@ -98,7 +98,7 @@ mod imp {
 
     #[cfg(test)]
     mod tests {
-        use super::friendly;
+        use super::{build_endpoint_urls, friendly, parse_prefixes, DEFAULT_PREFIXES, MANIFEST_URL};
 
         #[test]
         fn network_error_is_explained_in_chinese() {
@@ -122,6 +122,45 @@ mod imp {
             let msg = friendly(&raw);
             assert!(msg.ends_with('…'), "应当截断");
             assert!(msg.chars().count() < 300, "{}", msg.chars().count());
+        }
+
+        // 加速域名不可回退：0.5.3 曾把加速域名弄丢、写死回 GitHub，
+        // 导致教室大屏连不上更新服务器。下面这组测试钉住"加速域名优先 +
+        // GitHub 兜底"，谁再把 endpoints 改回纯 GitHub 就会红。
+        #[test]
+        fn endpoints_put_accelerated_mirror_first_and_github_last() {
+            let urls = build_endpoint_urls(&DEFAULT_PREFIXES.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+            assert!(urls.len() >= 2, "必须是双源以上，不能只剩 GitHub：{urls:?}");
+            assert_eq!(urls.last().unwrap(), MANIFEST_URL, "GitHub 原地址必须兜底在最后");
+            assert!(
+                urls[..urls.len() - 1]
+                    .iter()
+                    .all(|u| u.contains("ghfast.top") || u.contains("gh-proxy.com") || u.contains("ghproxy.net")),
+                "清单来源必须是国内加速域名：{urls:?}"
+            );
+            // 每个加速地址 = 前缀 + 原清单地址（origin 仍是 GitHub，内容不搬家）
+            for u in &urls[..urls.len() - 1] {
+                assert!(u.ends_with(MANIFEST_URL), "加速地址应拼在清单地址前：{u}");
+            }
+        }
+
+        #[test]
+        fn parse_prefixes_strips_comments_and_adds_slash() {
+            let text = "# 国内加速域名\nghfast.top   # 主\nhttps://gh-proxy.com\n\n  ghproxy.net  \n";
+            let got = parse_prefixes(text);
+            assert_eq!(got, vec!["ghfast.top/", "https://gh-proxy.com/", "ghproxy.net/"]);
+        }
+
+        #[test]
+        fn accelerated_endpoint_urls_are_valid_https() {
+            // 加速地址形如 https://ghfast.top/https://github.com/... ：
+            // 里面的 github 是 path 的一部分，不是 scheme。必须能被 Url 解析
+            // 且 scheme=https，否则 release 构建的 endpoints 校验会失败。
+            let urls = build_endpoint_urls(&DEFAULT_PREFIXES.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+            for u in urls {
+                let parsed = url::Url::parse(&u).unwrap_or_else(|e| panic!("解析失败 {u}: {e}"));
+                assert_eq!(parsed.scheme(), "https", "{u}");
+            }
         }
     }
 
@@ -148,13 +187,121 @@ mod imp {
         });
     }
 
+    // ---- 更新源：国内加速域名优先 + GitHub 原地址兜底 ------------------
+    //
+    // 教室一体机不允许直连 GitHub。清单和安装包都必须走国内可访问的
+    // 加速域名（ghfast.top / gh-proxy.com / ghproxy.net 这类前缀代理）。
+    //
+    // 历史教训：0.3.x 就已用加速域名跑通更新（v0.3.4 起），但 0.5.3
+    // 换成 Tauri 更新器时把加速域名弄丢了，endpoints 写死回 GitHub，
+    // 教室大屏从此连不上更新服务器。这次恢复时把配置从程序里挪到
+    // 数据目录的 update-source.txt：改加速域名只改这一行，不用重发版。
+    //
+    // 格式（每行一个，# 开头为注释）：
+    //   # 国内加速域名前缀，末尾带 /
+    //   https://ghfast.top/
+    //   https://gh-proxy.com/
+    const UPDATE_SOURCE_FILE: &str = "update-source.txt";
+    const DEFAULT_PREFIXES: &[&str] = &[
+        "https://ghfast.top/",
+        "https://gh-proxy.com/",
+        "https://ghproxy.net/",
+    ];
+    const MANIFEST_URL: &str =
+        "https://github.com/sulengyin/ClassBeat/releases/latest/download/latest.json";
+
+    /// 把 update-source.txt 的文本解析成加速域名前缀列表（纯函数，便于测试）。
+    /// 每行 strip 注释与空白，末尾补 /；空文件返回空列表（调用方再填默认值）。
+    fn parse_prefixes(text: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        for line in text.lines() {
+            let line = line.split('#').next().unwrap_or("").trim();
+            if line.is_empty() {
+                continue;
+            }
+            let p = if line.ends_with('/') {
+                line.to_string()
+            } else {
+                format!("{line}/")
+            };
+            if !out.contains(&p) {
+                out.push(p);
+            }
+        }
+        out
+    }
+
+    /// 读加速域名前缀。优先级：老师可改的 %APPDATA%\ClassBeat\update-source.txt
+    /// → 包内只读的 resources/update-source.txt → 内置默认列表。
+    fn load_prefixes(app: &AppHandle) -> Vec<String> {
+        use tauri::Manager;
+        let (data, install_root) = match app.try_state::<crate::AppState>() {
+            Some(st) => (st.paths.data.clone(), st.paths.install_root.clone()),
+            None => return DEFAULT_PREFIXES.iter().map(|s| s.to_string()).collect(),
+        };
+        // 先读可写数据目录（老师改过的），再读包内默认
+        for path in [data.join(UPDATE_SOURCE_FILE), install_root.join(UPDATE_SOURCE_FILE)] {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                let got = parse_prefixes(&text);
+                if !got.is_empty() {
+                    logging::info(&format!("更新源前缀来自 {}", path.display()));
+                    return got;
+                }
+            }
+        }
+        DEFAULT_PREFIXES.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// 构造更新源地址列表（纯函数，便于测试）：每个加速域名拼清单地址在前，
+    /// GitHub 原地址最后兜底。updater 插件按顺序试，第一个返回有效清单的胜出
+    /// （插件源码 updater.rs::check 已确认）。
+    fn build_endpoint_urls(prefixes: &[String]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for prefix in prefixes {
+            let raw = format!("{}{}", prefix.trim_end_matches('/'), MANIFEST_URL);
+            if !out.contains(&raw) {
+                out.push(raw);
+            }
+        }
+        // GitHub 原地址兜底：加速域名全挂、且学校临时放行 GitHub 时仍可更新
+        if !out.contains(&MANIFEST_URL.to_string()) {
+            out.push(MANIFEST_URL.to_string());
+        }
+        out
+    }
+
+    fn build_endpoints(app: &AppHandle) -> Result<Vec<String>, String> {
+        let urls = build_endpoint_urls(&load_prefixes(app));
+        if urls.is_empty() {
+            return Err("没有可用的更新源".into());
+        }
+        Ok(urls)
+    }
+
     async fn run(app: AppHandle, interactive: bool) -> Result<(), String> {
         // 安装器要覆盖 $INSTDIR 里的服务程序与 resources，而 updater 插件装完是
         // 直接 std::process::exit(0)（绕过 Drop 也绕过我们自己的 shutdown），
         // 所以必须在安装前把服务停掉，否则 NSIS 会卡在"文件正在使用"。
         let app_for_exit = app.clone();
+        let endpoint_strings = build_endpoints(&app)?;
+        logging::info(&format!("更新源（按序）：{}", endpoint_strings.join(" | ")));
+        let endpoints: Vec<url::Url> = endpoint_strings
+            .iter()
+            .filter_map(|s| match url::Url::parse(s) {
+                Ok(u) => Some(u),
+                Err(e) => {
+                    logging::warn(&format!("忽略无效更新源 {s}：{e}"));
+                    None
+                }
+            })
+            .collect();
+        if endpoints.is_empty() {
+            return Err("没有可用的更新源地址".into());
+        }
         let updater = app
             .updater_builder()
+            .endpoints(endpoints)
+            .map_err(|e| format!("更新源地址无效：{e}"))?
             .on_before_exit(move || {
                 logging::info("更新安装前先停掉本地服务，避免文件占用");
                 crate::server::stop(&app_for_exit);
