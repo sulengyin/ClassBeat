@@ -435,5 +435,24 @@ check(ob && ob.people[0] === "赵六",
   "岗位人员写成对象时取姓名，不上屏 [object Object]",
   ob ? JSON.stringify(ob.people) : "缺失");
 
+/* 时段常驻岗位必须是醒目卡片，不当「每节课」那样降权成灰字
+   （2026-11-26 真机：勾了三个时段常驻，屏上却像没出现） */
+function dayWithPresents() {
+  const cfg = JSON.parse(JSON.stringify(global.window.RHYTHM_DATA));
+  const first = cfg.roles.roles[0];
+  cfg.dutyPresents = { reading: [first.id], break: [], noon: [] };
+  return Engine.buildDay(cfg, "2026-11-10");
+}
+const presentDay = dayWithPresents();
+const firstBlock = presentDay.timeline.filter(b => b.type === "reading")[0];
+if (firstBlock) {
+  const t = firstBlock.start.split(":").map(Number);
+  const res = R.dutiesAt(presentDay, t[0] * 60 + t[1] + 1);
+  const presentItem = res.items.filter(x => x.name === global.window.RHYTHM_DATA.roles.roles[0].name)[0];
+  check(!!presentItem && presentItem.quiet === false,
+    "时段常驻岗位是醒目卡片（quiet=false），不是灰字",
+    presentItem ? JSON.stringify({ name: presentItem.name, quiet: presentItem.quiet }) : "没出现");
+}
+
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");
 process.exit(fail ? 1 : 0);

@@ -520,8 +520,12 @@
         return;
       }
       if (d.freqKind === "each" || d.freqKind === "present") {
+        /* 时段常驻（present）是老师特意在三个时段里勾的岗位，必须看得见：
+           用普通卡片样式（有边框、有底），不再和「每节课」(each) 一样当灰字。
+           （2026-11-26 真机反馈：勾了常驻却像没出现） */
         each.push({ key: d.roleId, name: d.name, tasks: [], people: d.people || [],
-                    order: d.order, assign: d.assign, unknown: d.status !== "ok", quiet: true,
+                    order: d.order, assign: d.assign, unknown: d.status !== "ok",
+                    quiet: d.freqKind === "each",
                     pending: [] });
         return;
       }

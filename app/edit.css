@@ -155,6 +155,11 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-teacher-chip:active{background:#FFD64F;color:#2B1D10}
 
 .ep-rows{display:flex;flex-direction:column;gap:.8vmin;max-height:54vmin;overflow:auto}
+/* 新增小岗位按钮：和列表分开，一眼能找到 */
+.ep-addrole{font:inherit;font-size:2.3vmin;font-weight:800;width:100%;
+            padding:1.3vmin 1.6vmin;margin-bottom:1.2vmin;border-radius:1.2vmin;
+            border:.24vmin dashed #B0803C;background:#3D2D20;color:#F2C879;cursor:pointer}
+.ep-addrole:hover{background:#4A3728;border-color:#E0A84E;color:#FFD64F}
 .ep-rowline{display:flex;align-items:center;gap:.6vmin}
 .ep-rowline .ep-row{flex:1;min-width:0}
 .ep-row{display:flex;align-items:center;gap:1.5vmin;width:100%;text-align:left;
@@ -257,6 +262,13 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
 .ep-dialog.picker > .ep-groups::-webkit-scrollbar-track{background:transparent}
 .ep-dialog-title{font-size:2.9vmin;font-weight:900;margin-bottom:1.8vmin}
 .ep-dialog .ep-input{margin-bottom:1.3vmin}
+/* 岗位改名行：改名和选人一起保存 */
+.ep-picker-name{display:flex;align-items:center;gap:1.2vmin;margin-bottom:1.3vmin}
+.ep-picker-name > span{font-size:2.2vmin;color:#C1B09A;flex:none;letter-spacing:.08em}
+.ep-role-name-input{font:inherit;font-size:2.5vmin;flex:1;min-width:0;padding:1.2vmin 1.5vmin;
+                    border-radius:1.1vmin;border:.2vmin solid #6B5641;background:#3D2D20;color:#E2D4BC}
+.ep-role-name-input:focus{border-color:#FFD64F}
+.ep-role-name-input::placeholder{color:#7C6A56}
 
 /* 换人卡片：遮罩挡住后面的岗位，右上角留一个 44px 的明确关闭按钮，
    一体机上不靠「点空白处」猜着退出 */

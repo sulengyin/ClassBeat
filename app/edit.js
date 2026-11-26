@@ -1287,6 +1287,34 @@
     var roles = (doc.roles || []).slice().sort(function (a, b) {
       return (typeof a.order === "number" ? a.order : 0) - (typeof b.order === "number" ? b.order : 0);
     });
+
+    /* 新增岗位（2026-11-26）：老师自己加一个小岗位，不必改岗位表重新上传。
+       和「以上传岗位表为准」并存——表里有的照旧导入，这里加的额外岗位也保留。 */
+    var addBtn = h("button", "ep-addrole", "＋ 新增岗位");
+    addBtn.title = "加一个小岗位，然后点它设名字和值日人";
+    addBtn.addEventListener("click", function () {
+      var next = JSON.parse(JSON.stringify(roleDoc()));
+      var list = next.roles || [];
+      var used = {}, maxOrder = 0;
+      list.forEach(function (x) {
+        if (x && x.id) used[x.id] = 1;
+        if (x && typeof x.order === "number" && x.order > maxOrder) maxOrder = x.order;
+      });
+      var n = 1;
+      while (used["r" + n]) n++;
+      var id = "r" + n;
+      var fresh = { id: id, name: "新岗位", duty: "", freq: { kind: "unset" },
+                    people: [], order: maxOrder + 10, assign: "fixed", grp: null };
+      list.push(fresh);
+      next.roles = list;
+      S.patchConfig({ roles: next });
+      flash("已新增「新岗位」，点它改名和选人");
+      renderBody(id);
+      /* 加完立刻打开面板，老师当场改名、选人，不用再去列表里找。 */
+      openPicker(fresh, key, { focus: "" });
+    });
+    sec.appendChild(addBtn);
+
     var list = h("div", "ep-rows");
     roles.forEach(function (r, i) {
       var changed = ov.roles && ov.roles[r.id];
@@ -1617,6 +1645,17 @@
     var mask = h("div", "ep-picker-mask");
     mask.addEventListener("click", function () { closePicker(); });
 
+    /* 岗位改名：新增的小岗位默认叫「新岗位」，老师在这里改名。
+       和选人一起保存（saveLong），不会一改就写、取消就丢。 */
+    var nameRow = h("div", "ep-picker-name");
+    nameRow.appendChild(h("span", null, "岗位名"));
+    var nameInput = document.createElement("input");
+    nameInput.className = "ep-role-name-input";
+    nameInput.value = draft.name || "";
+    nameInput.placeholder = "例如：地面清洁师";
+    nameRow.appendChild(nameInput);
+    wrap.appendChild(nameRow);
+
     /* 先搜索、先出候选：老师打开面板十次有九次是来找人的 */
     var q = document.createElement("input");
     q.className = "ep-input";
@@ -1913,6 +1952,8 @@
       var at = -1;
       list.forEach(function (x, i) { if (x && x.id === role.id) at = i; });
       if (at < 0) { flash("找不到岗位配置"); return; }
+      var typedName = (nameInput.value || "").trim();
+      if (typedName) draft.name = typedName;
       list[at] = draft;
       S.patchConfig({ roles: doc });
       var ovr = (S.getDayOverride(key) || {}).roles || {};
@@ -1922,7 +1963,7 @@
       }
       closePicker();
       var saved = slotNames();
-      flash(role.name + " 已保存"
+      flash(draft.name + " 已保存"
         + (saved.length ? "：" + (saved.length > 3 ? saved.length + " 人" : saved.join("、")) : ""));
       renderBody(role.id);
     }

@@ -1053,6 +1053,28 @@ const r14 = global.Store.config().roles.roles.filter(r => r.id === "r14")[0];
 check(r14.people.length === 7, "「保存」把结果写进岗位配置", r14.people.join("、"));
 check(document.querySelectorAll(".ep-dialog.picker").length === 0, "保存后自动关窗回到列表");
 
+/* 新增小岗位（2026-11-26）：编辑面板开放按钮，加完能改名 */
+check(document.querySelectorAll(".ep-addrole").length === 1,
+  "值日页有「新增岗位」按钮");
+const rolesBeforeAdd = global.Store.config().roles.roles.length;
+document.querySelector(".ep-addrole")._h.click();
+const rolesAfterAdd = global.Store.config().roles.roles;
+check(rolesAfterAdd.length === rolesBeforeAdd + 1,
+  "点新增岗位后岗位配置多一条", rolesBeforeAdd + " → " + rolesAfterAdd.length);
+const freshRole = rolesAfterAdd.filter(r => r.id === "r" + (rolesBeforeAdd + 1))[0]
+  || rolesAfterAdd[rolesAfterAdd.length - 1];
+check(!!freshRole && freshRole.name === "新岗位" && freshRole.freq.kind === "unset",
+  "新岗位默认名与未设频率", freshRole ? freshRole.name + "/" + freshRole.freq.kind : "没找到");
+check(document.querySelectorAll(".ep-dialog.picker").length === 1
+  && document.querySelectorAll(".ep-role-name-input").length === 1,
+  "新增后自动打开面板且有岗位名输入框");
+const renameInput = document.querySelector(".ep-role-name-input");
+renameInput.value = "图书管理员";
+document.querySelector(".ep-primary")._h.click();
+const renamed = global.Store.config().roles.roles.filter(r => r.id === freshRole.id)[0];
+check(!!renamed && renamed.name === "图书管理员",
+  "改名随保存写回岗位配置", renamed ? renamed.name : "没找到");
+
 /* 只改今天：写当天覆盖，岗位配置一个字不动 */
 const confBeforeToday = JSON.stringify(global.Store.config().roles.roles.filter(r => r.id === "r14")[0].people);
 document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("擦窗户") >= 0)[0].children[0]._h.click();
