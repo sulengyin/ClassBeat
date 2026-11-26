@@ -489,14 +489,23 @@
     }
     appendPass();
 
-    if (track.scrollWidth > el.duty.clientWidth + 4) {
-      appendPass();   /* 无缝循环：内容两份接在后面，translateX(-50%) 绕回 */
-      track.classList.add("scroll");
-      /* 滚一圈的时间按内容宽度算：约每秒 60px，最少 10 秒 */
-      track.style.setProperty("--dur",
-        Math.max(10, Math.round(track.scrollWidth / 60)) + "s");
-    }
+    /* 必须先入 DOM 再量宽度：脱离文档的 div 没有布局，scrollWidth 恒为 0，
+       旧代码在这里先量再挂，判断永远为假——岗位多时滚动从未真正触发过，
+       屏幕就只显示前几个岗位（真机 2026-11-26 反馈）。
+       小岗位很多时让整行从右往左循环滚，岗位少时不滚，其余完全不变。 */
     el.duty.appendChild(track);
+
+    if (track.scrollWidth > el.duty.clientWidth + 4) {
+      /* 此刻 track 里只有一份内容，scrollWidth 就是这一份的真实宽度。
+         再复制一份接在后面，translateX(-50%) 才能无缝绕回。 */
+      var onePass = track.scrollWidth;
+      appendPass();
+      track.classList.add("scroll");
+      /* 一圈走的是「一份内容」的宽度（约每秒 60px，最少 10 秒）。
+         appendPass 之后 scrollWidth 变成两份，这里要用复制前量到的值。 */
+      track.style.setProperty("--dur",
+        Math.max(10, Math.round(onePass / 60)) + "s");
+    }
   }
 
   function showDetail(item) {

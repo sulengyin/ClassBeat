@@ -105,7 +105,10 @@ body{
   color:var(--ink);
   font-family:system-ui,-apple-system,"HarmonyOS Sans SC","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
   padding:0 4.4vmin;
-  display:grid;grid-template-rows:auto 1fr auto;
+  /* minmax(0,1fr)：值日条岗位多、内容 nowrap 很长时，别让隐式列被内容撑宽、
+     把整页（main/footer）顶到视口之外——否则滚动判断量到的 clientWidth
+     是撑大后的假宽度，屏面看着就是「岗位显示不全 + 画面被推出去」。 */
+  display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);
   overflow:hidden;-webkit-user-select:none;user-select:none;
   -webkit-tap-highlight-color:transparent;
   -webkit-font-smoothing:antialiased;
