@@ -94,21 +94,44 @@ fn reveal(w: &tauri::WebviewWindow) {
            每次都补一遍窗口样式，才是持久的「永远不进任务栏」。 */
         hide_from_taskbar(w);
     }
-    if !w.is_fullscreen().unwrap_or(false) {
-        let _ = w.set_fullscreen(true);
-    }
+    /* 【0.5.13 修复】这里以前是 `if !w.is_fullscreen()` 条件判断，是个坑：
+       页面上的「最小化」是服务端用 Win32 SW_MINIMIZE 做的（server-rs/src/win.rs），
+       Tauri 侧完全不知情，它记的状态还是「全屏」，条件判断就直接跳过，
+       窗口于是停在建窗时的 inner_size(1280x720)——在逻辑分辨率更小的机器上
+       画面就会超出屏幕右边。真机照片里右上角时间被切、底部岗位栏贴边，
+       就是窗口没真正撑满的表现；「后来又突然好了」也和这种状态滞后吻合。
+       set_fullscreen(true) 是幂等的：本来就是全屏则空转，没全屏则补上。
+       无条件调一次，不管 Tauri 记的状态准不准，都能覆盖到。 */
+    let _ = w.set_fullscreen(true);
     let _ = w.set_always_on_top(true);
     let _ = w.set_focus();
 
     /* 以前每一步都是 `let _ =`，恢复失败时日志里一个字都没有，
-       真机报「点图标没反应」只能靠猜。现在把前后状态记下来。 */
+       真机报「点图标没反应」只能靠猜。现在把前后状态记下来。
+       顺带记窗口/显示器尺寸：真机若再报「画面超出屏幕」，日志里能直接
+       看出窗口是不是又停在了 1280x720，不用靠斜拍的照片猜。 */
+    #[cfg(windows)]
+    let size_note = match (w.current_monitor(), w.inner_size()) {
+        (Ok(Some(m)), Ok(s)) => format!(
+            "，窗口 {}x{} / 屏 {}x{}",
+            s.width,
+            s.height,
+            m.size().width,
+            m.size().height
+        ),
+        _ => String::new(),
+    };
+    #[cfg(not(windows))]
+    let size_note = String::new();
+
     logging::info(&format!(
-        "恢复大屏：可见 {}→{}，最小化 {}→{}，全屏 {}",
+        "恢复大屏：可见 {}→{}，最小化 {}→{}，全屏 {}{}",
         visible_before,
         w.is_visible().unwrap_or(false),
         minimal_before,
         w.is_minimized().unwrap_or(false),
-        w.is_fullscreen().unwrap_or(false)
+        w.is_fullscreen().unwrap_or(false),
+        size_note
     ));
 }
 
