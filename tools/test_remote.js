@@ -23,6 +23,7 @@ function wait(ms) {
 function boot(hubPorts, search, opts) {
   const legacy = !!(opts && opts.legacy);
   const calls = [];
+  let shown = 0;
   const root = {
     location: { search: search || "", protocol: "file:", host: "" },
     document: { readyState: "complete", addEventListener() {} },
@@ -31,10 +32,13 @@ function boot(hubPorts, search, opts) {
       todayKey: () => "2026-11-09",
       render() {},
       hideMessage() {},
-      showMessage() {}
+      showMessage() { shown++; }
     },
     Store: { patchDayOverride() {} },
-    EventSource: function (url) { this.url = url; this.readyState = 0; this.close = function () {}; },
+    EventSource: function (url) {
+      this.url = url; this.readyState = 0; this.close = function () {};
+      root.__es = this;   /* 留给回放测试触发 onmessage */
+    },
     setTimeout: setTimeout,
     clearTimeout: clearTimeout,
     /* 大屏在真机上会常驻，这里给个假的，别让 node 等十分钟 */
@@ -66,7 +70,7 @@ function boot(hubPorts, search, opts) {
   const ctx = vm.createContext(root);
   ctx.window = ctx;
   vm.runInContext(CODE, ctx, { filename: "remote.js" });
-  return { root: ctx, calls: calls };
+  return { root: ctx, calls: calls, shown: () => shown };
 }
 
 (async function main() {
@@ -118,6 +122,26 @@ function boot(hubPorts, search, opts) {
   const late = await e.root.Remote.probe();
   check(late.online === true && /^http:\/\/127\.0\.0\.1:8766$/.test(e.root.Remote.hub),
         "⑤a 服务后起，下次探测自动接上", e.root.Remote.hub);
+
+  /* ⑥ 2026-11-27 审查：断线重连后服务端回放已处理过的消息，不能重复弹卡片。
+     EventSource 自动重连用建连时的老 URL，服务端会把 since 之后的历史再推一遍。 */
+  const f = boot(new Set([8765]));
+  await wait(120);
+  const es = f.root.__es;
+  check(!!es && typeof es.onmessage === "function", "⑥ 建立了 SSE 连接", es ? es.url : "无");
+  const msg = (seq) => ({ data: JSON.stringify({
+    seq, text: "现在排队", level: "normal", forWhom: "class",
+    at: "08:00", until: "23:59", createdAt: Date.now()
+  }) });
+  es.onmessage(msg(5));
+  const once = f.shown();
+  es.onmessage(msg(5));   /* 回放同一条 */
+  es.onmessage(msg(4));   /* 更早的 */
+  check(f.shown() === once,
+    "⑥ 回放已处理过的 seq 不重复弹卡片（幂等）",
+    `弹了 ${f.shown()} 次，期望 ${once} 次`);
+  es.onmessage(msg(6));
+  check(f.shown() === once + 1, "⑥ 新 seq 仍正常弹卡片", `弹了 ${f.shown()} 次`);
 
   console.log();
   console.log(`${pass}/${pass + fail} 通过`);

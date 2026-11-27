@@ -248,7 +248,15 @@
   function addStudent(name) {
     var n = personNameOf(name);
     if (!n || n === "[object Object]") return { ok: false, why: "这个名字不能用。" };
-    var list = normStudents(config().students).slice();
+    var own = config().students;
+    /* 2026-11-27 审查：本机还没存过名单时，config().students 是 undefined，
+       以前直接从空数组起步——老师在这儿补一个人就写回 1 人的名单，把包里
+       出厂的整份名单抹掉（换人候选从此只剩这一个人）。和 setup 的 rosterAll
+       用同一口径：只有「本机明确存过名单」（含老师主动清空的空数组）才以
+       本机为准，否则拿班级数据里的出厂名单打底。 */
+    var source = Array.isArray(own) ? own
+      : ((root.RHYTHM_DATA && root.RHYTHM_DATA.students) || own);
+    var list = normStudents(source).slice();
     for (var i = 0; i < list.length; i++) {
       if (list[i].name === n) return { ok: true, existed: true, n: list.length };
     }

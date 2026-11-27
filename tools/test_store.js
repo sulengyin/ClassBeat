@@ -657,6 +657,23 @@ var addObj = S.addStudent({ name: "王五" });
 check(addObj.ok && S.config().students.length === 3,
   "对象形状的姓名也能加（对象取 name）", JSON.stringify(addObj));
 
+/* 2026-11-27 审查：本机从没存过名单时补一个人，不能把出厂整份名单抹掉。
+   先把本机名单清回「没存过」的状态（null 会被 config() 丢掉）。 */
+var bakedN = (D.students || []).length;
+S.patchConfig({ students: null });
+var firstAdd = S.addStudent("插班生");
+check(firstAdd.ok && S.config().students.length === bakedN + 1,
+  "本机没名单时补一人，以出厂名单打底而不是只剩这个人",
+  "出厂 " + bakedN + " → 现在 " + S.config().students.length);
+check(S.rankStudents(S.config().students, "插班生", null, 8).length === 1,
+  "补进去的人确实在名单里");
+/* 老师主动清空的空数组是有效状态：再加人不能把出厂名单又灌回来 */
+S.patchConfig({ students: [] });
+S.addStudent("唯一同学");
+check(S.config().students.length === 1,
+  "本机名单明确清空过，再加人仍从空名单起步（不灌回出厂名单）",
+  S.config().students.length + " 人");
+
 /* 删名单里的学生时，「要不要顺手从分组/岗位上清掉」由老师在弹框里勾。
    默认不清（删名单可撤销，清分组不可逆），勾了才走 prunePeople。 */
 S.patchConfig({

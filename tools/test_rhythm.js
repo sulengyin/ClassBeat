@@ -452,6 +452,16 @@ if (firstBlock) {
   check(!!presentItem && presentItem.quiet === false,
     "时段常驻岗位是醒目卡片（quiet=false），不是灰字",
     presentItem ? JSON.stringify({ name: presentItem.name, quiet: presentItem.quiet }) : "没出现");
+
+  /* 2026-11-27 审查：常驻岗位还必须和本时段的日常岗位共存。
+     旧逻辑 `items = merged.length ? merged : each`，只要本段有任意日常岗位，
+     常驻（在 each 里）就被整段丢弃——老师勾了常驻却看不到。 */
+  const dailyMoment = 7 * 60 + 41;   /* 07:41，班牌/劳动委员等日常岗位在窗口内 */
+  const both = R.dutiesAt(presentDay, dailyMoment);
+  const bothNames = both.items.map(x => x.name);
+  check(bothNames.indexOf("路队长") >= 0 && bothNames.indexOf("班牌") >= 0,
+    "常驻岗位与日常岗位同段时，两者都显示（常驻不被日常挤掉）",
+    bothNames.join("、"));
 }
 
 console.log("\n" + pass + "/" + (pass + fail) + " 通过");

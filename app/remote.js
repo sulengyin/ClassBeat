@@ -239,6 +239,12 @@
     es.onmessage = function (ev) {
       var msg;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      /* EventSource 自动重连用的是建连时的老 URL（旧 since），服务端会把它
+         之后的历史消息再推一遍。以前这里对所有消息都 apply(msg, true)，
+         重连一次就把早上那条通知重新弹一次，全班被吓一跳（作者注释写的
+         「重连要从 lastSeq 续」只更新了游标，没有真正挡住回放）。
+         已经处理过的 seq 直接丢掉，apply 保持幂等。 */
+      if (msg.seq && lastSeq && msg.seq <= lastSeq) return;
       if (msg.seq && msg.seq > lastSeq) lastSeq = msg.seq;
       apply(msg, true);
     };

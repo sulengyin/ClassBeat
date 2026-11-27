@@ -229,10 +229,18 @@
     panelEl.style.display = "flex";
     var t = document.getElementById("epTitle");
     if (t) {
-      var d = new Date();
-      var hh = d.getHours(), mm = d.getMinutes();
-      t.textContent = CFG.klass() + " · " + (d.getMonth() + 1) + "月" + d.getDate() + "日　"
-        + (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+      /* 面板标题跟大屏同一把钟：教室一体机系统时区可能不是 +08:00，
+         直接用 new Date() 会显示成差 8 小时的时间，老师以为设备坏了。 */
+      var p = root.Clock && root.Clock.partsAt ? root.Clock.partsAt(root.Clock.nowMs()) : null;
+      if (p) {
+        t.textContent = CFG.klass() + " · " + p.month + "月" + p.day + "日　"
+          + (p.hour < 10 ? "0" : "") + p.hour + ":" + (p.minute < 10 ? "0" : "") + p.minute;
+      } else {
+        var d = new Date();
+        var hh = d.getHours(), mm = d.getMinutes();
+        t.textContent = CFG.klass() + " · " + (d.getMonth() + 1) + "月" + d.getDate() + "日　"
+          + (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+      }
     }
     paintTabs();
     renderBody();
@@ -460,13 +468,17 @@
     if (!draft.text.trim()) { flash("还没写内容"); return; }
     if (!draft.timeAck) { flash("先确认时间对不对"); paintHintRow(); return; }
 
-    var now = new Date();
-    var until = R.m2t(now.getHours() * 60 + now.getMinutes() + draft.minutes);
+    /* 起止时间一律走 Clock：它统一按北京时间算，还含服务端校时的 skew。
+       以前这里读 new Date().getHours()，一体机系统时区是 UTC 时会记成
+       差 8 小时——屏上按 Clock 算当前分钟，通知就永远不显示或立刻过期。 */
+    var nowMin = root.Clock ? Math.floor(root.Clock.minutes())
+      : (function () { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
+    var until = R.m2t(nowMin + draft.minutes);
     S.patchDayOverride(key, {
       notice: {
         text: draft.text.trim(),
         level: draft.level,
-        at: R.m2t(now.getHours() * 60 + now.getMinutes()),
+        at: R.m2t(nowMin),
         until: until,
         createdAt: Date.now()
       }
@@ -1844,6 +1856,9 @@
           b.addEventListener("click", function () {
             writeSlot(g.names.slice());
             g.names.forEach(function (n) { S.markPicked(n); });
+            /* 整组带进来就是多人一起干；固定岗位也要跟着切成多人态，
+               否则接下来点一个人会把刚带进来的一整组顶掉。 */
+            if (g.names.length > 1) oneSeat = false;
             paintAll();
             flash("已带入「" + g.name + "」");
           });
@@ -1935,6 +1950,11 @@
       mode = k;
       slot = mode === "fixed" ? null : firstFilledSlot();
       focusName = "";
+      /* 原来的 oneSeat 是打开面板时按「固定 + 0/1 人」算的。新增岗位恰好
+         就是这种状态，切到 A/B 后它还是 true，点第二个人就变成「换人」，
+         一槽永远只能勾一个。轮流方式每格本来就允许多人，切回固定再按
+         实际人数重判。 */
+      oneSeat = mode === "fixed" && S.peopleList(draft.people).length <= 1;
       paintAll();
       /* 人已经坐在「已选」里了，这句话只是确认「切成功了」，
          不再解释搬到哪儿——解释交给眼睛。 */

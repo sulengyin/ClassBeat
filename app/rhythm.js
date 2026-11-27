@@ -538,13 +538,22 @@
       g.unknown = !g.people.length;
     });
 
-    /* 日常岗位永远给临时任务让位，不抢同一行 */
-    var items = merged.length ? merged : each;
+    /* 2026-11-27 修复：以前是 `merged.length ? merged : each`，只要本段有
+       任意日常岗位，常驻（present）就被整段丢弃——老师专门勾了「时段常驻」
+       却看不见，和 0.5.13 修的「常驻像没出现」是同一个坑的残留（那次只修了
+       降权样式，没修共显）。现在把常驻从 each 里拆出来单独并进去：
+         · 日常 merged + 常驻 present 一起显示；
+         · 「每节课」each 仍然只在没有常驻/日常时兜底（它才是让位对象）；
+         · quiet 只在只剩降权的 each 时为真。 */
+    var steady = each.filter(function (x) { return x.quiet === false; });
+    var filler = each.filter(function (x) { return x.quiet === true; });
+    var items = merged.concat(steady);
+    if (!items.length) items = filler;
     items.sort(function (a, b) { return a.order - b.order; });
 
     /* 0.3.23 起不截断：全部渲染，屏面写不下时整行从右往左循环滚动
        （编辑面板按时段多选后岗位可能不止 3 个）。overflow 保留 0 兼容旧签名。 */
-    return { items: items, overflow: 0, quiet: !merged.length };
+    return { items: items, overflow: 0, quiet: !merged.length && !steady.length };
   }
 
   var api = { t2m: t2m, m2t: m2t, mmss: mmss, human: human,

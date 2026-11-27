@@ -915,6 +915,23 @@ check(slots.length === 3
   "三个时段各有标题子块分隔", slots.length + " 块");
 document.querySelectorAll(".ep-tab").filter(b => b.textContent === "今天")[0]._h.click();
 
+/* 2026-11-27 审查：通知的 at/until 必须走 Clock（UTC+8），不能读本机时区。
+   一体机出厂默认 UTC 时，用 new Date().getHours() 会把 08:00 记成 00:00，
+   屏上按北京时间算当前分钟，通知就永远不显示或立刻过期。 */
+window.__rhythmTime = 8 * 60 + 30;   /* 固定为北京时间 08:30 */
+const ntBox = document.getElementById("ntText");
+ntBox.value = "现在整理书包";
+ntBox._h.input();
+document.querySelector(".ep-primary")._h.click();
+const tzNotice = (global.Store.getDayOverride("2026-11-09") || {}).notice || {};
+check(tzNotice.at === "08:30" && tzNotice.until === "08:40",
+  "通知起止时间跟 Clock 时钟一致（不读本机时区）",
+  JSON.stringify({ at: tzNotice.at, until: tzNotice.until }));
+delete window.__rhythmTime;
+global.Store.patchDayOverride("2026-11-09", { notice: null });
+global.Edit.open();
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "今天")[0]._h.click();
+
 const tabs = document.querySelectorAll(".ep-tab");
 const hoursTab = tabs.filter(b => b.textContent === "作息")[0];
 check(!!hoursTab, "面板里有「作息」这一页");
@@ -1074,6 +1091,21 @@ document.querySelector(".ep-primary")._h.click();
 const renamed = global.Store.config().roles.roles.filter(r => r.id === freshRole.id)[0];
 check(!!renamed && renamed.name === "图书管理员",
   "改名随保存写回岗位配置", renamed ? renamed.name : "没找到");
+
+/* 2026-11-27 真机反馈：新增岗位切到 A/B 轮流后，一个槽要能勾多个人。
+   新增岗位初始是「固定 + 0 人」→ oneSeat=true；以前切模式时这个标志不重算，
+   结果在 A/B 模式下点第二个人会把第一个顶掉，永远只能勾一个。 */
+document.querySelectorAll(".ep-rowline").filter(l => l.textContent.indexOf("图书管理员") >= 0)[0].children[0]._h.click();
+document.querySelectorAll(".ep-modebtn").filter(b => b.textContent === "A/B 轮流")[0]._h.click();
+check(document.querySelectorAll(".ep-seat.on")[0].textContent.indexOf("A 组") === 0,
+  "新岗位切到 A/B 后落在 A 槽",
+  document.querySelectorAll(".ep-seat.on")[0].textContent);
+document.querySelectorAll(".ep-person")[0]._h.click();
+document.querySelectorAll(".ep-person").filter(b => !b.classList.contains("on"))[0]._h.click();
+check(document.querySelectorAll(".ep-pickchip").length === 2,
+  "新增岗位切到 A/B 后，A 槽能勾多个人（第二个人不该顶掉第一个）",
+  "已选 " + document.querySelectorAll(".ep-pickchip").map(c => c.textContent).join("、"));
+document.querySelector(".ep-dialog-close")._h.click();
 
 /* 只改今天：写当天覆盖，岗位配置一个字不动 */
 const confBeforeToday = JSON.stringify(global.Store.config().roles.roles.filter(r => r.id === "r14")[0].people);

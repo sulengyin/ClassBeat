@@ -2460,15 +2460,21 @@
   }
 
   function setEntry(w, n, subject) {
-    var hit = null;
-    state.entries.forEach(function (e) {
-      if (+e.weekday === w && +e.periodNo === n) hit = e;
+    var same = state.entries.filter(function (e) {
+      return +e.weekday === w && +e.periodNo === n;
     });
     if (!subject) {
-      if (hit) state.entries = state.entries.filter(function (e) { return e !== hit; });
+      /* 清空这一格：单双周同格有两条记录，必须一起删。
+         以前只删最后一条，界面还显示另一条，老师以为没清掉。 */
+      if (same.length) state.entries = state.entries.filter(function (e) { return same.indexOf(e) < 0; });
       return;
     }
-    if (hit) {
+    if (same.length) {
+      /* 网格显示的是同格第一条（见 pageGrid 的 filter()[0]），编辑就必须改
+         同一条——所见即所改。以前 forEach 覆盖成最后一条，单双周那格
+         「显示单周、改的是双周」，老师改完发现屏上没变。
+         单双周的另一条保持原样，不擅自合并。 */
+      var hit = same[0];
       /* 换了科目就不再认原来的任课老师；科目没动时老师照旧留着。 */
       if (hit.subject !== subject) delete hit.teacher;
       hit.subject = subject;
