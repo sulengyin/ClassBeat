@@ -164,6 +164,7 @@ header{
   position:relative;z-index:3;
   display:flex;align-items:center;gap:1.8vmin;
   padding:2.4vmin 0 1.4vmin;
+  min-width:0;
   animation:head-in .6s var(--e-out) backwards;
 }
 @keyframes head-in{from{opacity:0;transform:translateY(-1.2vmin)}to{opacity:1;transform:none}}
@@ -172,18 +173,24 @@ header{
 .buddy svg{width:100%;height:100%;display:block;transform:rotate(-6deg)}
 body[data-reduce="1"] .buddy svg{transform:none}
 
-.cls{font-size:3.5vmin;font-weight:900;letter-spacing:.06em;color:var(--ink)}
+.cls{font-size:3.5vmin;font-weight:900;letter-spacing:.06em;color:var(--ink);
+  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .date{
   font-family:var(--hand);font-size:2.3vmin;color:var(--ink-3);
   letter-spacing:.1em;padding-left:2vmin;border-left:.3vmin dashed var(--line-soft);
 }
 
+/* 2026-11-27：这里原来的 transform:rotate(.8deg) 会生成独立合成层。
+   教室一体机的 WebView2 偶发首帧丢层——顶栏的班级名/日期都在，唯独
+   这张贴纸整块不见（连 --:-- 都没有），最小化恢复也不会回来，因为
+   WebView 没重建、那个空合成层就一直在。去掉 transform 让它跟 header
+   同层渲染；0.8 度的歪斜肉眼几乎看不出，圆角已经保留「贴纸」的感觉。
+   flex:none 是顺手加的保险：班级名再长也不许把这贴纸挤成 0 宽。 */
 .clock-wrap{
-  margin-left:auto;display:flex;align-items:baseline;gap:.7vmin;
+  margin-left:auto;flex:none;display:flex;align-items:baseline;gap:.7vmin;
   background:var(--cream);border:.34vmin solid var(--line);border-radius:1.8vmin 1.4vmin 1.9vmin 1.3vmin;
   padding:.7vmin 2vmin .8vmin;
   box-shadow:.55vmin .55vmin 0 rgba(58,42,30,.13);
-  transform:rotate(.8deg);
   transition:background-color var(--d-slow) var(--e-soft);
 }
 .clock{font:800 6.2vmin/1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--ink)}

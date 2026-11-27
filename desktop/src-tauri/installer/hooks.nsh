@@ -156,7 +156,13 @@
     !insertmacro CB_LOG "停旧版没用上 PowerShell，改用 taskkill 兜底"
     nsExec::Exec 'taskkill /F /IM classbeat.exe /T'
     Pop $0
-    !insertmacro CB_LOG "taskkill：退出码=$0（128=没有这个进程，属于正常）"
+    !insertmacro CB_LOG "taskkill 主程序：退出码=$0（128=没有这个进程，属于正常）"
+    ; 0.5.x 的服务是独立进程 classbeat-server.exe，和主程序同名匹配不到，
+    ; 必须单独按映像名收 —— 否则它变孤儿进程占着 resources\server 里的文件，
+    ; NSIS 覆盖时就会报「无法写入 classbeat-server.exe」（真机实测）。
+    nsExec::Exec 'taskkill /F /IM classbeat-server.exe /T'
+    Pop $0
+    !insertmacro CB_LOG "taskkill 服务：退出码=$0（128=没有这个进程，属于正常）"
   cb_stop_done:
   Sleep 1500
   Delete "$TEMP\cb-stop-legacy.ps1"
@@ -169,13 +175,29 @@
   ; 解压就会在 classbeat.exe 上失败——而 NSIS 只回一句「无法写入文件」，
   ; 更糟的是文件可能已经被截断，老师再点桌面图标就变成
   ; 「此应用无法在你的电脑上运行」，两句话其实是一个原因。
-  IfFileExists "$INSTDIR\classbeat.exe" 0 cb_lock_ok
+  IfFileExists "$INSTDIR\classbeat.exe" 0 cb_srv_lock_ok
     ClearErrors
     FileOpen $2 "$INSTDIR\classbeat.exe" a
     IfErrors cb_locked
     FileClose $2
     !insertmacro CB_LOG "占用检查：classbeat.exe 没有被占用"
+    ; 不跳过服务检查：两个都占着时，主程序检查通过也要继续看服务
+  cb_srv_lock_ok:
+  ; 0.5.x 的服务也占着 resources\server\classbeat-server.exe，一并检查。
+  IfFileExists "$INSTDIR\resources\server\classbeat-server.exe" 0 cb_lock_ok
+    ClearErrors
+    FileOpen $2 "$INSTDIR\resources\server\classbeat-server.exe" a
+    IfErrors cb_locked_srv
+    FileClose $2
+    !insertmacro CB_LOG "占用检查：classbeat-server.exe 没有被占用"
     Goto cb_lock_ok
+  cb_locked_srv:
+    !insertmacro CB_LOG "!!! classbeat-server.exe 仍被占用，停止安装"
+    FileClose $9
+    IfSilent cb_lock_srv_quit
+      MessageBox MB_ICONEXCLAMATION|MB_OK "ClassBeat 的后台服务还占着程序文件，装不进去。$\r$\n$\r$\n最常见的原因是 ClassBeat 还在运行（后台服务不会随托盘退出自动停）。$\r$\n$\r$\n请这样处理：$\r$\n1. 重启电脑（最稳妥，会清掉后台服务）；$\r$\n2. 然后重新双击安装包。$\r$\n$\r$\n安装日志：$TEMP\classbeat-install.log"
+    cb_lock_srv_quit:
+    Quit
   cb_locked:
     !insertmacro CB_LOG "!!! classbeat.exe 仍被占用，停止安装"
     FileClose $9

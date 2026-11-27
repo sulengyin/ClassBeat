@@ -38,8 +38,8 @@ function Matches([string]$cmdline) {
   foreach ($t in $targets) {
     if ($c.Contains($t)) { return $true }
   }
-  # 名字兜底：主进程没有别的同名程序，可以安全按映像名收
-  return $c.Contains('classbeat.exe')
+  # 名字兜底：主程序和服务都没有别的同名程序，可以安全按映像名收
+  return $c.Contains('classbeat.exe') -or $c.Contains('classbeat-server.exe')
 }
 
 $killed = 0
@@ -48,7 +48,7 @@ $blockedList = @()
 try {
   $procs = Get-CimInstance Win32_Process -ErrorAction Stop |
     Where-Object {
-      $_.Name -in @('classbeat.exe', 'pythonw.exe', 'python.exe', 'powershell.exe', 'pwsh.exe') -and
+      $_.Name -in @('classbeat.exe', 'classbeat-server.exe', 'pythonw.exe', 'python.exe', 'powershell.exe', 'pwsh.exe') -and
       (Matches ([string]$_.CommandLine))
     }
   foreach ($p in $procs) {
@@ -69,11 +69,11 @@ try {
   # （那种机器上 0.3.x 本来就装不上，见 docs/跨代升级）。
   Write-Out ("枚举进程失败：" + $_.Exception.Message + "，改用 Get-Process 按映像名兜底")
   try {
-    foreach ($p in (Get-Process -Name 'classbeat' -ErrorAction SilentlyContinue)) {
+    foreach ($p in (Get-Process -Name 'classbeat', 'classbeat-server' -ErrorAction SilentlyContinue)) {
       try {
         Stop-Process -Id $p.Id -Force -ErrorAction Stop
         $killed++
-        Write-Out ("已结束 classbeat.exe pid=" + $p.Id)
+        Write-Out ("已结束 " + $p.ProcessName + ".exe pid=" + $p.Id)
       } catch {
         $blocked++
         $blockedList += ("classbeat.exe pid=" + $p.Id)

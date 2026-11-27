@@ -20,6 +20,31 @@ test("打开就有内容，且没有脚本错误", async ({ page }) => {
   expect(errors, "控制台不应有报错").toEqual([]);
 });
 
+test("右上角时钟贴纸整块可见，且不被挤出视口", async ({ page }) => {
+  await openScreen(page, ARRIVE);
+  const d = await page.evaluate(() => {
+    const wrap = document.querySelector(".clock-wrap");
+    const r = wrap.getBoundingClientRect();
+    const cs = getComputedStyle(wrap);
+    return {
+      left: r.left, right: r.right, w: r.width, h: r.height,
+      vw: window.innerWidth,
+      display: cs.display, visibility: cs.visibility,
+      opacity: parseFloat(cs.opacity), transform: cs.transform,
+    };
+  });
+  expect(d.display, "贴纸不能被 display:none").not.toBe("none");
+  expect(d.visibility, "贴纸不能被 visibility:hidden").not.toBe("hidden");
+  expect(d.opacity).toBeGreaterThan(0.9);
+  expect(d.w, "贴纸宽度不能塌成 0").toBeGreaterThan(20);
+  expect(d.h, "贴纸高度不能塌成 0").toBeGreaterThan(20);
+  expect(d.left, "贴纸不能被挤到左边界外").toBeGreaterThanOrEqual(-1);
+  expect(d.right, "贴纸不能被挤出右边界（班级名过长时会发生）").toBeLessThanOrEqual(d.vw + 1);
+  // 0.8 度的装饰性 rotate 会生成独立合成层；教室一体机的 WebView2 首帧
+  // 偶发丢层，整张贴纸从此消失、最小化也不回来。钉住 none 防止加回去。
+  expect(d.transform, "时钟贴纸不能再有 transform（合成层丢层根因）").toBe("none");
+});
+
 test("整屏不出滚动条（一体机没有鼠标，溢出即丢失）", async ({ page }) => {
   await openScreen(page, ARRIVE);
   const box = await overflow(page);
