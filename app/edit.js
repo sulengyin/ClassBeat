@@ -1260,6 +1260,19 @@
     return DATA.roles || { roles: [] };
   }
 
+  /* A/B 岗位的「今天算哪组」，口径只有一个：选中哪组，今天就是哪组。
+     根因：切到 A/B 时 cycle.current 被写成 null、status 是 unconfirmed，
+     引擎 resolvePeople 的 chosen 拿不到组，于是连 groups.A / groups.B 都不读，
+     两组都排了人也一律显示「没选人」——这是数据链断了，不是文案问题。
+     现在老师点哪组、在哪组里选人，立刻把 cycle.current 钉成那组；
+     保存后引擎直接按它出人，不需要再点一次「确认」。 */
+  function markGroupNow(draft, group) {
+    if (group == null) return;
+    draft.cycle = Object.assign({ kind: "date-range" }, draft.cycle || {});
+    draft.cycle.current = group;
+    draft.cycle.status = "confirmed";
+  }
+
   /* 「这个岗位今天是谁」——只有引擎一个答案。
      两段与覆盖层的语义一致：今天的临时换人（override）在外层，没换人
      才看岗位配置里的轮换规则。
@@ -1382,8 +1395,11 @@
     var mode = S.roleModeOf ? S.roleModeOf(role) : "fixed";
     var text = MODE_TEXT[mode] || "固定";
     if (mode === "ab") {
+      /* 今天哪组：引擎算得出就用引擎的，算不出（全局轮换未确认）
+         就退回岗位自己钉的 current——「选中什么就是谁」的落点。 */
       var d = RT && RT.day ? RT.day(key) : null;
-      if (d && d.group) text += " · 今天 " + d.group;
+      var g = (d && d.group) || (role.cycle && role.cycle.current);
+      if (g) text += " · 今天 " + g;
     }
     if (role.assign === "self-organize") text += " · 自主";
     var b = h("span", "ep-modebadge" + (mode === "fixed" ? "" : " on"), text);
@@ -1397,7 +1413,14 @@
       var w = d ? (WEEKDAYS.filter(function (x) { return x.n === d.weekday; })[0] || {}) : {};
       return (w.label || "这一天") + "还没排人";
     }
-    if (mode === "ab") return roleRosterSize(role) ? "今天这组还没人" : "还没分 A/B 组";
+    if (mode === "ab") {
+      if (!roleRosterSize(role)) return "还没分 A/B 组";
+      /* 两组都排了人却仍取不到：要么没点定今天哪组，要么点定的那组是空的。
+         以前一律说「今天这组还没人」，老师会以为 A 组白排了。 */
+      var cy = role.cycle || {};
+      if (!cy.current) return "还没点定今天哪组";
+      return "今天这组还没人";
+    }
     return "还没排人";
   }
 
@@ -1434,11 +1457,21 @@
       var opts = h("div", "ep-opts");
       roles.forEach(function (r) {
         var on = (pres[slot.key] || []).indexOf(r.id) >= 0;
-        /* 人员状态直接标在选项上：没选人的岗位勾了常驻，
-           大屏只会显示「待定」，当场告诉老师先去选人 */
-        var empty = !rolePeopleNow(r, key).length;
-        var b = h("button", "ep-opt" + (on ? " on" : "") + (empty ? " ep-opt-warn" : ""),
-          r.name + (empty ? "（还没选人）" : ""));
+        /* 判空必须和引擎同一个口径（rolePeopleNow = 今天这组是谁），
+           否则面板说「有人」、大屏说「待定」，老师更糊涂。
+           但「整个岗位没配人」和「配了、只是本周这组空」是两件事，
+           要分开说：前者是没选人，后者要么轮换没确认、要么另一组没排。 */
+        var roster = relatedNames(r).length;
+        var nowN = rolePeopleNow(r, key).length;
+        var mode = S.roleModeOf ? S.roleModeOf(r) : "fixed";
+        var abPending = mode === "ab" && !(r.cycle && r.cycle.current);
+        var empty = !roster;
+        var dayEmpty = roster && !nowN;
+        var tail = empty ? "（还没选人）"
+                 : abPending ? "（还没点定哪组）"
+                 : dayEmpty ? "（本周这组空）" : "";
+        var b = h("button", "ep-opt" + (on ? " on" : "") + (empty ? " ep-opt-warn" : "")
+          + (dayEmpty && !empty ? " ep-opt-dayempty" : ""), r.name + tail);
         b.addEventListener("click", function () {
           var cur = ((RT.config().dutyPresents || {})[slot.key] || []).slice();
           var at = cur.indexOf(r.id);
@@ -1624,6 +1657,8 @@
       if (mode === "ab") {
         draft.groups = draft.groups || {};
         draft.groups[s] = names.slice();
+        /* 选中什么，今天就是什么：在哪组里选了人，就把当前组钉到那组。 */
+        if (names.length) markGroupNow(draft, s);
         return;
       }
       draft.peopleMap = draft.peopleMap || {};
@@ -1780,7 +1815,15 @@
       slotList().forEach(function (s) {
         var n = slotNames(s).length;
         var b = h("button", "ep-seat" + (s === slot ? " on" : ""), seatLabel(s) + (n ? " · " + n : ""));
-        b.addEventListener("click", function () { slot = s; paintAll(); });
+        b.addEventListener("click", function () {
+          slot = s;
+          /* 点到哪组就算选中哪组；只在组里有人时才钉，
+             空组不能把「今天」指到一个没人可出的组上。 */
+          if (mode === "ab" && S.peopleList(draft.groups && draft.groups[s]).length) {
+            markGroupNow(draft, s);
+          }
+          paintAll();
+        });
         seatsRow.appendChild(b);
       });
     }
@@ -1949,6 +1992,14 @@
       else { draft.mode = k; }
       mode = k;
       slot = mode === "fixed" ? null : firstFilledSlot();
+      /* 切到 A/B 且某一组已经有种子人：直接认这一组为「今天」，
+         否则 setRoleMode 写下的 current:null 会让这个岗位一直出不了人。 */
+      if (k === "ab") {
+        var hasA = S.peopleList(draft.groups && draft.groups.A).length;
+        var hasB = S.peopleList(draft.groups && draft.groups.B).length;
+        if (hasA) markGroupNow(draft, "A");
+        else if (hasB) markGroupNow(draft, "B");
+      }
       focusName = "";
       /* 原来的 oneSeat 是打开面板时按「固定 + 0/1 人」算的。新增岗位恰好
          就是这种状态，切到 A/B 后它还是 true，点第二个人就变成「换人」，

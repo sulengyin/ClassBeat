@@ -1302,6 +1302,83 @@ check(!!warnOpt && warnOpt.textContent.indexOf("还没选人") >= 0,
 global.Store.patchConfig({ roles: rolesBackup });
 document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
 
+/* 修复回归：选了人但今天没排到的岗位，不能再误标「还没选人」。
+   按星期岗位只在周二排了人，今天（2026-11-09 周一）引擎 resolvePeople 取不到人，
+   以前常驻区据此判空，老师明明选了人却看到「还没选人」，以为白选了。 */
+const rolesWeekday = JSON.parse(JSON.stringify(global.Runtime.config().roles));
+const wkRole = rolesWeekday.roles.find(r => r.id === unsetRole.id);
+delete wkRole.people;
+wkRole.mode = "weekday";
+wkRole.peopleMap = { "2": [global.RHYTHM_DATA.students[0].name] };
+global.Store.patchConfig({ roles: rolesWeekday,
+  dutyPresents: { break: [unsetRole.id], reading: [], noon: [] } });
+global.__rhythmDate = "2026-11-09";
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
+const wkOpt = Array.from(document.querySelectorAll(".ep-opt"))
+  .filter(b => b.textContent.indexOf(wkRole.name) >= 0)[0];
+check(!!wkOpt && wkOpt.textContent.indexOf("还没选人") < 0,
+  "按星期岗位今天没排人、其他天有人：常驻区不再误标「还没选人」",
+  wkOpt ? wkOpt.textContent : "缺失");
+check(!!wkOpt && !wkOpt.classList.contains("ep-opt-warn"),
+  "这个岗位不再挂虚线警示框");
+global.Store.patchConfig({ roles: rolesBackup, dutyPresents: null });
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
+
+/* 修复回归：虚线警示框选中态必须亮底深字，和未选中态拉开强对比。
+   原来 on 态沿用深底+琥珀字，和没选中几乎一样，老师分不清勾没勾。 */
+const cssTxt = fs.readFileSync(path.join(ROOT, "app/edit.css"), "utf8");
+const warnOnRule = (cssTxt.match(/\.ep-opt\.ep-opt-warn\.on\s*\{[^}]*\}/) || [""])[0];
+check(/background:\s*#FFD64F/.test(warnOnRule) && /color:\s*#2B1D10/.test(warnOnRule)
+      && !/background:\s*#3D2D20/.test(warnOnRule),
+  "虚线框选中态改为亮底深字（和普通选中态一致，对比强烈）", warnOnRule);
+
+/* A/B 组根因回归（2026-11-27）：选中哪组，今天就是哪组。
+   旧链路：切到 A/B 时 cycle.current 被写成 null，引擎 resolvePeople 的
+   chosen 拿不到组就连 groups.A/B 都不读，两组都排了人也显示「还没选人」。 */
+const abOrig = JSON.parse(JSON.stringify(global.Runtime.config().roles));
+const abMut = JSON.parse(JSON.stringify(abOrig));
+const abRole = abMut.roles.find(r => r.groups && r.groups.A && r.groups.B
+  && global.Store.roleModeOf(r) === "ab");
+check(!!abRole, "样例里有 A/B 组岗位可测");
+if (abRole) {
+  abRole.cycle = { kind: "date-range", current: null, status: "unconfirmed" };
+  global.Store.patchConfig({ roles: abMut });
+  global.__rhythmDate = "2026-11-09";
+  document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
+
+  const abOpt0 = Array.from(document.querySelectorAll(".ep-opt"))
+    .filter(b => b.textContent.indexOf(abRole.name) >= 0)[0];
+  check(!!abOpt0 && abOpt0.textContent.indexOf("还没选人") < 0,
+    "A/B 两组都排了人：没点定组也不说「还没选人」",
+    abOpt0 ? abOpt0.textContent : "缺失");
+
+  const abRow = Array.from(document.querySelectorAll(".ep-rowline"))
+    .filter(l => l.textContent.indexOf(abRole.name) >= 0)[0];
+  check(!!abRow, "值日列表里有这个 A/B 岗位行");
+  if (abRow) abRow.children[0]._h.click();
+  const seatA = Array.from(document.querySelectorAll(".ep-seat"))
+    .filter(b => b.textContent.indexOf("A 组") >= 0)[0];
+  check(!!seatA, "A/B 面板有「A 组」座位");
+  if (seatA) seatA._h.click();
+  const saveAb = Array.from(document.querySelectorAll(".ep-primary"))[0];
+  if (saveAb) saveAb._h.click();
+
+  const savedAb = global.Runtime.config().roles.roles.find(r => r.id === abRole.id);
+  check(!!savedAb && savedAb.cycle && savedAb.cycle.current === "A"
+        && savedAb.cycle.status === "confirmed",
+    "点 A 组即认今天为 A 组（current=A · confirmed）",
+    savedAb && savedAb.cycle ? JSON.stringify(savedAb.cycle) : "缺失");
+
+  const abOpt1 = Array.from(document.querySelectorAll(".ep-opt"))
+    .filter(b => b.textContent.indexOf(abRole.name) >= 0)[0];
+  check(!!abOpt1 && abOpt1.textContent.indexOf("还没选人") < 0
+        && abOpt1.textContent.indexOf("点定") < 0,
+    "点定 A 组后常驻区不再提示没选人/未点定",
+    abOpt1 ? abOpt1.textContent : "缺失");
+}
+global.Store.patchConfig({ roles: abOrig });
+document.querySelectorAll(".ep-tab").filter(b => b.textContent === "值日")[0]._h.click();
+
 /* 单选岗位：点人就是换人（不是追加） */
 document.querySelectorAll(".ep-dialog.picker").forEach(n => n.remove());
 const energyRow2 = document.querySelectorAll(".ep-rowline")

@@ -122,9 +122,13 @@ textarea.ep-input{min-height:12vmin;line-height:1.55}
         border:.26vmin solid #6B5641;background:#3D2D20;color:#DCCDB6;cursor:pointer}
 .ep-opt.on{background:#FFD64F;border-color:#F1E3C6;color:#2B1D10}
 .ep-opt.urgent.on{background:#DE3B34;border-color:#F1E3C6;color:#FFF6F3}
-/* 常驻区：还没选人的岗位用虚线框标出，提醒先去选人再勾常驻 */
+/* 常驻区：还没选人的岗位用虚线框标出，提醒先去选人再勾常驻。
+   选中态必须和普通按钮一样亮底深字，一眼能看出勾上了：
+   原来 on 态沿用深底+琥珀字，和没选中几乎一模一样，老师分不清到底勾没勾。
+   虚线保留（仍提示还没选人），但边框加粗提亮，和未选中态拉开强对比，
+   教室一体机强光下也看得清。 */
 .ep-opt.ep-opt-warn{border-style:dashed;border-color:#B0803C;color:#F2C879}
-.ep-opt.ep-opt-warn.on{background:#3D2D20;color:#F2C879;border-color:#B0803C}
+.ep-opt.ep-opt-warn.on{background:#FFD64F;border-color:#FFF3D0;color:#2B1D10;border-width:.42vmin}
 
 .ep-recall{display:flex;flex-wrap:wrap;gap:.9vmin;margin-top:1.5vmin;align-items:center}
 .ep-recall-label{font-size:2vmin;color:#8E7B66;letter-spacing:.14em}
