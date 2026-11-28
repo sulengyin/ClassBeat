@@ -98,7 +98,10 @@ mod imp {
 
     #[cfg(test)]
     mod tests {
-        use super::{build_endpoint_urls, friendly, parse_prefixes, DEFAULT_PREFIXES, MANIFEST_URL};
+        use super::{
+            build_download_urls, build_endpoint_urls, friendly, parse_prefixes, DEFAULT_PREFIXES,
+            MANIFEST_URL,
+        };
 
         #[test]
         fn network_error_is_explained_in_chinese() {
@@ -138,9 +141,12 @@ mod imp {
                     .all(|u| u.contains("ghfast.top") || u.contains("gh-proxy.com") || u.contains("ghproxy.net")),
                 "清单来源必须是国内加速域名：{urls:?}"
             );
-            // 每个加速地址 = 前缀 + 原清单地址（origin 仍是 GitHub，内容不搬家）
+            // 每个加速地址 = 前缀 + "/" + 原清单地址。必须钉住中间那个 /：
+            // 少了它会拼成 https://ghfast.tophttps://github.com/...，Url 解析
+            // 仍成功、ends_with 也成立，但主机名错乱、运行时全部连不上。
             for u in &urls[..urls.len() - 1] {
-                assert!(u.ends_with(MANIFEST_URL), "加速地址应拼在清单地址前：{u}");
+                assert!(u.ends_with(&format!("/{MANIFEST_URL}")), "前缀和清单之间缺 /：{u}");
+                assert!(u.contains("top/https://github.com") || u.contains("com/https://github.com") || u.contains("net/https://github.com"), "主机名与路径没分开：{u}");
             }
         }
 
@@ -161,6 +167,54 @@ mod imp {
                 let parsed = url::Url::parse(&u).unwrap_or_else(|e| panic!("解析失败 {u}: {e}"));
                 assert_eq!(parsed.scheme(), "https", "{u}");
             }
+        }
+
+        // 下载源必须跟着配置前缀换，不能只认清单里写死的那个（0.5.17 的单点）。
+        // 清单从备用域名拿到、包却去主域名下载时，主域名挂了就更新失败。
+        #[test]
+        fn download_urls_follow_every_configured_prefix() {
+            let manifest = "https://ghfast.top/https://github.com/sulengyin/ClassBeat/releases/download/v0.5.17/ClassBeat_0.5.17_x64-setup.exe";
+            let prefixes: Vec<String> = vec![
+                "https://ghfast.top/".into(),
+                "https://gh-proxy.com".into(),
+                "https://ghproxy.net/".into(),
+            ];
+            let got = build_download_urls(manifest, &prefixes);
+            let urls: Vec<&str> = got.iter().map(|(u, _)| u.as_str()).collect();
+            assert_eq!(urls.len(), 4, "三个前缀 + GitHub 原地址：{urls:?}");
+            // 每一项都指向同一个 GitHub 原路径，只是前缀不同
+            for u in &urls {
+                assert!(u.contains("https://github.com/sulengyin/ClassBeat/releases/download/v0.5.17/ClassBeat_0.5.17_x64-setup.exe"), "{u}");
+            }
+            // 备用域名确实在候选里——这是修复的核心
+            assert!(urls[1].starts_with("https://gh-proxy.com/"), "{urls:?}");
+            assert!(urls[2].starts_with("https://ghproxy.net/"), "{urls:?}");
+            // GitHub 原地址兜底在最后
+            assert_eq!(urls[3], "https://github.com/sulengyin/ClassBeat/releases/download/v0.5.17/ClassBeat_0.5.17_x64-setup.exe");
+            // 标签是人能看懂的域名，便于日志定位
+            assert_eq!(got[0].1, "https://ghfast.top");
+        }
+
+        #[test]
+        fn download_urls_handle_bare_github_manifest() {
+            // 清单里 url 本来就是 GitHub 原地址（没加速前缀）时也要能换源
+            let bare = "https://github.com/sulengyin/ClassBeat/releases/download/v0.5.17/x.exe";
+            let prefixes: Vec<String> = vec!["https://ghfast.top/".into()];
+            let got = build_download_urls(bare, &prefixes);
+            assert_eq!(got.len(), 2, "{got:?}");
+            assert_eq!(got[0].0, "https://ghfast.top/https://github.com/sulengyin/ClassBeat/releases/download/v0.5.17/x.exe");
+            assert_eq!(got[1].0, bare);
+        }
+
+        #[test]
+        fn download_urls_deduplicate_and_reject_unknown_origin() {
+            let prefixes: Vec<String> = vec!["https://github.com/".into(), "https://github.com".into()];
+            let bare = "https://github.com/o/r/releases/download/v1/x.exe";
+            let got = build_download_urls(bare, &prefixes);
+            // 两个 GitHub 前缀 trim 后相同，去重成一条；再加 GitHub 原地址兜底 = 2
+            assert_eq!(got.len(), 2, "重复前缀必须去重：{got:?}");
+            // 没有 GitHub 起点：返回空，绝不拿来历不明的 URL 去下载
+            assert!(build_download_urls("https://evil.example/pkg.exe", &prefixes).is_empty());
         }
     }
 
@@ -258,7 +312,10 @@ mod imp {
     fn build_endpoint_urls(prefixes: &[String]) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         for prefix in prefixes {
-            let raw = format!("{}{}", prefix.trim_end_matches('/'), MANIFEST_URL);
+            // 前缀末尾去斜杠、清单以 https:// 开头，中间必须补一个 /，
+            // 否则拼成 https://ghfast.tophttps://github.com/...（主机名错乱，
+            // 运行时 endpoints 全部连不上）。2026-11-28 实测抓到这个拼接错误。
+            let raw = format!("{}/{}", prefix.trim_end_matches('/'), MANIFEST_URL);
             if !out.contains(&raw) {
                 out.push(raw);
             }
@@ -276,6 +333,37 @@ mod imp {
             return Err("没有可用的更新源".into());
         }
         Ok(urls)
+    }
+
+    /// GitHub 原地址在加速 URL 里的固定起点。清单里的 `url` 不论有没有
+    /// 加速前缀，都包含这一段（前缀只是拼在完整 GitHub 地址前面）。
+    const GITHUB_ORIGIN: &str = "https://github.com/";
+
+    /// 把清单给出的下载 URL 拆成「按配置前缀换源后的候选列表 + 标签」。
+    ///
+    /// 清单里的 `url` 形如 `https://ghfast.top/https://github.com/o/r/.../x.exe`
+    /// 或干脆就是 `https://github.com/o/r/.../x.exe`。两种都从 GITHUB_ORIGIN
+    /// 起截取原路径，再对每个加速前缀拼一份；GitHub 原地址放最后兜底。
+    /// 找不到 GitHub 起点（异常清单）时返回空列表，调用方按「全部失败」处理，
+    /// 不会拿一个来历不明的 URL 去下载。
+    fn build_download_urls(download_url: &str, prefixes: &[String]) -> Vec<(String, String)> {
+        let Some(at) = download_url.find(GITHUB_ORIGIN) else {
+            return Vec::new();
+        };
+        let origin = &download_url[at..];
+        let mut out: Vec<(String, String)> = Vec::new();
+        for prefix in prefixes {
+            let p = prefix.trim_end_matches('/');
+            let candidate = format!("{p}/{origin}");
+            if !out.iter().any(|(u, _)| u == &candidate) {
+                out.push((candidate, p.to_string()));
+            }
+        }
+        // GitHub 原地址兜底；也可能前缀里本来就含 GitHub，去重。
+        if !out.iter().any(|(u, _)| u == origin) {
+            out.push((origin.to_string(), "GitHub 原地址".to_string()));
+        }
+        out
     }
 
     async fn run(app: AppHandle, interactive: bool) -> Result<(), String> {
@@ -310,7 +398,7 @@ mod imp {
             .map_err(|e| format!("更新器不可用：{e}"))?;
         let found = updater.check().await.map_err(|e| e.to_string())?;
 
-        let Some(update) = found else {
+        let Some(mut update) = found else {
             if interactive {
                 ui::info("检查更新", "已经是最新版。");
             }
@@ -336,18 +424,41 @@ mod imp {
             return Ok(());
         }
 
+        // 下载源逐个试：插件 check() 只按 endpoints 顺序拿清单，
+        // 下载时用的却是 latest.json 里写死的 URL（updater.rs::download）。
+        // 于是清单从备用域名拿到、包却仍去主域名下载时就会失败。这里从
+        // 清单给出的下载地址里剥出 GitHub 原路径，按配置的前缀逐个换源，
+        // GitHub 原地址放最后兜底，试到成功为止。每次 download() 内部都
+        // 做 minisign 验签，换源不会绕过验签。
+        let download_candidates = build_download_urls(update.download_url.as_str(), &load_prefixes(&app));
+        let mut last_err = String::new();
+        let mut bytes = None;
+        for (candidate, label) in download_candidates {
+            let Ok(parsed) = url::Url::parse(&candidate) else {
+                last_err = format!("下载源地址无效：{candidate}");
+                continue;
+            };
+            update.download_url = parsed;
+            match update
+                .download(
+                    |_chunk, _total| {},
+                    || logging::info("更新包下载完成，开始安装"),
+                )
+                .await
+            {
+                Ok(b) => {
+                    logging::info(&format!("更新包来自 {label}"));
+                    bytes = Some(b);
+                    break;
+                }
+                Err(e) => {
+                    last_err = e.to_string();
+                    logging::warn(&format!("下载源 {label} 不可用，换下一个：{last_err}"));
+                }
+            }
+        }
         // 先落盘再装：backups/installers/ 里留一份，装坏了能人工回滚（06 §E3）。
-        // download() 内部做 minisign 验签，签名不对这里就 Err，不会走到安装。
-        let bytes = update
-            .download(
-                |chunk, total| {
-                    // 只记到日志：失败时能核对下载量，正常时老师看不到。
-                    let _ = (chunk, total);
-                },
-                || logging::info("更新包下载完成，开始安装"),
-            )
-            .await
-            .map_err(|e| format!("下载或验签失败：{e}"))?;
+        let bytes = bytes.ok_or_else(|| format!("所有下载源都失败：{last_err}"))?;
 
         let kept = keep_installer(&app, &version, &bytes);
         logging::info(&format!(
